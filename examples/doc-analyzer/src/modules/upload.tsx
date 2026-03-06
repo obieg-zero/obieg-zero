@@ -78,8 +78,36 @@ function UploadPage() {
       )}
 
       {!pages && !busy && (
-        <div className="text-center py-12 text-base-content/20 text-sm">
-          Wrzuć PDF — OPFS · OCR · Embeddings · Bielik — zero backendu.
+        <div className="space-y-6 py-4">
+          <div>
+            <h2 className="text-lg font-light font-mono">obieg<span className="text-primary">-zero</span></h2>
+            <p className="text-xs text-base-content/40 mt-1">Browser-native document flow engine. Zero backend, zero config, zero barrier.</p>
+          </div>
+
+          <div className="text-xs text-base-content/50 space-y-2">
+            <p>Wrzuć dowolny PDF powyżej. Dokument zostanie przetworzony <strong className="text-base-content/70">lokalnie w przeglądarce</strong>:</p>
+            <ul className="space-y-1 ml-4">
+              <li>→ Zapisany w <strong className="text-base-content/70">OPFS</strong> (przeglądarkowy system plików)</li>
+              <li>→ Rozpoznany przez <strong className="text-base-content/70">OCR</strong> (pdfjs + Tesseract)</li>
+              <li>→ Zaindeksowany <strong className="text-base-content/70">embeddingami</strong> (multilingual-e5-small)</li>
+              <li>→ Analizowany przez <strong className="text-base-content/70">Bielik 1.5B</strong> — polski LLM działający w WebAssembly</li>
+            </ul>
+            <p>Żadne dane nie opuszczają przeglądarki. Zero API, zero serwera.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/core</span><br/><span className="text-base-content/30">flow engine, templates, extract</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/storage</span><br/><span className="text-base-content/30">OPFS + IndexedDB persistence</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/ocr</span><br/><span className="text-base-content/30">PDF parsing + Tesseract</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/embed</span><br/><span className="text-base-content/30">embeddings + semantic search</span></div>
+            <div className="bg-base-100 rounded p-2 col-span-2"><span className="text-primary">@obieg-zero/llm</span> <span className="text-base-content/30">— local LLM via wllama/GGUF (Bielik 1.5B, ~928 MB, pobierany przy pierwszym użyciu)</span></div>
+          </div>
+
+          <div className="flex gap-2">
+            <a href="https://github.com/obieg-zero/obieg-zero" className="btn btn-ghost btn-xs">GitHub</a>
+            <a href="https://www.npmjs.com/org/obieg-zero" className="btn btn-ghost btn-xs">npm</a>
+            <a href="https://github.com/obieg-zero/obieg-zero/tree/main/examples/doc-analyzer" className="btn btn-ghost btn-xs">Kod tego demo</a>
+          </div>
         </div>
       )}
     </div>
