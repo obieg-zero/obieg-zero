@@ -25,7 +25,7 @@ export function ocrNode(config?: { language?: string }): NodeDef {
       ctx.progress('Ładuję PDF…');
 
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.mjs';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
 
       const arrayBuffer = target instanceof File
         ? await target.arrayBuffer()
