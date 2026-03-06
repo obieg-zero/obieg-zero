@@ -1,0 +1,9 @@
+{
+  "name": "@obieg-zero/core",
+  "version": "0.1.0",
+  "description": "Browser-native document flow engine. Zero backend, zero config, zero barrier.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" }
+}

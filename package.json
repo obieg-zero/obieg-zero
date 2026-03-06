@@ -1,0 +1,10 @@
+{
+  "name": "obieg-zero",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser-native document flow engine. Zero backend, zero config, zero barrier.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "license": "MIT"
+}
