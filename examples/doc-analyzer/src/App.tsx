@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { modules } from './modules.ts'
+import { useApp } from './store.ts'
 
 // import modules — registration happens on import
 import './modules/upload.tsx'
 import './modules/ocr-view.tsx'
 import './modules/qa.tsx'
+import './modules/settings.tsx'
 
 function Sheet({ mod, onClose }: { mod: typeof modules[0]; onClose: () => void }) {
   return (
@@ -25,30 +27,31 @@ function Sheet({ mod, onClose }: { mod: typeof modules[0]; onClose: () => void }
 }
 
 export default function App() {
-  const [activePageId, setActivePageId] = useState(() => {
-    const hash = location.hash.slice(1)
-    return modules.find(m => m.type === 'page' && m.id === hash)?.id
-      ?? modules.find(m => m.type === 'page')?.id ?? ''
-  })
-  const [openSheetId, setOpenSheetId] = useState<string | null>(null)
+  const init = useApp(s => s.init)
+  const activePageId = useApp(s => s.activePageId)
+  const openSheetId = useApp(s => s.openSheetId)
+  const enabledModules = useApp(s => s.enabledModules)
+  const setPage = useApp(s => s.setPage)
+  const toggleSheet = useApp(s => s.toggleSheet)
+  const closeSheet = useApp(s => s.closeSheet)
 
-  // hash routing
+  useEffect(() => { init() }, [init])
   useEffect(() => {
     const onHash = () => {
       const id = location.hash.slice(1)
-      const mod = modules.find(m => m.type === 'page' && m.id === id)
-      if (mod) setActivePageId(mod.id)
+      if (modules.find(m => m.type === 'page' && m.id === id)) setPage(id)
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
-  }, [])
+  }, [setPage])
 
-  useEffect(() => { location.hash = activePageId }, [activePageId])
-
-  const pages = modules.filter(m => m.type === 'page')
-  const sheets = modules.filter(m => m.type === 'sheet')
+  const pages = modules.filter(m => m.type === 'page' && enabledModules.includes(m.id))
+  const sheets = modules.filter(m => m.type === 'sheet' && enabledModules.includes(m.id))
   const activePage = pages.find(m => m.id === activePageId)
   const activeSheet = sheets.find(m => m.id === openSheetId)
+
+  // settings always visible
+  const settingsMod = modules.find(m => m.id === 'settings')
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col">
@@ -56,10 +59,10 @@ export default function App() {
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
           <h1 className="font-mono font-light text-sm">obieg<span className="text-primary">-zero</span></h1>
           <div className="flex gap-1">
-            {pages.map(m => {
+            {pages.filter(m => m.id !== 'settings').map(m => {
               const Icon = m.icon
               return (
-                <button key={m.id} onClick={() => setActivePageId(m.id)} title={m.label}
+                <button key={m.id} onClick={() => setPage(m.id)} title={m.label}
                   className={`btn btn-ghost btn-sm btn-circle ${activePageId === m.id ? '' : 'opacity-40'}`}>
                   <Icon className="w-4 h-4" />
                 </button>
@@ -69,12 +72,21 @@ export default function App() {
             {sheets.map(m => {
               const Icon = m.icon
               return (
-                <button key={m.id} onClick={() => setOpenSheetId(openSheetId === m.id ? null : m.id)} title={m.label}
+                <button key={m.id} onClick={() => toggleSheet(m.id)} title={m.label}
                   className={`btn btn-ghost btn-sm btn-circle ${openSheetId === m.id ? '' : 'opacity-40'}`}>
                   <Icon className="w-4 h-4" />
                 </button>
               )
             })}
+            {settingsMod && (
+              <>
+                <div className="divider divider-horizontal mx-0" />
+                <button onClick={() => setPage('settings')} title="Ustawienia"
+                  className={`btn btn-ghost btn-sm btn-circle ${activePageId === 'settings' ? '' : 'opacity-40'}`}>
+                  <settingsMod.icon className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -83,7 +95,7 @@ export default function App() {
         {activePage && <activePage.Component />}
       </main>
 
-      {activeSheet && <Sheet mod={activeSheet} onClose={() => setOpenSheetId(null)} />}
+      {activeSheet && <Sheet mod={activeSheet} onClose={closeSheet} />}
     </div>
   )
 }
