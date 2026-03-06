@@ -1,0 +1,32 @@
+{
+  "name": "obieg-zero-doc-analyzer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@obieg-zero/core": "^0.1.0",
+    "@obieg-zero/storage": "^0.1.0",
+    "@obieg-zero/ocr": "^0.1.0",
+    "@obieg-zero/embed": "^0.1.1",
+    "@obieg-zero/llm": "^0.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@huggingface/transformers": "^3.4.1",
+    "@wllama/wllama": "^2.2.1",
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "daisyui": "^5.0.0",
+    "vite": "^6.2.0",
+    "typescript": "^5.8.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
