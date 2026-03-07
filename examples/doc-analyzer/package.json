@@ -10,7 +10,7 @@
     "@huggingface/transformers": "^3.4.1",
     "@obieg-zero/core": "^0.1.0",
     "@obieg-zero/embed": "^0.1.1",
-    "@obieg-zero/llm": "^0.1.0",
+    "@obieg-zero/llm": "^0.1.1",
     "@obieg-zero/ocr": "^0.1.1",
     "@obieg-zero/storage": "^0.1.0",
     "@wllama/wllama": "^2.2.1",

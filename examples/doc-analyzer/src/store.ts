@@ -1,14 +1,18 @@
 import { create } from 'zustand'
 import { modules } from './modules.ts'
 
+const DEFAULT_MODEL_URL = 'https://huggingface.co/speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf'
+
 interface AppState {
   activePageId: string
   openSheetId: string | null
   enabledModules: string[]
+  modelUrl: string
   setPage: (id: string) => void
   toggleSheet: (id: string) => void
   closeSheet: () => void
   toggleModule: (id: string) => void
+  setModelUrl: (url: string) => void
   init: () => void
 }
 
@@ -16,6 +20,7 @@ export const useApp = create<AppState>((set) => ({
   activePageId: '',
   openSheetId: null,
   enabledModules: [],
+  modelUrl: localStorage.getItem('modelUrl') ?? DEFAULT_MODEL_URL,
 
   init: () => {
     const saved = localStorage.getItem('enabledModules')
@@ -35,6 +40,11 @@ export const useApp = create<AppState>((set) => ({
 
   toggleSheet: (id) => set(s => ({ openSheetId: s.openSheetId === id ? null : id })),
   closeSheet: () => set({ openSheetId: null }),
+
+  setModelUrl: (url) => {
+    localStorage.setItem('modelUrl', url)
+    set({ modelUrl: url })
+  },
 
   toggleModule: (id) => set(s => {
     const has = s.enabledModules.includes(id)

@@ -4,8 +4,6 @@ import { ocrNode } from '@obieg-zero/ocr'
 import { embedNode, searchNode } from '@obieg-zero/embed'
 import { llmNode } from '@obieg-zero/llm'
 
-const MODEL_URL = `${window.location.origin}/models/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf`
-
 export const flow = createFlow()
 
 // storage
@@ -28,8 +26,8 @@ flow.node('embed', embedNode({
 }))
 flow.node('search', searchNode({ topK: 3 }))
 
-// llm
-flow.node('llm', llmNode({ modelUrl: MODEL_URL }))
+// llm — modelUrl read from flow context ($modelUrl), set by store
+flow.node('llm', llmNode({ modelUrl: '' }))
 
 // prompts
 flow.node('extract-prompt', templateNode({

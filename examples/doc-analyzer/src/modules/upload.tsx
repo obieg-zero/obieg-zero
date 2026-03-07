@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { registerModule } from '../modules.ts'
 import { flow } from '../flow.ts'
+import { useApp } from '../store.ts'
 import type { FlowEvent } from '@obieg-zero/core'
 
 interface StepState {
@@ -25,6 +26,7 @@ function UploadPage() {
   const [pages, setPages] = useState<any[] | null>(flow.get('pages') ?? null)
   const [extracted, setExtracted] = useState<any>(flow.get('extracted') ?? null)
   const [llmStatus, setLlmStatus] = useState('')
+  const modelUrl = useApp(s => s.modelUrl)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -86,6 +88,7 @@ function UploadPage() {
       if (e.type === 'progress') setLlmStatus(e.status)
     })
 
+    flow.set('modelUrl', modelUrl)
     flow.set('context', pages.map((p: any) => p.text).join('\n\n').slice(0, 3000))
     try {
       await flow.run('extract-prompt', 'llm', 'parse')

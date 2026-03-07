@@ -22,6 +22,8 @@ export function llmNode(config: LlmConfig): NodeDef {
 
       if (!finalPrompt) throw new Error('llm: needs $prompt or ($query + $context)');
 
+      const effectiveUrl = ctx.get('modelUrl') ?? modelUrl;
+
       if (!wllamaInstance) {
         ctx.progress('Ładuję model…');
         const { Wllama } = await import('@wllama/wllama');
@@ -30,7 +32,7 @@ export function llmNode(config: LlmConfig): NodeDef {
           'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
         } as any);
 
-        await wllamaInstance.loadModelFromUrl(modelUrl, {
+        await wllamaInstance.loadModelFromUrl(effectiveUrl, {
           n_ctx: nCtx,
           progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
             const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;

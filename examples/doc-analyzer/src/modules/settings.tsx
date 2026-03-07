@@ -5,26 +5,40 @@ import { useApp } from '../store.ts'
 function SettingsPage() {
   const enabledModules = useApp(s => s.enabledModules)
   const toggleModule = useApp(s => s.toggleModule)
+  const modelUrl = useApp(s => s.modelUrl)
+  const setModelUrl = useApp(s => s.setModelUrl)
 
   const toggleable = modules.filter(m => m.id !== 'settings')
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-sm font-bold uppercase tracking-widest text-base-content/40">Moduły</h2>
-      <div className="space-y-1">
-        {toggleable.map(m => {
-          const Icon = m.icon
-          const enabled = enabledModules.includes(m.id)
-          return (
-            <label key={m.id} className="flex items-center gap-3 p-2 rounded hover:bg-base-100 cursor-pointer">
-              <input type="checkbox" className="toggle toggle-sm toggle-primary"
-                checked={enabled} onChange={() => toggleModule(m.id)} />
-              <Icon className="w-4 h-4 opacity-40" />
-              <span className="text-sm">{m.label}</span>
-              <span className="text-xs text-base-content/30 ml-auto">{m.type}</span>
-            </label>
-          )
-        })}
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-base-content/40">Moduły</h2>
+        <div className="space-y-1">
+          {toggleable.map(m => {
+            const Icon = m.icon
+            const enabled = enabledModules.includes(m.id)
+            return (
+              <label key={m.id} className="flex items-center gap-3 p-2 rounded hover:bg-base-100 cursor-pointer">
+                <input type="checkbox" className="toggle toggle-sm toggle-primary"
+                  checked={enabled} onChange={() => toggleModule(m.id)} />
+                <Icon className="w-4 h-4 opacity-40" />
+                <span className="text-sm">{m.label}</span>
+                <span className="text-xs text-base-content/30 ml-auto">{m.type}</span>
+              </label>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-base-content/40">Model LLM (GGUF)</h2>
+        <input type="text" value={modelUrl} onChange={e => setModelUrl(e.target.value)}
+          placeholder="https://huggingface.co/..."
+          className="input input-bordered input-sm w-full font-mono text-xs" />
+        <p className="text-[10px] text-base-content/30">
+          URL do pliku GGUF — np. z HuggingFace. Model ~928 MB pobierany przy pierwszym użyciu LLM.
+        </p>
       </div>
     </div>
   )
