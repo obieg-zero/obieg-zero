@@ -1,5 +1,5 @@
 import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
-import { opfsUpload, opfsRead, persistSave, persistLoad } from '@obieg-zero/storage'
+import { opfsUpload, opfsRead, persistSave } from '@obieg-zero/storage'
 import { ocrNode } from '@obieg-zero/ocr'
 import { embedNode, searchNode } from '@obieg-zero/embed'
 import { llmNode } from '@obieg-zero/llm'
@@ -11,7 +11,6 @@ export const flow = createFlow()
 flow.node('upload', opfsUpload())
 flow.node('read-file', opfsRead())
 flow.node('save', persistSave({ keys: ['pages', 'chunks', 'extracted'] }))
-flow.node('load', persistLoad({ keys: ['pages', 'chunks', 'extracted'] }))
 
 // ocr
 flow.node('ocr', ocrNode({ language: 'pol' }))
@@ -28,7 +27,7 @@ flow.node('embed', embedNode({
 flow.node('search', searchNode({ topK: 3 }))
 
 // llm
-flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl }))
+flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl, nCtx: 4096, nPredict: 1024 }))
 
 // prompts
 flow.node('extract-prompt', templateNode({

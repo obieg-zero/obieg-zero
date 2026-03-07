@@ -9,7 +9,7 @@ export function extractNode(config?: { output?: string }): NodeDef {
 
       ctx.set('extractError', null);
 
-      const jsonMatch = answer.match(/\{[\s\S]*\}/) ?? answer.match(/\[[\s\S]*\]/);
+      const jsonMatch = answer.match(/\{[\s\S]*?\}/) ?? answer.match(/\[[\s\S]*?\]/);
       if (!jsonMatch) {
         ctx.set('extractError', 'Nie znaleziono JSON w odpowiedzi');
         ctx.set(output, null);

@@ -12,13 +12,11 @@ function QaSheet() {
     if (!query.trim() || busy) return
     setBusy(true); setAnswer(''); setStreaming('')
 
-    const pages = flow.get('pages')
-    if (pages) flow.set('context', pages.map((p: any) => p.text).join('\n\n').slice(0, 2000))
     flow.set('query', query)
     flow.set('onToken', (t: string) => setStreaming(t))
 
     try {
-      await flow.run('qa-prompt', 'llm')
+      await flow.run('search', 'qa-prompt', 'llm')
       setAnswer(flow.get('answer'))
       setStreaming('')
     } catch (err: any) {

@@ -6,18 +6,14 @@ export function ocrNode(config?: { language?: string }): NodeDef {
   return {
     async run(ctx) {
       const file: File | undefined = ctx.get('file');
-      const storedFile = ctx.get('storedFile');
-      const target = file ?? storedFile;
-      if (!target) throw new Error('ocr: needs $file or $storedFile');
+      if (!file || !(file instanceof File)) throw new Error('ocr: needs $file (File object)');
 
       ctx.progress('Ładuję PDF…');
 
       const pdfjsLib = await import('pdfjs-dist');
       pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
 
-      const arrayBuffer = target instanceof File
-        ? await target.arrayBuffer()
-        : await (target as File).arrayBuffer();
+      const arrayBuffer = await file.arrayBuffer();
 
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
       const pages: { page: number; text: string }[] = [];

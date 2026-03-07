@@ -96,6 +96,10 @@ export default function App() {
       </main>
 
       {activeSheet && <Sheet mod={activeSheet} onClose={closeSheet} />}
+
+      <footer className="text-center text-xs text-base-content/30 py-4">
+        MIT · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="underline hover:text-base-content/50">GitHub</a>
+      </footer>
     </div>
   )
 }

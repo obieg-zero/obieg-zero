@@ -39,7 +39,14 @@ export function embedNode(config: EmbedConfig): NodeDef {
     const id = ++reqId;
     const w = getWorker();
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`Embedding timeout (id=${id})`));
+      }, 60_000);
+      pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
       w.postMessage({ id, text, model, dtype });
     });
   }
