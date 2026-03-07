@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { modules } from './modules.ts'
+import type { AppModule } from './modules.ts'
 import { useApp } from './store.ts'
 
 // import modules — registration happens on import
@@ -8,7 +9,7 @@ import './modules/ocr-view.tsx'
 import './modules/qa.tsx'
 import './modules/settings.tsx'
 
-function Sheet({ mod, onClose }: { mod: typeof modules[0]; onClose: () => void }) {
+function Sheet({ mod, onClose }: { mod: AppModule; onClose: () => void }) {
   return (
     <div className="drawer drawer-end open">
       <input type="checkbox" className="drawer-toggle" checked readOnly />
@@ -40,19 +41,20 @@ export default function App() {
   useEffect(() => {
     const onHash = () => {
       const id = location.hash.slice(1)
-      if (modules.find(m => m.type === 'page' && m.id === id)) setPage(id)
+      if (modules().find(m => m.type === 'page' && m.id === id)) setPage(id)
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const pages = modules.filter(m => m.type === 'page' && enabledModules.includes(m.id))
-  const sheets = modules.filter(m => m.type === 'sheet' && enabledModules.includes(m.id))
+  const allMods = modules()
+  const pages = allMods.filter(m => m.type === 'page' && enabledModules.includes(m.id))
+  const sheets = allMods.filter(m => m.type === 'sheet' && enabledModules.includes(m.id))
   const activePage = pages.find(m => m.id === activePageId)
   const activeSheet = sheets.find(m => m.id === openSheetId)
 
   // settings always visible
-  const settingsMod = modules.find(m => m.id === 'settings')
+  const settingsMod = allMods.find(m => m.id === 'settings')
 
   if (!ready) return null
 

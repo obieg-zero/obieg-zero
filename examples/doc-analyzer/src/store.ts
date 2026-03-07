@@ -40,9 +40,10 @@ export const useApp = create<AppState>((set) => ({
 
     // UI modules
     const savedUi: string[] | undefined = await loadSettings('enabledUiModules')
-    const enabled = savedUi ?? modules.map(m => m.id)
+    const all = modules()
+    const enabled = savedUi ?? all.map(m => m.id)
     const hash = location.hash.slice(1)
-    const firstPage = modules.find(m => m.type === 'page' && enabled.includes(m.id))
+    const firstPage = all.find(m => m.type === 'page' && enabled.includes(m.id))
     set({
       ready: true,
       enabledModules: enabled,
@@ -60,13 +61,12 @@ export const useApp = create<AppState>((set) => ({
 
   setFlowSetting: (moduleId, key, value) => {
     flow.configure(moduleId, { [key]: value })
-    // persist async, no need to await
-    loadSettings('flowSettings').then(all => {
-      const settings = all ?? {}
-      if (!settings[moduleId]) settings[moduleId] = {}
-      settings[moduleId][key] = value
-      saveSettings('flowSettings', settings)
-    })
+    // persist full config snapshot — no read-modify-write race
+    const snapshot: Record<string, any> = {}
+    for (const mod of flow.modules()) {
+      snapshot[mod.def.id] = { ...mod.config }
+    }
+    saveSettings('flowSettings', snapshot)
   },
 
   toggleFlowModule: (moduleId) => {

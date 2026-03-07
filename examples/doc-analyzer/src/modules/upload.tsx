@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { registerModule } from '../modules.ts'
-import { flow } from '../flow.ts'
+import { flow, PIPELINE_INGEST, PIPELINE_EXTRACT } from '../flow.ts'
 import { useFlowVar } from '../useFlowVar.ts'
 import type { FlowEvent } from '@obieg-zero/core'
 
@@ -11,12 +11,6 @@ interface StepState {
   detail?: string
 }
 
-const PIPELINE_STEPS = [
-  { id: 'upload', label: 'OPFS — zapis pliku' },
-  { id: 'ocr', label: 'OCR — rozpoznanie tekstu' },
-  { id: 'embed', label: 'Embedding — indeksowanie' },
-  { id: 'save', label: 'Persist — zapis do IndexedDB' },
-]
 
 function UploadPage() {
   const [steps, setSteps] = useState<StepState[]>([])
@@ -53,17 +47,14 @@ function UploadPage() {
     setBusy(true)
     setError('')
     setPct(0)
-    setSteps(PIPELINE_STEPS.map(s => ({ ...s, status: 'pending' as const })))
+    setSteps(PIPELINE_INGEST.map(s => ({ ...s, status: 'pending' as const })))
 
     try {
       flow.set('file', file)
       flow.set('projectId', 'demo')
       flow.set('fileKey', 'doc')
 
-      await flow.run('upload')
-      await flow.run('ocr')
-      await flow.run('embed')
-      await flow.run('save')
+      await flow.run(...PIPELINE_INGEST.map(s => s.id))
     } catch (err: any) {
       setError(err?.message || String(err))
     }
@@ -84,7 +75,7 @@ function UploadPage() {
 
     flow.set('query', 'typ dokumentu, data, strony, kwota')
     try {
-      await flow.run('search', 'extract-prompt', 'llm', 'parse')
+      await flow.run(...PIPELINE_EXTRACT)
       const extractError = flow.get('extractError')
       if (extractError) setError(extractError)
       setLlmStatus('')

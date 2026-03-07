@@ -8,8 +8,12 @@ export interface AppModule {
   Component: ComponentType
 }
 
-export const modules: AppModule[] = []
+const registry = new Map<string, AppModule>()
 
 export function registerModule(mod: AppModule) {
-  modules.push(mod)
+  registry.set(mod.id, mod) // dedup by id — safe for HMR
+}
+
+export function modules(): AppModule[] {
+  return [...registry.values()]
 }

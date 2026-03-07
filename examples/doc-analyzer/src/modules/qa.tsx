@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { registerModule } from '../modules.ts'
-import { flow } from '../flow.ts'
+import { flow, PIPELINE_QA } from '../flow.ts'
 
 function QaSheet() {
   const [query, setQuery] = useState('')
@@ -16,7 +16,7 @@ function QaSheet() {
     flow.set('onToken', (t: string) => setStreaming(t))
 
     try {
-      await flow.run('search', 'qa-prompt', 'llm')
+      await flow.run(...PIPELINE_QA)
       setAnswer(flow.get('answer'))
       setStreaming('')
     } catch (err: any) {

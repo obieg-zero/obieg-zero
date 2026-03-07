@@ -34,3 +34,14 @@ flow.node('qa-prompt', templateNode({
 }))
 
 flow.node('parse', extractNode({ output: 'extracted' }))
+
+// pipeline definitions — single source of truth for node sequences
+export const PIPELINE_INGEST = [
+  { id: 'upload', label: 'OPFS — zapis pliku' },
+  { id: 'ocr', label: 'OCR — rozpoznanie tekstu' },
+  { id: 'embed', label: 'Embedding — indeksowanie' },
+  { id: 'save', label: 'Persist — zapis do IndexedDB' },
+] as const
+
+export const PIPELINE_EXTRACT = ['search', 'extract-prompt', 'llm', 'parse'] as const
+export const PIPELINE_QA = ['search', 'qa-prompt', 'llm'] as const
