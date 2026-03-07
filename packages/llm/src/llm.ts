@@ -1,7 +1,7 @@
 import type { NodeDef } from '@obieg-zero/core';
 
 export interface LlmConfig {
-  modelUrl: string;
+  modelUrl: string | (() => string);
   nCtx?: number;
   nPredict?: number;
   temperature?: number;
@@ -22,7 +22,7 @@ export function llmNode(config: LlmConfig): NodeDef {
 
       if (!finalPrompt) throw new Error('llm: needs $prompt or ($query + $context)');
 
-      const effectiveUrl = ctx.get('modelUrl') ?? modelUrl;
+      const effectiveUrl = typeof modelUrl === 'function' ? modelUrl() : modelUrl;
 
       if (!wllamaInstance) {
         ctx.progress('Ładuję model…');

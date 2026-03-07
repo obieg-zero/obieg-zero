@@ -3,6 +3,7 @@ import { opfsUpload, opfsRead, persistSave, persistLoad } from '@obieg-zero/stor
 import { ocrNode } from '@obieg-zero/ocr'
 import { embedNode, searchNode } from '@obieg-zero/embed'
 import { llmNode } from '@obieg-zero/llm'
+import { useApp } from './store.ts'
 
 export const flow = createFlow()
 
@@ -26,8 +27,8 @@ flow.node('embed', embedNode({
 }))
 flow.node('search', searchNode({ topK: 3 }))
 
-// llm — modelUrl read from flow context ($modelUrl), set by store
-flow.node('llm', llmNode({ modelUrl: '' }))
+// llm
+flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl }))
 
 // prompts
 flow.node('extract-prompt', templateNode({

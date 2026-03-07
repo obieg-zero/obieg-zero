@@ -1,17 +1,5 @@
 import type { NodeDef } from '@obieg-zero/core';
 
-// Polyfill for Map.getOrInsertComputed (not yet in all runtimes)
-if (!(Map.prototype as any).getOrInsertComputed) {
-  (Map.prototype as any).getOrInsertComputed = function <K, V>(
-    this: Map<K, V>, key: K, fn: (key: K) => V,
-  ): V {
-    if (this.has(key)) return this.get(key)!;
-    const val = fn(key);
-    this.set(key, val);
-    return val;
-  };
-}
-
 export function ocrNode(config?: { language?: string }): NodeDef {
   const language = config?.language ?? 'eng';
 

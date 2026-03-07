@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { registerModule } from '../modules.ts'
 import { flow } from '../flow.ts'
-import { useApp } from '../store.ts'
 
 function QaSheet() {
   const [query, setQuery] = useState('')
   const [answer, setAnswer] = useState('')
   const [streaming, setStreaming] = useState('')
   const [busy, setBusy] = useState(false)
-  const modelUrl = useApp(s => s.modelUrl)
 
   const handleAsk = async () => {
     if (!query.trim() || busy) return
@@ -17,7 +15,6 @@ function QaSheet() {
     const pages = flow.get('pages')
     if (pages) flow.set('context', pages.map((p: any) => p.text).join('\n\n').slice(0, 2000))
     flow.set('query', query)
-    flow.set('modelUrl', modelUrl)
     flow.set('onToken', (t: string) => setStreaming(t))
 
     try {

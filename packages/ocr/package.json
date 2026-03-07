@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/ocr",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "PDF parsing and OCR node for obieg-zero flows.",
   "type": "module",
   "main": "src/index.ts",
