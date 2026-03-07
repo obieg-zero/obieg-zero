@@ -8,7 +8,7 @@ export interface LlmConfig {
 }
 
 export function llmNode(config: LlmConfig): NodeDef {
-  const { modelUrl, nCtx = 2048, nPredict = 512, temperature = 0.3 } = config;
+  const { modelUrl, nCtx = 4096, nPredict = 1024, temperature = 0.3 } = config;
   let wllamaInstance: any = null;
 
   return {

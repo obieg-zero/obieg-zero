@@ -24,10 +24,10 @@ flow.node('embed', embedNode({
     { type: 'module' },
   ),
 }))
-flow.node('search', searchNode({ topK: 3 }))
+flow.node('search', searchNode())
 
 // llm
-flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl, nCtx: 4096, nPredict: 1024 }))
+flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl }))
 
 // prompts
 flow.node('extract-prompt', templateNode({

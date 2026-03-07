@@ -110,6 +110,7 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 **llmNode({ modelUrl, nCtx?, nPredict?, temperature? })**
 - Reads: `$prompt` OR (`$query` + `$context`), optional `$onToken` callback
 - Writes: `$answer`, `$llmReady` (after first model load)
+- Defaults: `nCtx=4096`, `nPredict=1024`, `temperature=0.3`
 - Peer dep: `@wllama/wllama`
 
 ## Conventions
