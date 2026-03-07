@@ -1,45 +1,75 @@
+import { useState } from 'react'
 import { registerModule } from '../modules.ts'
-import { modules } from '../modules.ts'
 import { useApp } from '../store.ts'
+import { flow } from '../flow.ts'
+import type { SettingDef } from '@obieg-zero/core'
+
+function SettingField({ moduleId, settingKey, def }: { moduleId: string; settingKey: string; def: SettingDef }) {
+  const setFlowSetting = useApp(s => s.setFlowSetting)
+  const mod = flow.module(moduleId)
+  const value = mod?.config[settingKey] ?? def.default
+  const [local, setLocal] = useState(String(value))
+
+  const commit = (raw: string) => {
+    setLocal(raw)
+    if (def.type === 'number') {
+      const n = Number(raw)
+      if (!isNaN(n)) setFlowSetting(moduleId, settingKey, n)
+    } else if (def.type === 'boolean') {
+      setFlowSetting(moduleId, settingKey, raw === 'true')
+    } else {
+      setFlowSetting(moduleId, settingKey, raw)
+    }
+  }
+
+  if (def.type === 'boolean') {
+    return (
+      <label className="flex items-center justify-between">
+        <span className="text-xs text-base-content/60">{def.label}</span>
+        <input type="checkbox" className="toggle toggle-xs toggle-primary"
+          checked={value === true || value === 'true'}
+          onChange={e => commit(String(e.target.checked))} />
+      </label>
+    )
+  }
+
+  return (
+    <label className="space-y-0.5">
+      <span className="text-xs text-base-content/60">{def.label}</span>
+      <input type={def.type === 'number' ? 'number' : 'text'} value={local}
+        onChange={e => commit(e.target.value)}
+        className="input input-bordered input-xs w-full font-mono text-xs" />
+    </label>
+  )
+}
 
 function SettingsPage() {
-  const enabledModules = useApp(s => s.enabledModules)
-  const toggleModule = useApp(s => s.toggleModule)
-  const modelUrl = useApp(s => s.modelUrl)
-  const setModelUrl = useApp(s => s.setModelUrl)
-
-  const toggleable = modules.filter(m => m.id !== 'settings')
+  const toggleFlowModule = useApp(s => s.toggleFlowModule)
+  const flowModules = flow.modules()
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-base-content/40">Moduły</h2>
-        <div className="space-y-1">
-          {toggleable.map(m => {
-            const Icon = m.icon
-            const enabled = enabledModules.includes(m.id)
-            return (
-              <label key={m.id} className="flex items-center gap-3 p-2 rounded hover:bg-base-100 cursor-pointer">
-                <input type="checkbox" className="toggle toggle-sm toggle-primary"
-                  checked={enabled} onChange={() => toggleModule(m.id)} />
-                <Icon className="w-4 h-4 opacity-40" />
-                <span className="text-sm">{m.label}</span>
-                <span className="text-xs text-base-content/30 ml-auto">{m.type}</span>
-              </label>
-            )
-          })}
-        </div>
-      </div>
+      {flowModules.map(mod => (
+        <div key={mod.def.id} className="bg-base-100 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-bold">{mod.def.label}</span>
+              <span className="text-[10px] text-base-content/30 ml-2">{mod.def.id}</span>
+            </div>
+            <input type="checkbox" className="toggle toggle-sm toggle-primary"
+              checked={mod.enabled}
+              onChange={() => toggleFlowModule(mod.def.id)} />
+          </div>
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-base-content/40">Model LLM (GGUF)</h2>
-        <input type="text" value={modelUrl} onChange={e => setModelUrl(e.target.value)}
-          placeholder="https://huggingface.co/..."
-          className="input input-bordered input-sm w-full font-mono text-xs" />
-        <p className="text-[10px] text-base-content/30">
-          URL do pliku GGUF z HuggingFace. Model pobierany przy pierwszym użyciu LLM.
-        </p>
-      </div>
+          {mod.enabled && Object.keys(mod.def.settings).length > 0 && (
+            <div className="space-y-2 border-t border-base-300 pt-3">
+              {Object.entries(mod.def.settings).map(([key, def]) => (
+                <SettingField key={key} moduleId={mod.def.id} settingKey={key} def={def} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
