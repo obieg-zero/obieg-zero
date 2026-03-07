@@ -77,6 +77,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
       }
 
       ctx.set('chunks', chunks);
+      ctx.set('embedFn', embed);
       ctx.progress('Embedding zakończony');
     },
   };

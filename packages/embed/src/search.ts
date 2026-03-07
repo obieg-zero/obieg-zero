@@ -18,8 +18,12 @@ export function searchNode(config?: { topK?: number }): NodeDef {
       const chunks: { text: string; page: number; embedding: number[] }[] = ctx.get('chunks');
       if (!query || !chunks?.length) throw new Error('search: needs $query and $chunks');
 
-      const queryEmbedding: number[] = ctx.get('queryEmbedding');
-      if (!queryEmbedding) throw new Error('search: needs $queryEmbedding (embed query first)');
+      let queryEmbedding: number[] = ctx.get('queryEmbedding');
+      if (!queryEmbedding) {
+        const embedFn = ctx.get('embedFn');
+        if (!embedFn) throw new Error('search: needs $queryEmbedding or $embedFn (run embed node first)');
+        queryEmbedding = await embedFn(query);
+      }
 
       ctx.progress('Szukam…');
 
