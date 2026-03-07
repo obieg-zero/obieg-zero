@@ -11,6 +11,7 @@ export interface FlowContext {
 
 export interface NodeDef {
   run(ctx: FlowContext): Promise<void>;
+  dispose?(): void;
 }
 
 export type FlowEvent =
@@ -54,8 +55,11 @@ export function createFlow(): Flow {
   }
 
   function rebuildNodes(reg: RegisteredModule) {
-    // remove old nodes from this module
-    for (const key of Object.keys(reg.def.nodes(reg.config))) {
+    // dispose and remove old nodes from this module
+    const oldKeys = Object.keys(reg.def.nodes(reg.config));
+    for (const key of oldKeys) {
+      const old = nodes.get(key);
+      if (old?.dispose) old.dispose();
       nodes.delete(key);
     }
     if (!reg.enabled) return;

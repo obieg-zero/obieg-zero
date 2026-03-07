@@ -1,7 +1,7 @@
 import type { NodeDef } from '@obieg-zero/core';
 
 export interface LlmConfig {
-  modelUrl: string | (() => string);
+  modelUrl: string;
   nCtx?: number;
   nPredict?: number;
   temperature?: number;
@@ -12,6 +12,12 @@ export function llmNode(config: LlmConfig): NodeDef {
   let wllamaInstance: any = null;
 
   return {
+    dispose() {
+      if (wllamaInstance) {
+        wllamaInstance.exit().catch(() => {});
+        wllamaInstance = null;
+      }
+    },
     async run(ctx) {
       const prompt = ctx.get('prompt');
       const query = ctx.get('query');
@@ -22,7 +28,7 @@ export function llmNode(config: LlmConfig): NodeDef {
 
       if (!finalPrompt) throw new Error('llm: needs $prompt or ($query + $context)');
 
-      const effectiveUrl = typeof modelUrl === 'function' ? modelUrl() : modelUrl;
+      if (!modelUrl) throw new Error('llm: needs modelUrl');
 
       if (!wllamaInstance) {
         ctx.progress('Ładuję model…');
@@ -32,7 +38,7 @@ export function llmNode(config: LlmConfig): NodeDef {
           'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
         } as any);
 
-        await wllamaInstance.loadModelFromUrl(effectiveUrl, {
+        await wllamaInstance.loadModelFromUrl(modelUrl, {
           n_ctx: nCtx,
           progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
             const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;

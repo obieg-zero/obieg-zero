@@ -53,6 +53,16 @@ export function embedNode(config: EmbedConfig): NodeDef {
   }
 
   return {
+    dispose() {
+      if (worker) {
+        worker.terminate();
+        worker = null;
+      }
+      for (const [, p] of pending) {
+        p.reject(new Error('embedNode disposed'));
+      }
+      pending.clear();
+    },
     async run(ctx) {
       const pages: { page: number; text: string }[] = ctx.get('pages');
       if (!pages?.length) throw new Error('embed: needs $pages');

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { registerModule } from '../modules.ts'
 import { flow } from '../flow.ts'
+import { useFlowVar } from '../useFlowVar.ts'
 import type { FlowEvent } from '@obieg-zero/core'
 
 interface StepState {
@@ -22,8 +23,8 @@ function UploadPage() {
   const [pct, setPct] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [pages, setPages] = useState<any[] | null>(flow.get('pages') ?? null)
-  const [extracted, setExtracted] = useState<any>(flow.get('extracted') ?? null)
+  const pages = useFlowVar<any[]>('pages')
+  const extracted = useFlowVar('extracted')
   const [llmStatus, setLlmStatus] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -52,8 +53,6 @@ function UploadPage() {
     setBusy(true)
     setError('')
     setPct(0)
-    setPages(null)
-    setExtracted(null)
     setSteps(PIPELINE_STEPS.map(s => ({ ...s, status: 'pending' as const })))
 
     try {
@@ -63,9 +62,6 @@ function UploadPage() {
 
       await flow.run('upload')
       await flow.run('ocr')
-      const p = flow.get('pages')
-      setPages(p)
-
       await flow.run('embed')
       await flow.run('save')
     } catch (err: any) {
@@ -89,7 +85,6 @@ function UploadPage() {
     flow.set('query', 'typ dokumentu, data, strony, kwota')
     try {
       await flow.run('search', 'extract-prompt', 'llm', 'parse')
-      setExtracted(flow.get('extracted'))
       const extractError = flow.get('extractError')
       if (extractError) setError(extractError)
       setLlmStatus('')
