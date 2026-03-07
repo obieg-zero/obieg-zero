@@ -1,35 +1,23 @@
 import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
-import { opfsUpload, opfsRead, persistSave } from '@obieg-zero/storage'
-import { ocrNode } from '@obieg-zero/ocr'
-import { embedNode, searchNode } from '@obieg-zero/embed'
-import { llmNode } from '@obieg-zero/llm'
-import { useApp } from './store.ts'
+import { storageModule } from '@obieg-zero/storage'
+import { ocrModule } from '@obieg-zero/ocr'
+import { embedModule } from '@obieg-zero/embed'
+import { llmModule } from '@obieg-zero/llm'
 
 export const flow = createFlow()
 
-// storage
-flow.node('upload', opfsUpload())
-flow.node('read-file', opfsRead())
-flow.node('save', persistSave({ keys: ['pages', 'chunks', 'extracted'] }))
-
-// ocr
-flow.node('ocr', ocrNode({ language: 'pol' }))
-
-// embed + search
-flow.node('embed', embedNode({
-  model: 'Xenova/multilingual-e5-small',
-  dtype: 'q8',
+// modules — defaults from packages, overrides where needed
+flow.use(storageModule)
+flow.use(ocrModule)
+flow.use(embedModule, {
   workerFactory: () => new Worker(
     new URL('@obieg-zero/embed/src/embedding-worker.ts', import.meta.url),
     { type: 'module' },
   ),
-}))
-flow.node('search', searchNode())
+})
+flow.use(llmModule)
 
-// llm
-flow.node('llm', llmNode({ modelUrl: () => useApp.getState().modelUrl }))
-
-// prompts
+// prompts (app-specific, not module defaults)
 flow.node('extract-prompt', templateNode({
   template: `Z dokumentu wyciągnij dane. Podaj TYLKO JSON, nic więcej.
 
