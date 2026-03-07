@@ -163,7 +163,7 @@ function UploadPage() {
         <div className="space-y-6 py-4">
           <div>
             <h2 className="text-lg font-light font-mono">obieg<span className="text-primary">-zero</span></h2>
-            <p className="text-xs text-base-content/40 mt-1">Browser-native document flow engine. Zero backend, zero config, zero barrier.</p>
+            <p className="text-xs text-base-content/40 mt-1">Przeglądarkowy silnik obiegu dokumentów. Zero backendu, zero konfiguracji, zero barier.</p>
           </div>
 
           <div className="text-xs text-base-content/50 space-y-2">
@@ -179,17 +179,17 @@ function UploadPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/core</span><br/><span className="text-base-content/30">flow engine, templates, extract</span></div>
-            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/storage</span><br/><span className="text-base-content/30">OPFS + IndexedDB persistence</span></div>
-            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/ocr</span><br/><span className="text-base-content/30">PDF parsing + Tesseract</span></div>
-            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/embed</span><br/><span className="text-base-content/30">embeddings + semantic search</span></div>
-            <div className="bg-base-100 rounded p-2 col-span-2"><span className="text-primary">@obieg-zero/llm</span> <span className="text-base-content/30">— local LLM via wllama/GGUF (Bielik 1.5B, ~928 MB)</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/core</span><br/><span className="text-base-content/30">silnik flow, szablony, ekstrakcja</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/storage</span><br/><span className="text-base-content/30">OPFS + IndexedDB</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/ocr</span><br/><span className="text-base-content/30">parsowanie PDF + Tesseract</span></div>
+            <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/embed</span><br/><span className="text-base-content/30">embeddingi + wyszukiwanie semantyczne</span></div>
+            <div className="bg-base-100 rounded p-2 col-span-2"><span className="text-primary">@obieg-zero/llm</span> <span className="text-base-content/30">— lokalny LLM przez wllama/GGUF (Bielik 1.5B, ~928 MB)</span></div>
           </div>
 
           <div className="flex gap-2">
             <a href="https://github.com/obieg-zero/obieg-zero" className="btn btn-ghost btn-xs">GitHub</a>
             <a href="https://www.npmjs.com/org/obieg-zero" className="btn btn-ghost btn-xs">npm</a>
-            <a href="https://github.com/obieg-zero/obieg-zero/tree/main/examples/doc-analyzer" className="btn btn-ghost btn-xs">Kod tego demo</a>
+            <a href="https://github.com/obieg-zero/obieg-zero/tree/main/examples/doc-analyzer" className="btn btn-ghost btn-xs">kod demo</a>
           </div>
         </div>
       )}
