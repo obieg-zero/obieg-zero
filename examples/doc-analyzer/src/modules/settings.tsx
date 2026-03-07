@@ -37,7 +37,7 @@ function SettingsPage() {
           placeholder="https://huggingface.co/..."
           className="input input-bordered input-sm w-full font-mono text-xs" />
         <p className="text-[10px] text-base-content/30">
-          URL do pliku GGUF — np. z HuggingFace. Model ~928 MB pobierany przy pierwszym użyciu LLM.
+          URL do pliku GGUF z HuggingFace. Model pobierany przy pierwszym użyciu LLM.
         </p>
       </div>
     </div>

@@ -61,7 +61,7 @@ export function opfsDeleteProject(): NodeDef {
       if (!projectId) throw new Error('opfsDeleteProject: needs $projectId');
 
       const root = await navigator.storage.getDirectory();
-      const projects = await root.getDirectoryHandle('rag-projects', { create: true });
+      const projects = await root.getDirectoryHandle('rag-projects');
       await projects.removeEntry(projectId, { recursive: true });
     },
   };

@@ -16,6 +16,7 @@ interface Chunk {
 
 export function embedNode(config: EmbedConfig): NodeDef {
   const { model, dtype = 'q8', chunkSize = 500, chunkOverlap = 50, workerFactory } = config;
+  if (chunkOverlap >= chunkSize) throw new Error('embedNode: chunkOverlap must be < chunkSize');
   let worker: Worker | null = null;
   let reqId = 0;
   const pending = new Map<number, { resolve: (v: number[]) => void; reject: (e: Error) => void }>();

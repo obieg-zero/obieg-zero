@@ -43,7 +43,7 @@ export default function App() {
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
-  }, [setPage])
+  }, [])
 
   const pages = modules.filter(m => m.type === 'page' && enabledModules.includes(m.id))
   const sheets = modules.filter(m => m.type === 'sheet' && enabledModules.includes(m.id))

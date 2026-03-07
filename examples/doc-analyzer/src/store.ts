@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { modules } from './modules.ts'
 
-const DEFAULT_MODEL_URL = 'https://huggingface.co/speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf'
+const DEFAULT_MODEL_URL = 'https://huggingface.co/speakleash/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q8_0.gguf'
 
 interface AppState {
   activePageId: string
@@ -24,7 +24,9 @@ export const useApp = create<AppState>((set) => ({
 
   init: () => {
     const saved = localStorage.getItem('enabledModules')
-    const enabled = saved ? JSON.parse(saved) : modules.map(m => m.id)
+    let enabled: string[]
+    try { enabled = saved ? JSON.parse(saved) : modules.map(m => m.id) }
+    catch { enabled = modules.map(m => m.id) }
     const hash = location.hash.slice(1)
     const firstPage = modules.find(m => m.type === 'page' && enabled.includes(m.id))
     set({

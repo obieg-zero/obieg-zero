@@ -69,7 +69,7 @@ function UploadPage() {
       await flow.run('embed')
       await flow.run('save')
     } catch (err: any) {
-      setError(err.message)
+      setError(err?.message || String(err))
     }
 
     setBusy(false)
