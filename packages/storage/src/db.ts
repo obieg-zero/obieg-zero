@@ -46,13 +46,18 @@ export function idbDelete(db: IDBDatabase, store: string, key: string): Promise<
 // High-level settings API (for module settings, UI state, etc.)
 export async function loadSettings(key: string): Promise<any> {
   const db = await openDB();
-  const val = await idbGet(db, SETTINGS_STORE, key);
-  db.close();
-  return val;
+  try {
+    return await idbGet(db, SETTINGS_STORE, key);
+  } finally {
+    db.close();
+  }
 }
 
 export async function saveSettings(key: string, value: any): Promise<void> {
   const db = await openDB();
-  await idbPut(db, SETTINGS_STORE, key, value);
-  db.close();
+  try {
+    await idbPut(db, SETTINGS_STORE, key, value);
+  } finally {
+    db.close();
+  }
 }

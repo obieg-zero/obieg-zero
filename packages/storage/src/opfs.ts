@@ -80,6 +80,7 @@ export function opfsOpen(): NodeDef {
       const url = URL.createObjectURL(file);
       ctx.set('fileUrl', url);
       window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
   };
 }

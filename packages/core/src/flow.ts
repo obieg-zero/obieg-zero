@@ -23,10 +23,19 @@ export type FlowEvent =
 
 export type FlowListener = (event: FlowEvent) => void;
 
+export interface EachConfig {
+  id?: string;
+  items: any[];
+  set: Record<string, (item: any, index: number) => any>;
+  run: readonly string[];
+  collect?: string;
+}
+
 export interface RegisteredModule {
   def: ModuleDef;
   config: Record<string, any>;
   enabled: boolean;
+  nodeKeys: string[];
 }
 
 export interface Flow {
@@ -34,7 +43,8 @@ export interface Flow {
   get(key: string): any;
   vars: Vars;
   node(id: string, def: NodeDef): Flow;
-  run(...ids: string[]): Promise<void>;
+  run(...ids: readonly string[]): Promise<void>;
+  each(config: EachConfig): Promise<any[]>;
   on(fn: FlowListener): () => void;
   use(mod: ModuleDef, overrides?: Record<string, any>): Flow;
   module(id: string): RegisteredModule | undefined;
@@ -44,7 +54,8 @@ export interface Flow {
   disable(moduleId: string): void;
 }
 
-export function createFlow(): Flow {
+export function createFlow(opts?: { debug?: boolean }): Flow {
+  const debug = opts?.debug ?? (typeof location !== 'undefined' && location.hostname === 'localhost');
   const vars: Vars = {};
   const nodes = new Map<string, NodeDef>();
   const listeners = new Set<FlowListener>();
@@ -55,18 +66,19 @@ export function createFlow(): Flow {
   }
 
   function rebuildNodes(reg: RegisteredModule) {
-    // dispose and remove old nodes from this module
-    const oldKeys = Object.keys(reg.def.nodes(reg.config));
-    for (const key of oldKeys) {
+    // dispose old nodes tracked by this module
+    for (const key of reg.nodeKeys) {
       const old = nodes.get(key);
       if (old?.dispose) old.dispose();
       nodes.delete(key);
     }
+    reg.nodeKeys = [];
     if (!reg.enabled) return;
-    // add nodes with current config
+    // build new nodes
     const built = reg.def.nodes(reg.config);
     for (const [id, def] of Object.entries(built)) {
       nodes.set(id, def);
+      reg.nodeKeys.push(id);
     }
   }
 
@@ -89,7 +101,7 @@ export function createFlow(): Flow {
 
     use(mod: ModuleDef, overrides?: Record<string, any>) {
       const config = { ...getDefaults(mod), ...overrides };
-      const reg: RegisteredModule = { def: mod, config, enabled: true };
+      const reg: RegisteredModule = { def: mod, config, enabled: true, nodeKeys: [] };
       registeredModules.set(mod.id, reg);
       rebuildNodes(reg);
       return flow;
@@ -124,33 +136,69 @@ export function createFlow(): Flow {
       rebuildNodes(reg);
     },
 
-    async run(...ids: string[]) {
+    async run(...ids: readonly string[]) {
+      if (debug) console.group(`[flow] run(${ids.join(', ')})`);
       for (const id of ids) {
         const node = nodes.get(id);
-        if (!node) throw new Error(`Node "${id}" not found`);
+        if (!node) {
+          if (debug) { console.error(`[flow] Node "${id}" not found. Registered: ${[...nodes.keys()].join(', ')}`); console.groupEnd(); }
+          throw new Error(`Node "${id}" not found`);
+        }
 
+        if (debug) console.log(`[flow] ▶ ${id}`);
         emit({ type: 'node:start', id });
 
         const ctx: FlowContext = {
           get: (key) => vars[key],
           set: (key, value) => {
             vars[key] = value;
+            if (debug) console.log(`[flow]   set ${key} =`, typeof value === 'string' ? value.slice(0, 120) : value);
             emit({ type: 'vars', key, value });
           },
           progress: (status, pct) => {
+            if (debug) console.log(`[flow]   progress ${id}: ${status}${pct != null ? ` (${pct}%)` : ''}`);
             emit({ type: 'progress', id, status, pct });
           },
         };
 
         try {
           await node.run(ctx);
+          if (debug) console.log(`[flow] ✓ ${id}`);
           emit({ type: 'node:done', id });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
+          if (debug) { console.error(`[flow] ✕ ${id}:`, err); console.groupEnd(); }
           emit({ type: 'node:error', id, error: msg });
           throw err;
         }
       }
+      if (debug) console.groupEnd();
+    },
+
+    async each(config: EachConfig) {
+      const { id = 'each', items, set: bindings, run: pipeline, collect } = config;
+      const results: any[] = [];
+
+      emit({ type: 'node:start', id });
+
+      for (let i = 0; i < items.length; i++) {
+        emit({ type: 'progress', id, status: `${i + 1}/${items.length}`, pct: ((i + 1) / items.length) * 100 });
+
+        for (const [key, fn] of Object.entries(bindings)) {
+          flow.set(key, fn(items[i], i));
+        }
+
+        await flow.run(...pipeline);
+
+        if (collect) {
+          const val = vars[collect];
+          if (val != null && typeof val === 'object') results.push({ _index: i, _item: items[i], ...val });
+          else if (val != null) results.push(val);
+        }
+      }
+
+      emit({ type: 'node:done', id });
+      return results;
     },
 
     on(fn: FlowListener) {

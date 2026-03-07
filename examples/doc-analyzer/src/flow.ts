@@ -6,42 +6,37 @@ import { llmModule } from '@obieg-zero/llm'
 
 export const flow = createFlow()
 
-// modules — defaults from packages, overrides where needed
 flow.use(storageModule)
 flow.use(ocrModule)
 flow.use(embedModule, {
+  topK: 1, chunkSize: 200,
   workerFactory: () => new Worker(
     new URL('@obieg-zero/embed/src/embedding-worker.ts', import.meta.url),
     { type: 'module' },
   ),
 })
-flow.use(llmModule)
+flow.use(llmModule, { nPredict: 150, temperature: 0.1 })
 
-// prompts (app-specific, not module defaults)
-flow.node('extract-prompt', templateNode({
-  template: `Z dokumentu wyciągnij dane. Podaj TYLKO JSON, nic więcej.
+// --- field patterns per document type ---
+export const FIELD_MAP: Record<string, string[]> = {
+  faktura: ['numer faktury', 'data wystawienia', 'sprzedawca', 'nabywca', 'NIP sprzedawcy', 'NIP nabywcy', 'kwota netto', 'kwota brutto', 'waluta'],
+  umowa: ['typ umowy', 'strona pierwsza', 'strona druga', 'data zawarcia', 'przedmiot umowy', 'wartość', 'okres obowiązywania'],
+  zaswiadczenie: ['wystawca', 'dotyczy kogo', 'data wydania', 'cel wydania', 'treść zaświadczenia'],
+  akt_notarialny: ['notariusz', 'numer repertorium', 'strony aktu', 'przedmiot', 'data aktu'],
+  decyzja: ['organ wydający', 'sygnatura', 'adresat', 'data decyzji', 'rozstrzygnięcie'],
+  pismo: ['nadawca', 'adresat', 'data pisma', 'temat', 'treść'],
+  inne: ['typ dokumentu', 'data', 'strony', 'treść'],
+}
 
-TEKST:
-{{context}}
+// classify queries — search for these, highest score wins
+export const CLASSIFY_QUERIES: Record<string, string> = {
+  faktura: 'faktura VAT numer faktury sprzedawca nabywca kwota brutto netto',
+  umowa: 'umowa strony umowy zawarta pomiędzy przedmiot umowy',
+  zaswiadczenie: 'zaświadczenie zaświadcza się wydaje się niniejszym',
+  akt_notarialny: 'akt notarialny repertorium notariusz kancelaria notarialna',
+  decyzja: 'decyzja postanawia organ administracyjny na podstawie art',
+  pismo: 'szanowni państwo w odpowiedzi na pismo informuję',
+}
 
-Wyciągnij: {"typ_dokumentu": "<string>", "data": "<YYYY-MM-DD>", "strony": ["<nazwa>"], "kwota": <number|null>, "waluta": "<string>"}
-
-JSON:`,
-}))
-
-flow.node('qa-prompt', templateNode({
-  template: `Kontekst:\n{{context}}\n\nOdpowiedz zwięźle po polsku: {{query}}`,
-}))
-
-flow.node('parse', extractNode({ output: 'extracted' }))
-
-// pipeline definitions — single source of truth for node sequences
-export const PIPELINE_INGEST = [
-  { id: 'upload', label: 'OPFS — zapis pliku' },
-  { id: 'ocr', label: 'OCR — rozpoznanie tekstu' },
-  { id: 'embed', label: 'Embedding — indeksowanie' },
-  { id: 'save', label: 'Persist — zapis do IndexedDB' },
-] as const
-
-export const PIPELINE_EXTRACT = ['search', 'extract-prompt', 'llm', 'parse'] as const
-export const PIPELINE_QA = ['search', 'qa-prompt', 'llm'] as const
+// --- pipelines ---
+export const PIPELINE_INGEST = ['upload', 'ocr', 'embed', 'save'] as const

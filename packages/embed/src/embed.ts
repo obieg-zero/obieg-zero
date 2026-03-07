@@ -18,6 +18,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
   const { model, dtype = 'q8', chunkSize = 500, chunkOverlap = 50, workerFactory } = config;
   if (chunkOverlap >= chunkSize) throw new Error('embedNode: chunkOverlap must be < chunkSize');
   let worker: Worker | null = null;
+  let disposed = false;
   let reqId = 0;
   const pending = new Map<number, { resolve: (v: number[]) => void; reject: (e: Error) => void }>();
 
@@ -37,6 +38,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
   }
 
   function embed(text: string): Promise<number[]> {
+    if (disposed) throw new Error('embedNode has been disposed');
     const id = ++reqId;
     const w = getWorker();
     return new Promise((resolve, reject) => {
@@ -54,6 +56,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
 
   return {
     dispose() {
+      disposed = true;
       if (worker) {
         worker.terminate();
         worker = null;

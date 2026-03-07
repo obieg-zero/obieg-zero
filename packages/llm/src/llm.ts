@@ -7,8 +7,13 @@ export interface LlmConfig {
   temperature?: number;
 }
 
+const WASM_CDN = {
+  'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.7/src/single-thread/wllama.wasm',
+  'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.7/src/multi-thread/wllama.wasm',
+};
+
 export function llmNode(config: LlmConfig): NodeDef {
-  const { modelUrl, nCtx = 8192, nPredict = 1024, temperature = 0.3 } = config;
+  const { modelUrl, nCtx = 4096, nPredict = 256, temperature = 0.3 } = config;
   let wllamaInstance: any = null;
 
   return {
@@ -20,32 +25,32 @@ export function llmNode(config: LlmConfig): NodeDef {
     },
     async run(ctx) {
       const prompt = ctx.get('prompt');
-      const query = ctx.get('query');
-      const context = ctx.get('context');
-
-      const finalPrompt = prompt
-        ?? (query && context ? `Kontekst:\n${context}\n\nPytanie: ${query}\n\nOdpowiedź:` : null);
-
-      if (!finalPrompt) throw new Error('llm: needs $prompt or ($query + $context)');
-
+      if (!prompt) throw new Error('llm: needs $prompt');
       if (!modelUrl) throw new Error('llm: needs modelUrl');
 
       if (!wllamaInstance) {
         ctx.progress('Ładuję model…');
-        const { Wllama } = await import('@wllama/wllama');
-        wllamaInstance = new Wllama({
-          'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
-          'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
-        } as any);
-
-        await wllamaInstance.loadModelFromUrl(modelUrl, {
-          n_ctx: nCtx,
-          progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
-            const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-            ctx.progress(`Pobieranie modelu ${pct}%`, pct);
-          },
+        const { Wllama, LoggerWithoutDebug } = await import('@wllama/wllama');
+        const instance = new Wllama(WASM_CDN, {
+          logger: LoggerWithoutDebug,
+          allowOffline: true,
         });
 
+        try {
+          await instance.loadModelFromUrl(modelUrl, {
+            n_ctx: nCtx,
+            n_batch: 256,
+            progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
+              const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+              ctx.progress(`Pobieranie modelu ${pct}%`, pct);
+            },
+          });
+        } catch (err) {
+          instance.exit().catch(() => {});
+          throw err;
+        }
+
+        wllamaInstance = instance;
         ctx.set('llmReady', true);
         ctx.progress('Model gotowy');
       }
@@ -56,10 +61,11 @@ export function llmNode(config: LlmConfig): NodeDef {
       let fullText = '';
 
       const result = await wllamaInstance.createChatCompletion(
-        [{ role: 'user', content: finalPrompt }] as any,
+        [{ role: 'user', content: prompt }] as any,
         {
           nPredict,
-          sampling: { temp: temperature },
+          sampling: { temp: temperature, top_p: 0.9, top_k: 40 },
+          useCache: true,
           onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
             fullText = currentText;
             if (onToken) onToken(currentText);

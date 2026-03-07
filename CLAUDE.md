@@ -110,7 +110,7 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 **llmNode({ modelUrl, nCtx?, nPredict?, temperature? })**
 - Reads: `$prompt` OR (`$query` + `$context`), optional `$onToken` callback
 - Writes: `$answer`, `$llmReady` (after first model load)
-- Defaults: `nCtx=4096`, `nPredict=1024`, `temperature=0.3`
+- Defaults: `nCtx=8192`, `nPredict=1024`, `temperature=0.3`
 - Peer dep: `@wllama/wllama`
 
 ## Conventions
@@ -138,6 +138,30 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 3. Create `src/index.ts` with exports
 4. Add to root `package.json` workspaces
 5. Publish: `cd packages/<name> && npm publish --access public`
+
+## What This Project Is
+
+obieg-zero is a **framework published on npm**. The packages `@obieg-zero/*` are the product — people install them via `npm install`. The demo at `obieg-zero.github.io` is a showcase of the framework, not the project itself.
+
+## Workflow After Changing packages/
+
+Every change in `packages/` MUST be published. Local workspace symlinks are for development only — npm is the delivery mechanism.
+
+```bash
+# 1. Bump version in each changed package
+cd packages/<name> && npm version patch --no-git-tag-version
+
+# 2. Publish each changed package
+cd packages/<name> && npm publish --access public
+
+# 3. Build demo
+cd examples/doc-analyzer && npx vite build
+
+# 4. Deploy demo
+npx gh-pages -d examples/doc-analyzer/dist -r https://github.com/obieg-zero/obieg-zero.github.io.git -b main
+```
+
+Do NOT skip step 2. Do NOT ask the user whether to publish — just do it.
 
 ## Publishing
 

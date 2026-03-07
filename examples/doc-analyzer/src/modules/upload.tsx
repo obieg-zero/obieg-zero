@@ -73,8 +73,8 @@ function UploadPage() {
       if (e.type === 'progress') setLlmStatus(e.status)
     })
 
-    flow.set('query', 'typ dokumentu, data, strony, kwota')
     try {
+      flow.set('query', 'Wyciągnij dane z dokumentu')
       await flow.run(...PIPELINE_EXTRACT)
       const extractError = flow.get('extractError')
       if (extractError) setError(extractError)
@@ -128,7 +128,7 @@ function UploadPage() {
           <button onClick={handleExtract} disabled={busy} className="btn btn-primary btn-sm">
             Wyciągnij dane (Bielik LLM)
           </button>
-          <p className="text-[10px] text-base-content/30">Model ~1.7 GB pobierany przy pierwszym użyciu z HuggingFace.</p>
+          <p className="text-[10px] text-base-content/30">Model pobierany przy pierwszym użyciu.</p>
 
           {llmStatus && (
             <div className="flex items-center gap-2 text-xs text-base-content/50">
@@ -171,7 +171,7 @@ function UploadPage() {
             <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/storage</span><br/><span className="text-base-content/30">OPFS + IndexedDB</span></div>
             <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/ocr</span><br/><span className="text-base-content/30">parsowanie PDF + Tesseract</span></div>
             <div className="bg-base-100 rounded p-2"><span className="text-primary">@obieg-zero/embed</span><br/><span className="text-base-content/30">embeddingi + wyszukiwanie semantyczne</span></div>
-            <div className="bg-base-100 rounded p-2 col-span-2"><span className="text-primary">@obieg-zero/llm</span> <span className="text-base-content/30">— lokalny LLM przez wllama/GGUF (Bielik 1.5B, ~1.7 GB)</span></div>
+            <div className="bg-base-100 rounded p-2 col-span-2"><span className="text-primary">@obieg-zero/llm</span> <span className="text-base-content/30">— lokalny LLM przez wllama/GGUF (Bielik 1.5B, ~928 MB)</span></div>
           </div>
 
           <div className="flex gap-2">
