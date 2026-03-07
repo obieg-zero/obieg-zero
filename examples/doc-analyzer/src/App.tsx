@@ -28,6 +28,7 @@ function Sheet({ mod, onClose }: { mod: typeof modules[0]; onClose: () => void }
 
 export default function App() {
   const init = useApp(s => s.init)
+  const ready = useApp(s => s.ready)
   const activePageId = useApp(s => s.activePageId)
   const openSheetId = useApp(s => s.openSheetId)
   const enabledModules = useApp(s => s.enabledModules)
@@ -35,7 +36,7 @@ export default function App() {
   const toggleSheet = useApp(s => s.toggleSheet)
   const closeSheet = useApp(s => s.closeSheet)
 
-  useEffect(() => { init() }, [init])
+  useEffect(() => { init() }, [])
   useEffect(() => {
     const onHash = () => {
       const id = location.hash.slice(1)
@@ -52,6 +53,8 @@ export default function App() {
 
   // settings always visible
   const settingsMod = modules.find(m => m.id === 'settings')
+
+  if (!ready) return null
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col">
