@@ -16,9 +16,9 @@ flow.use(embedModule, {
     { type: 'module' },
   ),
 })
-flow.use(llmModule, { nCtx: 2048, nPredict: 1 })
+flow.use(llmModule, { nCtx: 2048, nPredict: 256 })
 
 flow.node('qa-prompt', templateNode({
-  template: `Context:\n{{context}}\n\nAnswer concisely in Polish: {{query}}`,
+  template: `Context:\n{{context}}\n\nQuestion: {{query}}`,
   output: 'prompt',
 }))

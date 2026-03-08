@@ -69,8 +69,8 @@ export interface Preset { name: string; desc: string; steps: { type: StepType; i
 
 export const PRESETS: Preset[] = [
   {
-    name: 'LLM smoke test (1 token)',
-    desc: 'OCR → Embed → Search → LLM — proves pipeline works',
+    name: 'LLM smoke test',
+    desc: 'OCR → Embed → Search → LLM — set nPredict=1 in Modules',
     steps: [
       { type: 'ocr', input: '' },
       { type: 'embed', input: '' },
