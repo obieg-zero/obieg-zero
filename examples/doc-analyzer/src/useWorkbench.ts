@@ -2,7 +2,7 @@ import { useReducer, useEffect, useCallback } from 'react'
 import { flow, NODES, TPL_OUTPUT } from './flow.ts'
 import { templateNode } from '@obieg-zero/core'
 import type { FlowEvent } from '@obieg-zero/core'
-import type { S, Step, StepType, Log, Preset } from './types.ts'
+import type { S, Task, Step, StepType, Log, Preset } from './types.ts'
 import { INIT, STEP_DEFS } from './types.ts'
 
 function ts() {
@@ -19,7 +19,7 @@ function reducer(s: S, a: Partial<S> & { _log?: { text: string; level: Log['leve
 export function useWorkbench() {
   const [s, up] = useReducer(reducer, INIT)
   const busy = s.phase === 'running'
-  const hasFile = !!s.file
+  const task = s.tasks.find(t => t.id === s.activeTaskId) ?? null
 
   const log = useCallback((text: string, level: Log['level'] = 'info') => up({ _log: { text, level } }), [])
 
@@ -35,63 +35,89 @@ export function useWorkbench() {
     })
   }, [])
 
-  const resetSession = () => {
+  const updateTask = (id: number, patch: Partial<Task>) =>
+    up({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })
+
+  const updateTaskStep = (taskId: number, stepId: number, patch: Partial<Step>) =>
+    up({ tasks: s.tasks.map(t => t.id === taskId
+      ? { ...t, steps: t.steps.map(st => st.id === stepId ? { ...st, ...patch } : st) }
+      : t
+    ) })
+
+  // Switch active task — restore its flow vars
+  const activateTask = (taskId: number) => {
+    const t = s.tasks.find(t => t.id === taskId)
+    if (!t) return
+    // Clear flow vars
     for (const key of Object.keys(flow.vars)) flow.set(key, null)
-    up({ steps: s.steps.map(st => ({ ...st, output: '', status: 'idle' as const, meta: undefined })), streaming: '' })
+    // Set task's context
+    if (t.file) {
+      flow.set('file', t.file)
+      flow.set('projectId', t.projectId)
+      flow.set('fileKey', t.fileName)
+    }
+    up({ activeTaskId: taskId, logOpen: true })
+    log(`Task: ${t.name}`, 'info')
   }
 
-  const loadFile = (file: File) => {
-    resetSession()
-    const pid = `doc-${file.name}-${file.size}-${file.lastModified}`
-    flow.set('file', file)
-    flow.set('projectId', pid)
-    flow.set('fileKey', file.name)
-    up({ file, fileName: file.name, logOpen: true })
-    log(`Session: ${pid}`, 'ok')
-  }
-
-  const loadText = (text: string) => {
-    if (!text.trim()) return
-    resetSession()
-    const pid = `paste-${Date.now()}`
-    flow.set('pages', [{ page: 1, text }])
-    flow.set('projectId', pid)
-    const name = `Text (${text.length} chars)`
-    up({ file: new File([text], 'paste.txt'), fileName: name, logOpen: true })
-    log(`Session: ${pid}`, 'ok')
-  }
-
-  const addStep = (type: StepType) => {
-    up({
-      steps: [...s.steps, { id: s.nextId, type, input: '', output: '', status: 'idle' }],
-      nextId: s.nextId + 1,
-    })
-  }
-
-  const updateStep = (id: number, patch: Partial<Step>) =>
-    up({ steps: s.steps.map(st => st.id === id ? { ...st, ...patch } : st) })
-
-  const removeStep = (id: number) => up({ steps: s.steps.filter(st => st.id !== id) })
-
-  const loadPreset = (p: Preset) => {
+  // Preset creates a task instance
+  const createTask = (p: Preset) => {
     let nid = s.nextId
+    const taskId = nid++
     const steps: Step[] = p.steps.map(ps => ({
       id: nid++, type: ps.type, input: ps.input, output: '', status: 'idle' as const,
     }))
-    up({ steps, nextId: nid })
+    const newTask: Task = {
+      id: taskId, name: p.name, desc: p.desc, steps,
+      file: null, fileName: '', projectId: `task-${taskId}-${Date.now()}`,
+      status: 'idle',
+    }
+    // Clear flow vars for new task
+    for (const key of Object.keys(flow.vars)) flow.set(key, null)
+    flow.set('projectId', newTask.projectId)
+    up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, logOpen: true })
+    log(`New task: ${p.name}`, 'ok')
   }
 
-  // Module settings — one path: flow.configure() rebuilds nodes
+  const removeTask = (id: number) => {
+    const next = s.tasks.filter(t => t.id !== id)
+    up({ tasks: next, activeTaskId: s.activeTaskId === id ? (next[0]?.id ?? null) : s.activeTaskId })
+  }
+
+  const loadFile = (file: File) => {
+    if (!task) return
+    const pid = `task-${task.id}-${file.name}-${file.size}`
+    flow.set('file', file)
+    flow.set('projectId', pid)
+    flow.set('fileKey', file.name)
+    updateTask(task.id, { file, fileName: file.name, projectId: pid })
+    log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`, 'ok')
+  }
+
+  const loadText = (text: string) => {
+    if (!task || !text.trim()) return
+    const pid = `task-${task.id}-paste-${Date.now()}`
+    flow.set('pages', [{ page: 1, text }])
+    flow.set('projectId', pid)
+    const name = `Text (${text.length} chars)`
+    const fakeFile = new File([text], 'paste.txt')
+    updateTask(task.id, { file: fakeFile, fileName: name, projectId: pid })
+    log(`Text: ${text.length} chars`, 'ok')
+  }
+
   const configureMod = (moduleId: string, key: string, value: any) => {
     flow.configure(moduleId, { [key]: value })
-    up({}) // trigger re-render
+    up({})
   }
 
   const runStep = async (step: Step) => {
+    if (!task) return
     const def = STEP_DEFS[step.type]
     if (def.needsInput && !step.input.trim()) return
 
-    up({ phase: 'running', steps: s.steps.map(st => st.id === step.id ? { ...st, status: 'running', output: '' } : st) })
+    updateTask(task.id, { status: 'running' })
+    updateTaskStep(task.id, step.id, { status: 'running', output: '' })
+    up({ phase: 'running' })
 
     try {
       if (step.type === 'llm') {
@@ -102,7 +128,7 @@ export function useWorkbench() {
         flow.set('onToken', null)
         up({ streaming: '' })
         const answer = flow.get('answer') ?? ''
-        updateStep(step.id, {
+        updateTaskStep(task.id, step.id, {
           output: answer, status: 'done',
           meta: `context: ${(flow.get('context') ?? '').length} → prompt: ${(flow.get('prompt') ?? '').length} → answer: ${answer.length} chars`,
         })
@@ -111,7 +137,7 @@ export function useWorkbench() {
         flow.set('query', step.input)
         await flow.run(...def.nodes)
         const matched: any[] = flow.get('matchedChunks') ?? []
-        updateStep(step.id, {
+        updateTaskStep(task.id, step.id, {
           output: matched.map((c: any, i: number) =>
             `#${i + 1} [page ${c.page}, score ${c.score.toFixed(3)}]\n${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}`
           ).join('\n\n'),
@@ -122,24 +148,26 @@ export function useWorkbench() {
       } else if (step.type === 'template') {
         flow.node(NODES.TPL, templateNode({ template: step.input, output: TPL_OUTPUT }))
         await flow.run(NODES.TPL)
-        updateStep(step.id, { output: flow.get(TPL_OUTPUT), status: 'done' })
+        updateTaskStep(task.id, step.id, { output: flow.get(TPL_OUTPUT), status: 'done' })
 
       } else {
         await flow.run(...def.nodes)
         if (step.type === 'ocr') {
           const pages: any[] = flow.get('pages') ?? []
           const chars = pages.reduce((a: number, p: any) => a + p.text.length, 0)
-          updateStep(step.id, { output: `${pages.length} pages, ${chars} chars`, status: 'done' })
+          updateTaskStep(task.id, step.id, { output: `${pages.length} pages, ${chars} chars`, status: 'done' })
         } else if (step.type === 'embed') {
           const chunks: any[] = flow.get('chunks') ?? []
-          updateStep(step.id, { output: `${chunks.length} chunks embedded`, status: 'done' })
+          updateTaskStep(task.id, step.id, { output: `${chunks.length} chunks embedded`, status: 'done' })
         }
       }
 
       up({ phase: 'ready' })
+      updateTask(task.id, { status: 'done' })
       log(`Step ${step.id} (${step.type}) OK`, 'ok')
     } catch (err: any) {
-      updateStep(step.id, { output: err.message, status: 'error' })
+      updateTaskStep(task.id, step.id, { output: err.message, status: 'error' })
+      updateTask(task.id, { status: 'error' })
       up({ phase: 'ready', streaming: '' })
       flow.set('onToken', null)
       log(`Step ${step.id}: ${err.message}`, 'err')
@@ -147,21 +175,23 @@ export function useWorkbench() {
   }
 
   const runAll = async () => {
+    if (!task) return
     up({ phase: 'running' })
-    for (const step of s.steps) {
+    updateTask(task.id, { status: 'running' })
+    for (const step of task.steps) {
       const def = STEP_DEFS[step.type]
       if (def.needsInput && !step.input.trim()) continue
       await runStep({ ...step })
     }
     up({ phase: 'ready' })
+    updateTask(task.id, { status: 'done' })
   }
 
   return {
-    s, up, busy, hasFile,
+    s, up, busy, task,
+    createTask, activateTask, removeTask,
     loadFile, loadText,
-    addStep, updateStep, removeStep, loadPreset,
-    runStep, runAll, configureMod,
-    clearCache: async () => { await flow.clearCache(); log('Cache cleared', 'ok') },
+    updateTaskStep, runStep, runAll, configureMod,
     getModules: () => flow.modules(),
     getChunks: (): { text: string; page: number }[] => flow.get('chunks') ?? [],
     getVars: (): [string, any][] =>

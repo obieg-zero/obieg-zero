@@ -1,12 +1,13 @@
 import { useRef, type ReactNode, type ComponentType } from 'react'
 import { useWorkbench } from './useWorkbench.ts'
 import { STEP_DEFS, PRESETS, type StepType } from './types.ts'
-import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Layers, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, RefreshCw } from 'react-feather'
+import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Layers, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List } from 'react-feather'
 
 const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
   ocr: FileText, embed: Grid, search: Search, llm: Cpu, template: Edit3,
 }
 const LOG_COLORS: Record<string, string> = { info: 'text-info', ok: 'text-success', err: 'text-error', dim: 'text-base-content/30' }
+const STATUS_COLORS: Record<string, string> = { idle: 'bg-base-content/20', running: 'bg-warning', done: 'bg-success', error: 'bg-error' }
 
 function Panel({ label, icon, onClose, onClear, actions, children, width = 'w-72' }: {
   label: string; icon?: ReactNode; onClose?: () => void; onClear?: () => void; actions?: ReactNode
@@ -38,43 +39,17 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 
 export default function App() {
   const wb = useWorkbench()
-  const { s, up, busy, hasFile } = wb
+  const { s, up, busy, task } = wb
   const pasteRef = useRef<HTMLTextAreaElement>(null)
 
   return (
     <div className="h-screen bg-base-200 flex overflow-hidden text-sm">
-      {/* LEFT */}
+      {/* LEFT — Presets + Data */}
       <Panel label="Toolbox" icon={<Upload size={12} />} width="w-72">
         <div className="space-y-4">
-          <Section label="Data">
-            <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
-              className="file-input file-input-bordered file-input-xs w-full" />
-            <textarea ref={pasteRef} placeholder="...or paste text" rows={3} disabled={busy}
-              className="textarea textarea-bordered textarea-xs w-full font-mono" />
-            <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
-              className="btn btn-outline btn-xs w-full">Load text</button>
-          </Section>
-
-          <Section label="Blocks">
-            {(Object.keys(STEP_DEFS) as StepType[]).map(type => {
-              const st = STEP_DEFS[type]
-              const Icon = STEP_ICONS[type]
-              return (
-                <button key={type} onClick={() => wb.addStep(type)} disabled={busy}
-                  className={`btn btn-${st.color} btn-outline btn-xs w-full justify-start gap-2 h-auto py-1`}>
-                  <Icon size={14} />
-                  <div className="text-left leading-tight">
-                    <div className="font-semibold text-xs">{st.label}</div>
-                    <div className="text-2xs opacity-40 font-normal">{st.desc}</div>
-                  </div>
-                </button>
-              )
-            })}
-          </Section>
-
-          <Section label="Presets">
+          <Section label="New task">
             {PRESETS.map((p, i) => (
-              <button key={i} onClick={() => wb.loadPreset(p)} disabled={busy}
+              <button key={i} onClick={() => wb.createTask(p)} disabled={busy}
                 className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
                 <div className="leading-tight">
                   <div className="text-xs font-semibold">{p.name}</div>
@@ -83,6 +58,17 @@ export default function App() {
               </button>
             ))}
           </Section>
+
+          {task && (
+            <Section label="Document">
+              <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
+                className="file-input file-input-bordered file-input-xs w-full" />
+              <textarea ref={pasteRef} placeholder="...or paste text" rows={3} disabled={busy}
+                className="textarea textarea-bordered textarea-xs w-full font-mono" />
+              <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
+                className="btn btn-outline btn-xs w-full">Load text</button>
+            </Section>
+          )}
 
           <Section label="Flow vars">
             {wb.getVars().map(([k, v]) => {
@@ -97,40 +83,37 @@ export default function App() {
         </div>
       </Panel>
 
-      {/* CENTER */}
+      {/* CENTER — Active task */}
       <Panel
         label="workbench" icon={<span className="font-black text-primary">OBIEG-ZERO</span>} width="flex-1"
         actions={<>
-          {hasFile && (
+          {task?.fileName && (
             <div className="flex items-center gap-2 text-xs text-base-content/50 mr-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-success" />{s.fileName}
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />{task.fileName}
             </div>
           )}
-          {s.steps.length > 0 && (
-            <button onClick={wb.runAll} disabled={busy || !hasFile} className="btn btn-primary btn-xs gap-1 mr-1">
+          {task && task.steps.length > 0 && (
+            <button onClick={wb.runAll} disabled={busy || !task.file} className="btn btn-primary btn-xs gap-1 mr-1">
               {busy ? <span className="loading loading-spinner loading-xs" /> : <Play size={12} />}
-              {busy ? 'Running…' : `Run all (${s.steps.length})`}
+              {busy ? 'Running…' : `Run all (${task.steps.length})`}
             </button>
           )}
           <button onClick={() => up({ modulesOpen: !s.modulesOpen })} className={`btn btn-ghost btn-xs btn-square ${s.modulesOpen ? 'btn-active' : ''}`}><Sliders size={13} /></button>
-          <button onClick={() => up({ chunksOpen: !s.chunksOpen })} className={`btn btn-ghost btn-xs btn-square ${s.chunksOpen ? 'btn-active' : ''}`}><Layers size={13} /></button>
           <button onClick={() => up({ logOpen: !s.logOpen })} className={`btn btn-ghost btn-xs btn-square ${s.logOpen ? 'btn-active' : ''}`}><Terminal size={13} /></button>
-          <button onClick={wb.clearCache} disabled={busy} className="btn btn-ghost btn-xs btn-square" title="Clear cache"><RefreshCw size={13} /></button>
           <button onClick={() => { const dark = !s.dark; document.documentElement.dataset.theme = dark ? 'dracula' : 'corporate'; up({ dark }) }}
             className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
         </>}>
-        {s.steps.length === 0 ? (
+        {!task ? (
           <div className="flex flex-col items-center justify-center h-full text-base-content/20 gap-3">
             <div className="text-4xl font-light">pipeline</div>
-            <p className="text-xs">Build a document analysis pipeline</p>
-            <p className="text-xs">
-              <strong>OCR</strong> — <strong>Embed</strong> — <strong>Search</strong> — <strong>LLM</strong> — <strong>Template</strong>
-            </p>
-            <p className="text-2xs text-base-content/20">or pick a preset from the sidebar</p>
+            <p className="text-xs">Pick a task schema from the sidebar</p>
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-0">
-            {s.steps.map((step, idx) => {
+            {!task.file && (
+              <div className="pb-4 text-center text-xs text-warning">Load a document first</div>
+            )}
+            {task.steps.map((step, idx) => {
               const st = STEP_DEFS[step.type]
               const Icon = STEP_ICONS[step.type]
               return (
@@ -147,21 +130,19 @@ export default function App() {
                         {step.status === 'error' && <AlertCircle size={12} className="text-error" />}
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => wb.runStep(step)} disabled={busy || (st.needsInput && !step.input.trim()) || (!hasFile && step.type !== 'template')}
+                        <button onClick={() => wb.runStep(step)} disabled={busy || (st.needsInput && !step.input.trim()) || (!task.file && step.type !== 'template')}
                           className={`btn btn-${st.color} btn-xs btn-square`}><Play size={12} /></button>
-                        <button onClick={() => wb.removeStep(step.id)} disabled={busy}
-                          className="btn btn-ghost btn-xs btn-square opacity-30 hover:opacity-100"><X size={12} /></button>
                       </div>
                     </div>
 
                     {st.needsInput && (
                       step.type === 'template' ? (
-                        <textarea value={step.input} onChange={e => wb.updateStep(step.id, { input: e.target.value })}
+                        <textarea value={step.input} onChange={e => wb.updateTaskStep(task.id, step.id, { input: e.target.value })}
                           placeholder={st.ph} disabled={busy}
                           className="textarea textarea-bordered textarea-sm w-full font-mono text-xs" rows={3} />
                       ) : (
-                        <input type="text" value={step.input} onChange={e => wb.updateStep(step.id, { input: e.target.value })}
-                          onKeyDown={e => e.key === 'Enter' && hasFile && wb.runStep(step)}
+                        <input type="text" value={step.input} onChange={e => wb.updateTaskStep(task.id, step.id, { input: e.target.value })}
+                          onKeyDown={e => e.key === 'Enter' && task.file && wb.runStep(step)}
                           placeholder={st.ph} disabled={busy}
                           className="input input-bordered input-sm w-full" />
                       )
@@ -185,17 +166,43 @@ export default function App() {
                       <div className="mt-1 text-2xs text-base-content/25 font-mono">{step.meta}</div>
                     )}
                   </div>
-                  {idx < s.steps.length - 1 && <div className="flex justify-center py-1"><span className="text-base-content/10 text-lg">|</span></div>}
+                  {idx < task.steps.length - 1 && <div className="flex justify-center py-1"><span className="text-base-content/10 text-lg">|</span></div>}
                 </div>
               )
             })}
-
-            {!hasFile && <div className="pt-4 text-center text-xs text-warning">load a PDF file first</div>}
           </div>
         )}
       </Panel>
 
-      {/* RIGHT PANELS */}
+      {/* RIGHT — Task list */}
+      <Panel label={`Tasks (${s.tasks.length})`} icon={<List size={12} />} width="w-72">
+        <div className="space-y-2">
+          {s.tasks.map(t => (
+            <button key={t.id} onClick={() => wb.activateTask(t.id)}
+              className={`w-full text-left rounded p-2 ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[t.status]}`} />
+                  <span className="text-xs font-semibold truncate">{t.name}</span>
+                </div>
+                <button onClick={e => { e.stopPropagation(); wb.removeTask(t.id) }}
+                  className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
+              </div>
+              {t.fileName && (
+                <div className="text-2xs text-base-content/40 truncate ml-4">{t.fileName}</div>
+              )}
+              <div className="text-2xs text-base-content/25 ml-4">
+                {t.steps.filter(s => s.status === 'done').length}/{t.steps.length} steps
+              </div>
+            </button>
+          ))}
+          {s.tasks.length === 0 && (
+            <div className="text-center text-base-content/20 py-8 text-xs">Pick a schema from Toolbox</div>
+          )}
+        </div>
+      </Panel>
+
+      {/* OPTIONAL PANELS */}
       {s.modulesOpen && (
         <Panel label="Modules" icon={<Sliders size={12} />} onClose={() => up({ modulesOpen: false })}>
           <div className="space-y-3">
@@ -214,23 +221,6 @@ export default function App() {
                 ))}
               </div>
             ))}
-          </div>
-        </Panel>
-      )}
-
-      {s.chunksOpen && (
-        <Panel label={`Chunks (${wb.getChunks().length})`} icon={<Layers size={12} />} onClose={() => up({ chunksOpen: false })}>
-          <div className="space-y-2">
-            {wb.getChunks().map((ch, i) => (
-              <div key={i} className="bg-base-200 rounded p-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-2xs font-mono text-base-content/30">#{i + 1} p.{ch.page}</span>
-                  <span className="text-2xs font-mono text-base-content/20">{ch.text.length}</span>
-                </div>
-                <div className="text-xs text-base-content/50 leading-snug line-clamp-4">{ch.text}</div>
-              </div>
-            ))}
-            {wb.getChunks().length === 0 && <div className="text-center text-base-content/20 py-8 text-xs">Run OCR + Embed first</div>}
           </div>
         </Panel>
       )}

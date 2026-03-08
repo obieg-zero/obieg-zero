@@ -17,26 +17,36 @@ export interface Step {
   meta?: string
 }
 
+export interface Task {
+  id: number
+  name: string
+  desc: string
+  steps: Step[]
+  file: File | null
+  fileName: string
+  projectId: string
+  status: 'idle' | 'running' | 'done' | 'error'
+}
+
 export type Log = { t: string; text: string; level: 'info' | 'ok' | 'err' | 'dim' }
 
 export interface S {
   logs: Log[]
   pct: number
   phase: 'idle' | 'ready' | 'running'
-  file: File | null
-  fileName: string
-  steps: Step[]
+  tasks: Task[]
+  activeTaskId: number | null
   nextId: number
   streaming: string
   logOpen: boolean
-  chunksOpen: boolean
   modulesOpen: boolean
   dark: boolean
 }
 
 export const INIT: S = {
-  logs: [], pct: 0, phase: 'idle', file: null, fileName: '',
-  steps: [], nextId: 1, streaming: '', logOpen: false, chunksOpen: false, modulesOpen: false, dark: true,
+  logs: [], pct: 0, phase: 'idle',
+  tasks: [], activeTaskId: null, nextId: 1,
+  streaming: '', logOpen: false, modulesOpen: false, dark: true,
 }
 
 export const STEP_DEFS: Record<StepType, StepDef> = {
