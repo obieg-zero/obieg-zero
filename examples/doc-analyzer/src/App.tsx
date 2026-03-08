@@ -70,16 +70,6 @@ export default function App() {
             </Section>
           )}
 
-          <Section label="Flow vars">
-            {wb.getVars().map(([k, v]) => {
-              const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
-              return (
-                <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
-                  <span className="text-base-content/50">${k}</span> = {display}
-                </div>
-              )
-            })}
-          </Section>
         </div>
       </Panel>
 
@@ -196,6 +186,19 @@ export default function App() {
               </div>
             </button>
           ))}
+          {task && wb.getVars().length > 0 && (
+            <div className="border-t border-base-300 -mx-3 px-3 pt-3 mt-3">
+              <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Flow vars</div>
+              {wb.getVars().map(([k, v]) => {
+                const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
+                return (
+                  <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
+                    <span className="text-base-content/50">${k}</span> = {display}
+                  </div>
+                )
+              })}
+            </div>
+          )}
           {s.tasks.length === 0 && (
             <div className="text-center text-base-content/20 py-8 text-xs">Pick a schema from Toolbox</div>
           )}
