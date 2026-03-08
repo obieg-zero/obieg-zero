@@ -1,10 +1,10 @@
 import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
-import { storageModule, createIdbCache, opfsUpload, opfsRead } from '@obieg-zero/storage'
+import { storageModule } from '@obieg-zero/storage'
 import { ocrModule } from '@obieg-zero/ocr'
 import { embedModule } from '@obieg-zero/embed'
 import { llmModule } from '@obieg-zero/llm'
 
-// single source of truth for node IDs
+// single source of truth for node IDs — match module-registered names
 export const NODES = {
   OCR: 'ocr',
   EMBED: 'embed',
@@ -12,8 +12,9 @@ export const NODES = {
   QA_PROMPT: 'qa-prompt',
   LLM: 'llm',
   TPL: 'tpl',
-  UPLOAD: 'opfs-upload',
-  LOAD_FILE: 'opfs-read',
+  UPLOAD: 'upload',
+  LOAD_FILE: 'read-file',
+  DELETE_PROJECT: 'delete-project',
   EXTRACT: 'extract',
 } as const
 
@@ -21,7 +22,7 @@ export const TPL_OUTPUT = 'templateResult'
 
 export const flow = createFlow()
 
-flow.cache(createIdbCache('workbench'))
+// cache set per-task in useWorkbench (activateTask / createTask / loadFile / loadText)
 flow.use(storageModule)
 flow.use(ocrModule)
 flow.use(embedModule, {
@@ -37,6 +38,4 @@ flow.node(NODES.QA_PROMPT, templateNode({
   template: `Context:\n{{context}}\n\nQuestion: {{query}}`,
   output: 'prompt',
 }))
-flow.node(NODES.UPLOAD, opfsUpload())
-flow.node(NODES.LOAD_FILE, opfsRead())
 flow.node(NODES.EXTRACT, extractNode())

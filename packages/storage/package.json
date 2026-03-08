@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/storage",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "OPFS file storage and IndexedDB persistence for obieg-zero flows.",
   "type": "module",
   "main": "src/index.ts",

@@ -53,6 +53,8 @@ export function embedNode(config: EmbedConfig): NodeDef {
   }
 
   return {
+    reads: ['pages'],
+    writes: ['chunks'],
     dispose() {
       disposed = true;
       if (worker) { worker.terminate(); worker = null; }

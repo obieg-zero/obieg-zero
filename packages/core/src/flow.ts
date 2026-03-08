@@ -136,11 +136,14 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
           throw new Error(`Node "${id}" not found`);
         }
 
-        // cache check
-        if (cacheAdapter && node.reads?.length && node.writes?.length) {
+        // build cache key from inputs
+        const canCache = cacheAdapter && node.reads?.length && node.writes?.length;
+        let cacheKey: string | undefined;
+        if (canCache) {
           const inputs: Record<string, any> = {};
-          for (const key of node.reads) inputs[key] = hashable(vars[key]);
-          const cached = await cacheAdapter.get(await computeHash(id, inputs));
+          for (const key of node.reads!) inputs[key] = hashable(vars[key]);
+          cacheKey = await computeHash(id, inputs);
+          const cached = await cacheAdapter!.get(cacheKey);
           if (cached) {
             if (debug) console.log(`[flow] ⚡ ${id} (cached)`);
             emit({ type: 'node:start', id });
@@ -166,19 +169,15 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
         try {
           await node.run(ctx);
 
-          // cache store
-          if (cacheAdapter && node.reads?.length && node.writes?.length) {
+          // cache store (reuse cacheKey from above)
+          if (canCache && cacheKey) {
             const outputs: Record<string, any> = {};
-            let canCache = true;
-            for (const key of node.writes) {
-              if (!isSerializable(vars[key])) { canCache = false; break; }
+            let store = true;
+            for (const key of node.writes!) {
+              if (!isSerializable(vars[key])) { store = false; break; }
               outputs[key] = vars[key];
             }
-            if (canCache) {
-              const inputs: Record<string, any> = {};
-              for (const key of node.reads) inputs[key] = hashable(vars[key]);
-              await cacheAdapter.set(await computeHash(id, inputs), outputs);
-            }
+            if (store) await cacheAdapter!.set(cacheKey, outputs);
           }
 
           if (debug) console.log(`[flow] ✓ ${id}`);

@@ -2,11 +2,18 @@ import { useReducer, useEffect, useCallback, useState } from 'react'
 import { flow, NODES, TPL_OUTPUT } from './flow.ts'
 import { templateNode } from '@obieg-zero/core'
 import type { FlowEvent } from '@obieg-zero/core'
-import { saveSettings, loadSettings, listModels, removeModel, totalModelSize, type ModelEntry } from '@obieg-zero/storage'
+import { saveSettings, loadSettings, listModels, removeModel, totalModelSize, createOpfsCache, listProjectFiles, type ModelEntry, type OpfsEntry } from '@obieg-zero/storage'
 import type { S, Task, Step, Log, Preset } from './types.ts'
 import { INIT, STEP_DEFS } from './types.ts'
 
 const TASKS_KEY = 'workbench:tasks'
+
+function switchProject(pid: string) {
+  for (const key of Object.keys(flow.vars)) flow.set(key, null)
+  flow.cache(createOpfsCache(pid))
+  flow.set('projectId', pid)
+}
+
 
 function ts() {
   const d = new Date()
@@ -29,6 +36,7 @@ export function useWorkbench() {
   const busy = s.phase === 'running'
   const task = s.tasks.find(t => t.id === s.activeTaskId) ?? null
   const [models, setModels] = useState<{ list: ModelEntry[]; totalSize: number }>({ list: [], totalSize: 0 })
+  const [opfsFiles, setOpfsFiles] = useState<OpfsEntry[]>([])
 
   const log = useCallback((text: string, level: Log['level'] = 'info') => up({ _log: { text, level } }), [])
 
@@ -54,6 +62,12 @@ export function useWorkbench() {
   }, [s.tasks, s.nextId, s.activeTaskId])
 
   // Refresh model registry
+  const refreshOpfs = useCallback(async (pid?: string) => {
+    const id = pid ?? task?.projectId
+    if (id) setOpfsFiles(await listProjectFiles(id))
+    else setOpfsFiles([])
+  }, [task?.projectId])
+
   const refreshModels = useCallback(async () => {
     const [list, size] = await Promise.all([listModels(), totalModelSize()])
     setModels({ list, totalSize: size })
@@ -90,8 +104,7 @@ export function useWorkbench() {
   const activateTask = async (taskId: number) => {
     const t = s.tasks.find(t => t.id === taskId)
     if (!t) return
-    for (const key of Object.keys(flow.vars)) flow.set(key, null)
-    flow.set('projectId', t.projectId)
+    switchProject(t.projectId)
     if (t.fileName) {
       flow.set('fileKey', t.fileName)
       // Try to restore file from OPFS
@@ -105,6 +118,7 @@ export function useWorkbench() {
       }
     }
     up({ activeTaskId: taskId, logOpen: true })
+    refreshOpfs(t.projectId)
     log(`Task: ${t.name}`, 'info')
   }
 
@@ -119,8 +133,7 @@ export function useWorkbench() {
       file: null, fileName: '', projectId: `task-${taskId}-${Date.now()}`,
       status: 'idle',
     }
-    for (const key of Object.keys(flow.vars)) flow.set(key, null)
-    flow.set('projectId', newTask.projectId)
+    switchProject(newTask.projectId)
     up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, logOpen: true })
     log(`New task: ${p.name}`, 'ok')
   }
@@ -130,7 +143,7 @@ export function useWorkbench() {
     if (t) {
       // Clean up OPFS project
       flow.set('projectId', t.projectId)
-      flow.run('opfs-delete-project').catch(() => {})
+      flow.run(NODES.DELETE_PROJECT).catch(() => {})
     }
     const next = s.tasks.filter(t => t.id !== id)
     up({ tasks: next, activeTaskId: s.activeTaskId === id ? (next[0]?.id ?? null) : s.activeTaskId })
@@ -139,14 +152,15 @@ export function useWorkbench() {
   const loadFile = async (file: File) => {
     if (!task) return
     const pid = `task-${task.id}-${file.name}-${file.size}`
+    switchProject(pid)
     flow.set('file', file)
-    flow.set('projectId', pid)
     flow.set('fileKey', file.name)
     updateTask(task.id, { file, fileName: file.name, projectId: pid })
     // Persist to OPFS
     try {
       await flow.run(NODES.UPLOAD)
       log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) → OPFS`, 'ok')
+      refreshOpfs(pid)
     } catch {
       log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) [OPFS failed]`, 'info')
     }
@@ -155,8 +169,8 @@ export function useWorkbench() {
   const loadText = (text: string) => {
     if (!task || !text.trim()) return
     const pid = `task-${task.id}-paste-${Date.now()}`
+    switchProject(pid)
     flow.set('pages', [{ page: 1, text }])
-    flow.set('projectId', pid)
     const name = `Text (${text.length} chars)`
     const fakeFile = new File([text], 'paste.txt')
     updateTask(task.id, { file: fakeFile, fileName: name, projectId: pid })
@@ -214,7 +228,8 @@ export function useWorkbench() {
       } else if (step.type === 'template') {
         flow.node(NODES.TPL, templateNode({ template: step.input, output: TPL_OUTPUT }))
         await flow.run(NODES.TPL)
-        updateTaskStep(task.id, step.id, { output: flow.get(TPL_OUTPUT), status: 'done' })
+        const tplResult = flow.get(TPL_OUTPUT)
+        updateTaskStep(task.id, step.id, { output: tplResult, status: 'done' })
 
       } else {
         await flow.run(...def.nodes)
@@ -230,6 +245,7 @@ export function useWorkbench() {
 
       up({ phase: 'ready' })
       updateTask(task.id, { status: 'done' })
+      refreshOpfs()
       log(`Step ${step.id} (${step.type}) OK`, 'ok')
     } catch (err: any) {
       updateTaskStep(task.id, step.id, { output: err.message, status: 'error' })
@@ -265,6 +281,7 @@ export function useWorkbench() {
     loadFile, loadText,
     updateTaskStep, runStep, runAll, configureMod,
     models, deleteModel, refreshModels,
+    opfsFiles, refreshOpfs,
     getModules: () => flow.modules(),
     getChunks: (): { text: string; page: number }[] => flow.get('chunks') ?? [],
     getVars: (): [string, any][] =>

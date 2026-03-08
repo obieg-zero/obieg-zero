@@ -1,7 +1,7 @@
-import { useRef, type ReactNode, type ComponentType } from 'react'
+import { useRef, useState, type ReactNode, type ComponentType } from 'react'
 import { useWorkbench } from './useWorkbench.ts'
 import { STEP_DEFS, PRESETS, type StepType } from './types.ts'
-import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List, Database } from 'react-feather'
+import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List, Database, HardDrive } from 'react-feather'
 
 const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
   ocr: FileText, embed: Grid, search: Search, llm: Cpu, template: Edit3,
@@ -41,11 +41,23 @@ export default function App() {
   const wb = useWorkbench()
   const { s, up, busy, task } = wb
   const pasteRef = useRef<HTMLTextAreaElement>(null)
+  const [previewFile, setPreviewFile] = useState<string | null>(null)
+  const [previewContent, setPreviewContent] = useState<string>('')
+
+  const openOpfsFile = async (name: string) => {
+    if (previewFile === name) { setPreviewFile(null); return }
+    if (!task) return
+    try {
+      const { readProjectFile } = await import('@obieg-zero/storage')
+      setPreviewContent(await readProjectFile(task.projectId, name))
+      setPreviewFile(name)
+    } catch { setPreviewContent('Failed to read file') ; setPreviewFile(name) }
+  }
 
   return (
     <div className="h-screen bg-base-200 flex overflow-hidden text-sm">
-      {/* LEFT — Presets + Data */}
-      <Panel label="Toolbox" icon={<Upload size={12} />} width="w-72">
+      {/* LEFT — Tasks + Presets */}
+      <Panel label="Tasks" icon={<List size={12} />} width="w-72">
         <div className="space-y-4">
           <Section label="New task">
             {PRESETS.map((p, i) => (
@@ -59,7 +71,29 @@ export default function App() {
             ))}
           </Section>
 
-
+          {s.tasks.length > 0 && (
+            <Section label={`Active (${s.tasks.length})`}>
+              {s.tasks.map(t => (
+                <div key={t.id} onClick={() => wb.activateTask(t.id)}
+                  className={`w-full text-left rounded p-2 cursor-pointer ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[t.status]}`} />
+                      <span className="text-xs font-semibold truncate">{t.name}</span>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); wb.removeTask(t.id) }}
+                      className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
+                  </div>
+                  {t.fileName && (
+                    <div className="text-2xs text-base-content/40 truncate ml-4">{t.fileName}</div>
+                  )}
+                  <div className="text-2xs text-base-content/25 ml-4">
+                    {t.steps.filter(s => s.status === 'done').length}/{t.steps.length} steps
+                  </div>
+                </div>
+              ))}
+            </Section>
+          )}
         </div>
       </Panel>
 
@@ -169,46 +203,46 @@ export default function App() {
         )}
       </Panel>
 
-      {/* RIGHT — Task list */}
-      <Panel label={`Tasks (${s.tasks.length})`} icon={<List size={12} />} width="w-72">
-        <div className="space-y-2">
-          {s.tasks.map(t => (
-            <button key={t.id} onClick={() => wb.activateTask(t.id)}
-              className={`w-full text-left rounded p-2 ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[t.status]}`} />
-                  <span className="text-xs font-semibold truncate">{t.name}</span>
-                </div>
-                <button onClick={e => { e.stopPropagation(); wb.removeTask(t.id) }}
-                  className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
-              </div>
-              {t.fileName && (
-                <div className="text-2xs text-base-content/40 truncate ml-4">{t.fileName}</div>
-              )}
-              <div className="text-2xs text-base-content/25 ml-4">
-                {t.steps.filter(s => s.status === 'done').length}/{t.steps.length} steps
-              </div>
-            </button>
-          ))}
-          {task && wb.getVars().length > 0 && (
-            <div className="border-t border-base-300 -mx-3 px-3 pt-3 mt-3">
-              <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Flow vars</div>
-              {wb.getVars().map(([k, v]) => {
-                const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
-                return (
-                  <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
-                    <span className="text-base-content/50">${k}</span> = {display}
+      {/* RIGHT — Task data */}
+      {task && (
+        <Panel label={task.name} icon={<HardDrive size={12} />} width="w-72">
+          <div className="space-y-4">
+            {wb.opfsFiles.length > 0 && (
+              <Section label="OPFS files">
+                {wb.opfsFiles.map(f => (
+                  <div key={f.name}>
+                    <div onClick={() => f.name.endsWith('.json') ? openOpfsFile(f.name) : null}
+                      className={`text-2xs text-base-content/30 font-mono flex items-center justify-between ${f.name.endsWith('.json') ? 'cursor-pointer hover:text-base-content/60' : ''}`}>
+                      <span className="truncate" title={f.name}>
+                        {previewFile === f.name ? '- ' : f.name.endsWith('.json') ? '+ ' : '  '}{f.name}
+                      </span>
+                      <span className="text-base-content/20 shrink-0 ml-1">{f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(0)} KB`}</span>
+                    </div>
+                    {previewFile === f.name && (
+                      <pre className="text-2xs text-base-content/50 bg-base-200 rounded p-2 mt-1 mb-2 max-h-60 overflow-auto whitespace-pre-wrap break-all font-mono">
+                        {previewContent.slice(0, 5000)}{previewContent.length > 5000 ? '\n…truncated' : ''}
+                      </pre>
+                    )}
                   </div>
-                )
-              })}
-            </div>
-          )}
-          {s.tasks.length === 0 && (
-            <div className="text-center text-base-content/20 py-8 text-xs">Pick a schema from Toolbox</div>
-          )}
-        </div>
-      </Panel>
+                ))}
+              </Section>
+            )}
+
+            {wb.getVars().length > 0 && (
+              <Section label="Flow vars">
+                {wb.getVars().map(([k, v]) => {
+                  const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
+                  return (
+                    <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
+                      <span className="text-base-content/50">${k}</span> = {display}
+                    </div>
+                  )
+                })}
+              </Section>
+            )}
+          </div>
+        </Panel>
+      )}
 
       {/* OPTIONAL PANELS */}
       {s.modulesOpen && (

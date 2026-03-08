@@ -10,6 +10,8 @@ export function searchNode(config?: { topK?: number; keywordBoost?: number; maxC
   const { topK = 5, keywordBoost = 0.05, maxContextChars = 2000 } = config ?? {};
 
   return {
+    reads: ['query', 'chunks'],
+    writes: ['context', 'matchedChunks'],
     async run(ctx) {
       const query: string = ctx.get('query');
       const chunks: { text: string; page: number; embedding: number[] }[] = ctx.get('chunks');

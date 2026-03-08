@@ -3,6 +3,8 @@ import type { NodeDef } from './flow.js';
 export function extractNode(config?: { output?: string }): NodeDef {
   const output = config?.output ?? 'extracted';
   return {
+    reads: ['answer'],
+    writes: [output, 'extractError'],
     async run(ctx) {
       const answer: string = ctx.get('answer');
       if (!answer) throw new Error('extract: needs $answer');
