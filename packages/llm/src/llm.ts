@@ -37,29 +37,35 @@ export function llmNode(config: LlmConfig): NodeDef {
         throw new Error(`llm: prompt too long (~${estimatedTokens} tokens) + nPredict(${np}) > nCtx(${ctxSize}). Trim context or raise nCtx.`);
       }
 
+      const t0 = Date.now();
+      const log = (msg: string) => console.log(`[llm +${((Date.now() - t0) / 1000).toFixed(1)}s] ${msg}`);
+
       if (!wllama) {
         ctx.progress('Loading model…');
+        log(`Loading wllama…`);
         const { Wllama } = await import('@wllama/wllama');
         const paths = wasmPaths ?? {
           'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
           'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
         };
         wllama = new Wllama(paths as any);
+        log(`Loading model from ${modelUrl.split('/').pop()}, nCtx=${ctxSize}`);
         await wllama.loadModelFromUrl(modelUrl, {
           n_ctx: ctxSize,
           progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
             ctx.progress(`Downloading model ${total > 0 ? Math.round((loaded / total) * 100) : 0}%`);
           },
         });
+        log(`Model loaded`);
         ctx.set('llmReady', true);
       }
 
-      const estimatedPromptTokens = Math.ceil(prompt.length / 3);
-      ctx.progress(`Processing prompt (~${estimatedPromptTokens} tokens)… this may take a while`);
+      log(`Prompt: ${prompt.length} chars, ~${estimatedTokens} tokens, nPredict=${np}, nCtx=${ctxSize}`);
+      log(`Calling createCompletion…`);
+      ctx.progress(`Processing prompt (~${estimatedTokens} tokens)…`);
       const onToken = ctx.get('onToken');
       let fullText = '';
       let tokenCount = 0;
-      let firstTokenTime = 0;
 
       const t = ctx.get('timeout') ?? timeout;
       const abort = new AbortController();
@@ -76,17 +82,16 @@ export function llmNode(config: LlmConfig): NodeDef {
           },
           abortSignal: abort.signal,
           onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
-            if (!firstTokenTime) {
-              firstTokenTime = Date.now();
-              ctx.progress(`Generating…`);
-            }
+            if (!tokenCount) log(`First token! Prompt processing took ${((Date.now() - t0) / 1000).toFixed(1)}s`);
             fullText = currentText;
             tokenCount++;
+            log(`Token ${tokenCount}: "${currentText.slice(-20)}"`);
             ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
             if (onToken) onToken(currentText);
           },
         } as any);
       } catch (err) {
+        log(`Error: ${err}`);
         if (abort.signal.aborted) {
           wllama.exit().catch(() => {});
           wllama = null;
@@ -97,9 +102,11 @@ export function llmNode(config: LlmConfig): NodeDef {
         clearTimeout(timer);
       }
 
+      log(`Done: ${tokenCount} tokens, result type=${typeof result}, fullText="${fullText.slice(0, 100)}"`);
       const answer = typeof result === 'string' ? result
         : result && typeof result === 'object' && 'response' in result ? (result as any).response
         : fullText;
+      log(`Answer: "${answer.slice(0, 100)}"`);
       ctx.set('answer', answer);
       ctx.progress('Done');
     },
