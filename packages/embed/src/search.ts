@@ -6,8 +6,8 @@ function cosineSim(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
 }
 
-export function searchNode(config?: { topK?: number; keywordBoost?: number }): NodeDef {
-  const { topK = 5, keywordBoost = 0.05 } = config ?? {};
+export function searchNode(config?: { topK?: number; keywordBoost?: number; maxContextChars?: number }): NodeDef {
+  const { topK = 5, keywordBoost = 0.05, maxContextChars = 2000 } = config ?? {};
 
   return {
     async run(ctx) {
@@ -32,7 +32,13 @@ export function searchNode(config?: { topK?: number; keywordBoost?: number }): N
         .sort((a, b) => b.score - a.score)
         .slice(0, ctx.get('topK') ?? topK);
 
-      ctx.set('context', scored.map(m => m.text).join('\n\n'));
+      const maxChars = ctx.get('maxContextChars') ?? maxContextChars;
+      let context = '';
+      for (const m of scored) {
+        if (context.length + m.text.length > maxChars) break;
+        context += (context ? '\n\n' : '') + m.text;
+      }
+      ctx.set('context', context);
       ctx.set('matchedChunks', scored);
       ctx.progress(`Top ${scored.length} chunks (best: ${scored[0]?.score.toFixed(3) ?? '—'})`);
     },

@@ -10,7 +10,7 @@ flow.cache(createIdbCache('workbench'))
 flow.use(storageModule)
 flow.use(ocrModule)
 flow.use(embedModule, {
-  topK: 3, chunkSize: 200, chunkOverlap: 30,
+  topK: 3, chunkSize: 100, chunkOverlap: 20, maxContextChars: 2000,
   workerFactory: () => new Worker(
     new URL('@obieg-zero/embed/src/embedding-worker.ts', import.meta.url),
     { type: 'module' },

@@ -13,6 +13,7 @@ export const embedModule = defineModule({
     minChunkLength: { type: 'number', label: 'Min. długość chunka (znaki)', default: 10 },
     topK: { type: 'number', label: 'Wyniki wyszukiwania (topK)', default: 5 },
     keywordBoost: { type: 'number', label: 'Waga keyword boost', default: 0.05 },
+    maxContextChars: { type: 'number', label: 'Max context do LLM (znaki)', default: 2000 },
     embedTimeout: { type: 'number', label: 'Timeout embeddingu (ms)', default: 60000 },
   },
   nodes: (config) => ({
@@ -22,6 +23,6 @@ export const embedModule = defineModule({
       minChunkLength: config.minChunkLength, timeout: config.embedTimeout,
       workerFactory: config.workerFactory,
     }),
-    'search': searchNode({ topK: config.topK, keywordBoost: config.keywordBoost }),
+    'search': searchNode({ topK: config.topK, keywordBoost: config.keywordBoost, maxContextChars: config.maxContextChars }),
   }),
 });
