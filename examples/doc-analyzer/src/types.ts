@@ -47,13 +47,14 @@ export interface S {
   nextId: number
   streaming: string
   rightPanel: 'data' | 'modules' | 'log' | null
+  mobileView: 'tasks' | 'pipeline' | 'panel'
   dark: boolean
 }
 
 export const INIT: S = {
   logs: [], pct: 0, phase: 'idle',
   tasks: [], activeTaskId: null, nextId: 1,
-  streaming: '', rightPanel: null, dark: true,
+  streaming: '', rightPanel: null, mobileView: 'tasks', dark: true,
 }
 
 export const STEP_DEFS: Record<StepType, StepDef> = {

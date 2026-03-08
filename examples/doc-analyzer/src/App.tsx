@@ -55,10 +55,13 @@ export default function App() {
     } catch { setPreviewContent('Failed to read file') ; setPreviewFile(name) }
   }
 
+  const mv = s.mobileView
+  const setMv = (v: typeof mv) => up({ mobileView: v })
+
   return (
-    <div className="h-screen bg-base-200 flex overflow-hidden text-sm">
+    <div className="h-screen bg-base-200 flex flex-col md:flex-row overflow-hidden text-sm">
       {/* LEFT — Tasks + Presets */}
-      <Panel label="Tasks" icon={<List size={12} />} width="w-72" footer={
+      <Panel label="Tasks" icon={<List size={12} />} width={`${mv === 'tasks' ? 'flex' : 'hidden'} md:flex w-full md:w-72`} footer={
         <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
           <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — zero backend, zero API, zero cloud</div>
           <div className="text-base-content/80">Your data never leaves your machine.</div>
@@ -70,7 +73,7 @@ export default function App() {
             {wb.presets.length === 0 && !wb.presetsRateLimited && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
             {wb.presetsRateLimited && <div className="text-2xs text-warning/70">GitHub API rate limit exceeded. This is a free, budget-zero app — no API keys, no backend. Try again in ~1 hour.</div>}
             {wb.presets.map((p, i) => (
-              <button key={i} onClick={() => wb.createTask(p)} disabled={busy}
+              <button key={i} onClick={() => { wb.createTask(p); setMv('pipeline') }} disabled={busy}
                 className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
                 <div className="leading-tight">
                   <div className="text-xs font-semibold">{p.name}</div>
@@ -83,7 +86,7 @@ export default function App() {
           {s.tasks.length > 0 && (
             <Section label={`Active (${s.tasks.length})`}>
               {s.tasks.map(t => (
-                <div key={t.id} onClick={() => wb.activateTask(t.id)}
+                <div key={t.id} onClick={() => { wb.activateTask(t.id); setMv('pipeline') }}
                   className={`w-full text-left rounded p-2 cursor-pointer ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
@@ -108,7 +111,8 @@ export default function App() {
 
       {/* CENTER — Active task */}
       <Panel
-        label="workbench" icon={<span className="font-black text-primary">OBIEG-ZERO</span>} width="flex-1"
+        label="workbench" icon={<span className="font-black text-primary">OBIEG-ZERO</span>}
+        width={`${mv === 'pipeline' ? 'flex' : 'hidden'} md:flex flex-1`}
         actions={<>
           {task?.fileName && (
             <div className="flex items-center gap-2 text-xs text-base-content/50 mr-2">
@@ -228,7 +232,9 @@ export default function App() {
 
       {/* RIGHT — switched panel */}
       {s.rightPanel === 'data' && task && (
-        <Panel label={task.name} icon={<HardDrive size={12} />} width="w-72" onClose={() => up({ rightPanel: null })}>
+        <Panel label={task.name} icon={<HardDrive size={12} />}
+          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
+          onClose={() => up({ rightPanel: null })}>
           <div className="space-y-4">
             {wb.opfsFiles.length > 0 && (
               <Section label="OPFS files">
@@ -268,7 +274,9 @@ export default function App() {
       )}
 
       {s.rightPanel === 'modules' && (
-        <Panel label="Modules" icon={<Sliders size={12} />} onClose={() => up({ rightPanel: null })}>
+        <Panel label="Modules" icon={<Sliders size={12} />}
+          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
+          onClose={() => up({ rightPanel: null })}>
           <div className="space-y-3">
             {wb.getModules().map(mod => (
               <div key={mod.def.id} className="bg-base-200 rounded p-2">
@@ -317,7 +325,9 @@ export default function App() {
       )}
 
       {s.rightPanel === 'log' && (
-        <Panel label="Log" icon={<Terminal size={12} />} onClose={() => up({ rightPanel: null })} onClear={() => up({ logs: [] })}>
+        <Panel label="Log" icon={<Terminal size={12} />}
+          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
+          onClose={() => up({ rightPanel: null })} onClear={() => up({ logs: [] })}>
           <div className="font-mono text-2xs space-y-0.5">
             {s.logs.length === 0 && <div className="text-base-content/20">—</div>}
             {s.logs.map((l, i) => (
@@ -326,6 +336,13 @@ export default function App() {
           </div>
         </Panel>
       )}
+
+      {/* Mobile bottom nav */}
+      <div className="md:hidden btm-nav btm-nav-xs bg-base-100 border-t border-base-300">
+        <button onClick={() => setMv('tasks')} className={mv === 'tasks' ? 'active' : ''}><List size={16} /></button>
+        <button onClick={() => setMv('pipeline')} className={mv === 'pipeline' ? 'active' : ''}><Play size={16} /></button>
+        <button onClick={() => { setMv('panel'); if (!s.rightPanel) up({ rightPanel: 'log' }) }} className={mv === 'panel' ? 'active' : ''}><Sliders size={16} /></button>
+      </div>
     </div>
   )
 }
