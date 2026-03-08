@@ -60,39 +60,34 @@ export function llmNode(config: LlmConfig): NodeDef {
       let tokenCount = 0;
 
       const t = ctx.get('timeout') ?? timeout;
-      let timedOut = false;
 
-      const completion = wllama.createChatCompletion(
-        [{ role: 'user', content: prompt }] as any,
-        {
-          nPredict: np,
-          sampling: {
-            temp: ctx.get('temperature') ?? temperature,
-            top_p: ctx.get('topP') ?? topP,
-            top_k: ctx.get('topK') ?? topK,
-          },
-          onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
-            fullText = currentText;
-            tokenCount++;
-            ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
-            if (onToken) onToken(currentText);
-          },
-        } as any,
-      );
+      const completion = wllama.createCompletion(prompt, {
+        nPredict: np,
+        sampling: {
+          temp: ctx.get('temperature') ?? temperature,
+          top_p: ctx.get('topP') ?? topP,
+          top_k: ctx.get('topK') ?? topK,
+        },
+        onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
+          fullText = currentText;
+          tokenCount++;
+          ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
+          if (onToken) onToken(currentText);
+        },
+      } as any);
 
-      const timer = setTimeout(() => { timedOut = true; }, t);
-      const result = await Promise.race([
-        completion,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(
-          `llm: timeout (${Math.round(t / 1000)}s, ${tokenCount} tokens generated)`
-        )), t)),
-      ]);
-      clearTimeout(timer);
-
-      if (timedOut) {
-        // kill stuck inference
+      let result: any;
+      try {
+        result = await Promise.race([
+          completion,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error(
+            `llm: timeout (${Math.round(t / 1000)}s, ${tokenCount} tokens generated)`
+          )), t)),
+        ]);
+      } catch (err) {
         wllama.exit().catch(() => {});
         wllama = null;
+        throw err;
       }
 
       const answer = typeof result === 'string' ? result

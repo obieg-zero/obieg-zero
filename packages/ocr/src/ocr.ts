@@ -26,7 +26,7 @@ export function ocrNode(config?: { language?: string; ocrThreshold?: number; sca
         const content = await page.getTextContent();
         let text = content.items.map((item: any) => item.str).join(' ').trim();
 
-        if (!text || text.length < threshold) {
+        if (!text || text.replace(/\s+/g, '').length < threshold) {
           const viewport = page.getViewport({ scale: sc });
           const canvas = new OffscreenCanvas(viewport.width, viewport.height);
           const renderCtx = canvas.getContext('2d');

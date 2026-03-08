@@ -12,8 +12,10 @@ export function extractNode(config?: { output?: string }): NodeDef {
       if (start === -1) { ctx.set('extractError', 'No JSON found in answer'); ctx.set(output, null); return; }
 
       let parsed: any = null;
-      for (let i = answer.length; i > start; i--) {
-        try { parsed = JSON.parse(answer.slice(start, i)); break; } catch {}
+      // try from each closing bracket/brace, not char-by-char
+      const closer = answer[start] === '{' ? '}' : ']';
+      for (let i = answer.lastIndexOf(closer); i > start; i = answer.lastIndexOf(closer, i - 1)) {
+        try { parsed = JSON.parse(answer.slice(start, i + 1)); break; } catch {}
       }
 
       ctx.set(output, parsed);
