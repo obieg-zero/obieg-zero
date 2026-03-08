@@ -137,18 +137,20 @@ const TOPIC = 'obieg-zero-task'
 const CACHE_KEY = 'obieg-zero:presets'
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24h
 
-export async function fetchPresets(): Promise<Preset[]> {
+export type FetchResult = { presets: Preset[]; rateLimited: boolean }
+
+export async function fetchPresets(): Promise<FetchResult> {
   // Check localStorage cache
   try {
     const cached = localStorage.getItem(CACHE_KEY)
     if (cached) {
       const { ts, data } = JSON.parse(cached)
-      if (Date.now() - ts < CACHE_TTL) return data
+      if (Date.now() - ts < CACHE_TTL) return { presets: data, rateLimited: false }
     }
   } catch { /* ignore */ }
 
   const res = await fetch(`https://api.github.com/orgs/${ORG}/repos?per_page=100`)
-  if (!res.ok) return []
+  if (!res.ok) return { presets: [], rateLimited: res.status === 403 || res.status === 429 }
   const repos: any[] = await res.json()
   const taskRepos = repos.filter((r: any) => r.topics?.includes(TOPIC))
   const presets: Preset[] = []
@@ -163,5 +165,5 @@ export async function fetchPresets(): Promise<Preset[]> {
 
   // Cache result
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: presets })) } catch { /* ignore */ }
-  return presets
+  return { presets, rateLimited: false }
 }

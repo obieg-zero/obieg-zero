@@ -37,12 +37,13 @@ export function useWorkbench() {
   const [models, setModels] = useState<{ list: ModelEntry[]; totalSize: number }>({ list: [], totalSize: 0 })
   const [opfsFiles, setOpfsFiles] = useState<OpfsEntry[]>([])
   const [presets, setPresets] = useState<Preset[]>([])
+  const [presetsRateLimited, setPresetsRateLimited] = useState(false)
 
   const log = useCallback((text: string, level: Log['level'] = 'info') => up({ _log: { text, level } }), [])
 
   // Fetch task presets from GitHub
   useEffect(() => {
-    fetchPresets().then(setPresets).catch(() => {})
+    fetchPresets().then(r => { setPresets(r.presets); setPresetsRateLimited(r.rateLimited) }).catch(() => {})
   }, [])
 
   // Load persisted tasks on mount
@@ -250,7 +251,7 @@ export function useWorkbench() {
   }
 
   return {
-    s, up, busy, task, presets,
+    s, up, busy, task, presets, presetsRateLimited,
     createTask, activateTask, removeTask,
     loadFile, loadText,
     updateTaskStep, runStep, runAll, configureMod,

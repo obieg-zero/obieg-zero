@@ -60,7 +60,8 @@ export default function App() {
       <Panel label="Tasks" icon={<List size={12} />} width="w-72">
         <div className="space-y-4">
           <Section label="New task">
-            {wb.presets.length === 0 && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
+            {wb.presets.length === 0 && !wb.presetsRateLimited && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
+            {wb.presetsRateLimited && <div className="text-2xs text-warning/70">GitHub API rate limit exceeded. This is a free, budget-zero app — no API keys, no backend. Try again in ~1 hour.</div>}
             {wb.presets.map((p, i) => (
               <button key={i} onClick={() => wb.createTask(p)} disabled={busy}
                 className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
