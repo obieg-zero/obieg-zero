@@ -4,7 +4,7 @@ export function templateNode(config: { template: string; output?: string }): Nod
   const { template, output = 'prompt' } = config;
   return {
     async run(ctx) {
-      const result = template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+      const result = template.replace(/\{\{([\w:.]+)\}\}/g, (_, key) => {
         const val = ctx.get(key);
         return val != null ? String(val) : '';
       });

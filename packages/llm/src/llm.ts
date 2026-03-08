@@ -13,7 +13,7 @@ const WASM_CDN = {
 };
 
 export function llmNode(config: LlmConfig): NodeDef {
-  const { modelUrl, nCtx = 4096, nPredict = 256, temperature = 0.3 } = config;
+  const { modelUrl, nCtx = 8192, nPredict = 256, temperature = 0.3 } = config;
   let wllamaInstance: any = null;
 
   return {
@@ -60,7 +60,8 @@ export function llmNode(config: LlmConfig): NodeDef {
       const onToken = ctx.get('onToken');
       let fullText = '';
 
-      const result = await wllamaInstance.createChatCompletion(
+      const LLM_TIMEOUT = 5 * 60_000; // 5 min
+      const completion = wllamaInstance.createChatCompletion(
         [{ role: 'user', content: prompt }] as any,
         {
           nPredict,
@@ -73,6 +74,10 @@ export function llmNode(config: LlmConfig): NodeDef {
         } as any,
       );
 
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('llm: timeout (5 min)')), LLM_TIMEOUT));
+
+      const result = await Promise.race([completion, timeout]);
       const answer = typeof result === 'string' ? result : fullText;
       ctx.set('answer', answer);
       ctx.progress('Gotowe');

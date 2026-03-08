@@ -15,14 +15,17 @@ export function persistSave(config: { keys: string[] }): NodeDef {
 
       ctx.progress('Zapisuję dane…');
       const db = await openDB();
-      for (const key of config.keys) {
-        const val = ctx.get(key);
-        if (val !== undefined) {
-          await idbPut(db, STORE, scopedKey(projectId, key), val);
+      try {
+        for (const key of config.keys) {
+          const val = ctx.get(key);
+          if (val !== undefined) {
+            await idbPut(db, STORE, scopedKey(projectId, key), val);
+          }
         }
+        ctx.progress('Dane zapisane');
+      } finally {
+        db.close();
       }
-      db.close();
-      ctx.progress('Dane zapisane');
     },
   };
 }
@@ -35,14 +38,17 @@ export function persistLoad(config: { keys: string[] }): NodeDef {
 
       ctx.progress('Wczytuję dane…');
       const db = await openDB();
-      for (const key of config.keys) {
-        const val = await idbGet(db, STORE, scopedKey(projectId, key));
-        if (val !== undefined) {
-          ctx.set(key, val);
+      try {
+        for (const key of config.keys) {
+          const val = await idbGet(db, STORE, scopedKey(projectId, key));
+          if (val !== undefined) {
+            ctx.set(key, val);
+          }
         }
+        ctx.progress('Dane wczytane');
+      } finally {
+        db.close();
       }
-      db.close();
-      ctx.progress('Dane wczytane');
     },
   };
 }
@@ -54,10 +60,13 @@ export function persistDelete(config: { keys: string[] }): NodeDef {
       if (!projectId) throw new Error('persistDelete: needs $projectId');
 
       const db = await openDB();
-      for (const key of config.keys) {
-        await idbDelete(db, STORE, scopedKey(projectId, key));
+      try {
+        for (const key of config.keys) {
+          await idbDelete(db, STORE, scopedKey(projectId, key));
+        }
+      } finally {
+        db.close();
       }
-      db.close();
     },
   };
 }

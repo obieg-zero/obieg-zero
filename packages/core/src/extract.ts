@@ -9,17 +9,26 @@ export function extractNode(config?: { output?: string }): NodeDef {
 
       ctx.set('extractError', null);
 
-      const jsonMatch = answer.match(/\{(?:[^{}]|\{[^{}]*\})*\}/) ?? answer.match(/\[(?:[^\[\]]|\[[^\[\]]*\])*\]/);
-      if (!jsonMatch) {
-        ctx.set('extractError', 'Nie znaleziono JSON w odpowiedzi');
+      // find first { or [ and try to parse from there
+      const start = answer.search(/[{\[]/);
+      if (start === -1) {
+        ctx.set('extractError', 'No JSON found in answer');
         ctx.set(output, null);
         return;
       }
 
-      try {
-        ctx.set(output, JSON.parse(jsonMatch[0]));
-      } catch {
-        ctx.set('extractError', 'Błąd parsowania JSON');
+      let parsed: any = null;
+      for (let i = answer.length; i > start; i--) {
+        try {
+          parsed = JSON.parse(answer.slice(start, i));
+          break;
+        } catch { /* try shorter slice */ }
+      }
+
+      if (parsed !== null) {
+        ctx.set(output, parsed);
+      } else {
+        ctx.set('extractError', 'Failed to parse JSON');
         ctx.set(output, null);
       }
     },

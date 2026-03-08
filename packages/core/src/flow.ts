@@ -60,6 +60,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
   const nodes = new Map<string, NodeDef>();
   const listeners = new Set<FlowListener>();
   const registeredModules = new Map<string, RegisteredModule>();
+  let running = false;
 
   function emit(event: FlowEvent) {
     for (const fn of listeners) fn(event);
@@ -119,7 +120,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
       const reg = registeredModules.get(moduleId);
       if (!reg) throw new Error(`Module "${moduleId}" not registered`);
       Object.assign(reg.config, settings);
-      if (reg.enabled) rebuildNodes(reg);
+      if (reg.enabled && !running) rebuildNodes(reg);
     },
 
     enable(moduleId: string) {
@@ -137,6 +138,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
     },
 
     async run(...ids: readonly string[]) {
+      running = true;
       if (debug) console.group(`[flow] run(${ids.join(', ')})`);
       for (const id of ids) {
         const node = nodes.get(id);
@@ -167,11 +169,13 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
           emit({ type: 'node:done', id });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
+          running = false;
           if (debug) { console.error(`[flow] ✕ ${id}:`, err); console.groupEnd(); }
           emit({ type: 'node:error', id, error: msg });
           throw err;
         }
       }
+      running = false;
       if (debug) console.groupEnd();
     },
 

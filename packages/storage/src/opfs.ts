@@ -34,9 +34,13 @@ export function opfsRead(): NodeDef {
       if (!projectId || !fileKey) throw new Error('opfsRead: needs $projectId, $fileKey');
 
       const dir = await getProjectDir(projectId);
-      const handle = await dir.getFileHandle(fileKey);
-      const file = await handle.getFile();
-      ctx.set('file', file);
+      try {
+        const handle = await dir.getFileHandle(fileKey);
+        const file = await handle.getFile();
+        ctx.set('file', file);
+      } catch {
+        throw new Error(`opfsRead: file "${fileKey}" not found in project "${projectId}"`);
+      }
     },
   };
 }
@@ -49,7 +53,11 @@ export function opfsDelete(): NodeDef {
       if (!projectId || !fileKey) throw new Error('opfsDelete: needs $projectId, $fileKey');
 
       const dir = await getProjectDir(projectId);
-      await dir.removeEntry(fileKey);
+      try {
+        await dir.removeEntry(fileKey);
+      } catch {
+        throw new Error(`opfsDelete: file "${fileKey}" not found in project "${projectId}"`);
+      }
     },
   };
 }
@@ -60,9 +68,13 @@ export function opfsDeleteProject(): NodeDef {
       const projectId: string = ctx.get('projectId');
       if (!projectId) throw new Error('opfsDeleteProject: needs $projectId');
 
-      const root = await navigator.storage.getDirectory();
-      const projects = await root.getDirectoryHandle('rag-projects');
-      await projects.removeEntry(projectId, { recursive: true });
+      try {
+        const root = await navigator.storage.getDirectory();
+        const projects = await root.getDirectoryHandle('rag-projects');
+        await projects.removeEntry(projectId, { recursive: true });
+      } catch {
+        throw new Error(`opfsDeleteProject: project "${projectId}" not found`);
+      }
     },
   };
 }

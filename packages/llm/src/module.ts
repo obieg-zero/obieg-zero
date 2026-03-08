@@ -8,7 +8,7 @@ export const llmModule = defineModule({
   label: 'LLM (Bielik)',
   settings: {
     modelUrl: { type: 'string', label: 'URL modelu GGUF', default: DEFAULT_MODEL_URL },
-    nCtx: { type: 'number', label: 'Kontekst (n_ctx)', default: 4096 },
+    nCtx: { type: 'number', label: 'Kontekst (n_ctx)', default: 8192 },
     nPredict: { type: 'number', label: 'Maks. tokenów odpowiedzi', default: 256 },
     temperature: { type: 'number', label: 'Temperatura', default: 0.3 },
   },

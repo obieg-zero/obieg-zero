@@ -12,7 +12,5 @@
     "@obieg-zero/core": ">=0.1.0",
     "@wllama/wllama": ">=2.0.0"
   },
-  "dependencies": {
-    "@obieg-zero/llm": "^0.1.10"
-  }
+  "dependencies": {}
 }
