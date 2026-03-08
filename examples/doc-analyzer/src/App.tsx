@@ -14,7 +14,7 @@ function Panel({ label, icon, onClose, onClear, actions, children, footer, width
   children: ReactNode; footer?: ReactNode; width?: string
 }) {
   return (
-    <div className={`${width} bg-base-100 border-r border-base-300 flex flex-col min-h-0`}>
+    <div className={`${width} bg-base-100 border-r border-base-300 flex-col min-h-0`}>
       <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
         <span className="text-xs font-semibold text-base-content/40 flex items-center gap-1.5">{icon}{label}</span>
         <div className="flex items-center gap-1">
@@ -234,7 +234,7 @@ export default function App() {
       {s.rightPanel === 'data' && task && (
         <Panel label={task.name} icon={<HardDrive size={12} />}
           width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null })}>
+          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })}>
           <div className="space-y-4">
             {wb.opfsFiles.length > 0 && (
               <Section label="OPFS files">
@@ -276,7 +276,7 @@ export default function App() {
       {s.rightPanel === 'modules' && (
         <Panel label="Modules" icon={<Sliders size={12} />}
           width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null })}>
+          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })}>
           <div className="space-y-3">
             {wb.getModules().map(mod => (
               <div key={mod.def.id} className="bg-base-200 rounded p-2">
@@ -327,7 +327,7 @@ export default function App() {
       {s.rightPanel === 'log' && (
         <Panel label="Log" icon={<Terminal size={12} />}
           width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null })} onClear={() => up({ logs: [] })}>
+          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })} onClear={() => up({ logs: [] })}>
           <div className="font-mono text-2xs space-y-0.5">
             {s.logs.length === 0 && <div className="text-base-content/20">—</div>}
             {s.logs.map((l, i) => (
