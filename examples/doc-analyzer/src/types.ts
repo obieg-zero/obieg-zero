@@ -134,16 +134,14 @@ export interface Preset {
 
 const ORG = 'obieg-zero'
 const TOPIC = 'obieg-zero-task'
-const GH_API = 'https://api.github.com'
 
 export async function fetchPresets(): Promise<Preset[]> {
-  const res = await fetch(`${GH_API}/search/repositories?q=topic:${TOPIC}+org:${ORG}`, {
-    headers: { Accept: 'application/vnd.github.v3+json' },
-  })
+  const res = await fetch(`https://api.github.com/orgs/${ORG}/repos?per_page=100`)
   if (!res.ok) return []
-  const { items } = await res.json()
+  const repos: any[] = await res.json()
+  const taskRepos = repos.filter((r: any) => r.topics?.includes(TOPIC))
   const presets: Preset[] = []
-  for (const repo of items) {
+  for (const repo of taskRepos) {
     try {
       const raw = await fetch(`https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/task.json`)
       if (!raw.ok) continue
