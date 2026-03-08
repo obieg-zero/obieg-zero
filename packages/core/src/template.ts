@@ -6,7 +6,8 @@ export function templateNode(config: { template: string; output?: string }): Nod
     async run(ctx) {
       const result = template.replace(/\{\{([\w:.]+)\}\}/g, (_, key) => {
         const val = ctx.get(key);
-        return val != null ? String(val) : '';
+        if (val == null) throw new Error(`template: missing variable $${key}`);
+        return String(val);
       });
       ctx.set(output, result);
     },

@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/llm",
-  "version": "0.1.13",
+  "version": "0.1.24",
   "description": "Local LLM node (wllama/GGUF) for obieg-zero flows.",
   "type": "module",
   "main": "src/index.ts",
@@ -11,6 +11,5 @@
   "peerDependencies": {
     "@obieg-zero/core": ">=0.1.0",
     "@wllama/wllama": ">=2.0.0"
-  },
-  "dependencies": {}
+  }
 }

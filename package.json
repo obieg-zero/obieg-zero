@@ -7,5 +7,9 @@
     "packages/*",
     "examples/*"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^6.0.1"
+  }
 }

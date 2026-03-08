@@ -5,18 +5,20 @@ export interface EmbedConfig {
   dtype?: string;
   chunkSize?: number;
   chunkOverlap?: number;
+  minChunkLength?: number;
+  timeout?: number;
   workerFactory?: () => Worker;
 }
 
-interface Chunk {
-  text: string;
-  page: number;
-  embedding: number[];
-}
+interface Chunk { text: string; page: number; embedding: number[] }
 
 export function embedNode(config: EmbedConfig): NodeDef {
-  const { model, dtype = 'q8', chunkSize = 500, chunkOverlap = 50, workerFactory } = config;
-  if (chunkOverlap >= chunkSize) throw new Error('embedNode: chunkOverlap must be < chunkSize');
+  const {
+    model, dtype = 'q8',
+    chunkSize = 500, chunkOverlap = 50,
+    minChunkLength = 10, timeout = 60_000,
+    workerFactory,
+  } = config;
   let worker: Worker | null = null;
   let disposed = false;
   let reqId = 0;
@@ -31,8 +33,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
       const p = pending.get(id);
       if (!p) return;
       pending.delete(id);
-      if (error) p.reject(new Error(error));
-      else p.resolve(embedding);
+      if (error) p.reject(new Error(error)); else p.resolve(embedding);
     };
     return worker;
   }
@@ -42,10 +43,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
     const id = ++reqId;
     const w = getWorker();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        reject(new Error(`Embedding timeout (id=${id})`));
-      }, 60_000);
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Embedding timeout (id=${id})`)); }, timeout);
       pending.set(id, {
         resolve: (v) => { clearTimeout(timer); resolve(v); },
         reject: (e) => { clearTimeout(timer); reject(e); },
@@ -57,33 +55,28 @@ export function embedNode(config: EmbedConfig): NodeDef {
   return {
     dispose() {
       disposed = true;
-      if (worker) {
-        worker.terminate();
-        worker = null;
-      }
-      for (const [, p] of pending) {
-        p.reject(new Error('embedNode disposed'));
-      }
+      if (worker) { worker.terminate(); worker = null; }
+      for (const [, p] of pending) p.reject(new Error('embedNode disposed'));
       pending.clear();
     },
     async run(ctx) {
       const pages: { page: number; text: string }[] = ctx.get('pages');
       if (!pages?.length) throw new Error('embed: needs $pages');
 
-      ctx.progress('Dzielę tekst na fragmenty…');
+      const cs = ctx.get('chunkSize') ?? chunkSize;
+      const co = ctx.get('chunkOverlap') ?? chunkOverlap;
+      const minLen = ctx.get('minChunkLength') ?? minChunkLength;
 
       const chunks: Chunk[] = [];
       for (const p of pages) {
         const words = p.text.split(/\s+/);
-        for (let i = 0; i < words.length; i += chunkSize - chunkOverlap) {
-          const slice = words.slice(i, i + chunkSize).join(' ');
-          if (slice.length > 10) {
-            chunks.push({ text: slice, page: p.page, embedding: [] });
-          }
+        for (let i = 0; i < words.length; i += cs - co) {
+          const slice = words.slice(i, i + cs).join(' ');
+          if (slice.length > minLen) chunks.push({ text: slice, page: p.page, embedding: [] });
         }
       }
 
-      ctx.progress(`Embeddinguję ${chunks.length} fragmentów…`);
+      ctx.progress(`Embedding ${chunks.length} chunks…`);
       for (let i = 0; i < chunks.length; i++) {
         ctx.progress(`Embedding ${i + 1}/${chunks.length}`, ((i + 1) / chunks.length) * 100);
         chunks[i].embedding = await embed(chunks[i].text);
@@ -91,8 +84,7 @@ export function embedNode(config: EmbedConfig): NodeDef {
 
       ctx.set('chunks', chunks);
       ctx.set('embedFn', embed);
-      ctx.set('queryEmbedding', null);
-      ctx.progress('Embedding zakończony');
+      ctx.progress('Done');
     },
   };
 }

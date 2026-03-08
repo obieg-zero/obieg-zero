@@ -1,6 +1,8 @@
 # obieg-zero — Architecture Guide
 
-Browser-native document flow engine. Zero backend, zero config, zero barrier. Everything runs in the browser: OPFS, IndexedDB, WebAssembly, Web Workers.
+Browser-native document flow engine. Zero backend, zero API, zero cloud. Everything runs in the browser: OPFS, IndexedDB, WebAssembly, Web Workers.
+
+**CRITICAL CONSTRAINT: LLM runs as Q4 GGUF via WASM on a weak laptop. Every token costs seconds. Every wasted computation = wasted energy. Design everything to minimize LLM input: search a lot, send minimum context, ask LLM once. Never re-run nodes whose output already exists. Never send more chunks than needed. This is not a cloud app with unlimited GPU — this is a browser app with a carbon footprint goal of near zero.**
 
 ## Monorepo Structure
 
@@ -40,10 +42,12 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 
 ## Node Reference — Variables Contract
 
+All config params are also overridable at runtime via `ctx.get('paramName')`.
+
 ### @obieg-zero/core
 
 **templateNode({ template, output? })**
-- Reads: any `{{varName}}` referenced in template string
+- Reads: any `{{varName}}` referenced in template string — **throws on missing variable**
 - Writes: `$output` (default: `prompt`)
 
 **extractNode({ output? })**
@@ -53,6 +57,8 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 
 ### @obieg-zero/storage
 
+All OPFS nodes read `$opfsRoot` (default: `obieg-zero`) for root directory name.
+
 **opfsUpload()**
 - Reads: `$projectId`, `$fileKey`, `$file` (File object)
 - Writes: `$storedFile` ({ projectId, fileKey, name, size })
@@ -61,57 +67,89 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 - Reads: `$projectId`, `$fileKey`
 - Writes: `$file` (File object from OPFS)
 
-**opfsDelete()**
-- Reads: `$projectId`, `$fileKey`
+**opfsDelete()** — Reads: `$projectId`, `$fileKey`
 
-**opfsDeleteProject()**
-- Reads: `$projectId`
-- Deletes entire project directory from OPFS
+**opfsDeleteProject()** — Reads: `$projectId`
 
 **opfsOpen()**
-- Reads: `$projectId`, `$fileKey`
+- Reads: `$projectId`, `$fileKey`, `$revokeTimeout` (default: 60000ms)
 - Writes: `$fileUrl` — opens file in new tab
 
-**persistSave({ keys })**
-- Reads: `$projectId` + each key from `keys` array
-- Saves to IndexedDB scoped by projectId
-
-**persistLoad({ keys })**
-- Reads: `$projectId`
-- Writes: each key from `keys` array (loaded from IndexedDB)
-
-**persistDelete({ keys })**
-- Reads: `$projectId`
-- Deletes keys from IndexedDB
+**persistSave/Load/Delete({ keys })** — Reads: `$projectId`, saves/loads/deletes keys from IndexedDB
 
 ### @obieg-zero/ocr
 
-**ocrNode({ language? })**
+**ocrNode({ language?, ocrThreshold?, scale? })**
 - Reads: `$file` (File/Blob)
 - Writes: `$pages` — array of `{ page: number, text: string }`
-- Uses pdfjs-dist for text layer, falls back to Tesseract OCR
+- Config: `language` (default: `pol`), `ocrThreshold` (default: 20 chars), `scale` (default: 2)
+- Uses pdfjs-dist for text layer, falls back to Tesseract OCR when text < threshold
 - Peer deps: `pdfjs-dist`, `tesseract.js`
 
 ### @obieg-zero/embed
 
-**embedNode({ model, dtype?, chunkSize?, chunkOverlap?, workerFactory })**
+**embedNode({ model, dtype?, chunkSize?, chunkOverlap?, minChunkLength?, timeout?, workerFactory })**
 - Reads: `$pages` (from OCR)
-- Writes: `$chunks` — array of `{ text, page, embedding: number[] }`
-- `workerFactory` must return a Worker pointing to `embedding-worker.ts`
+- Writes: `$chunks`, `$embedFn`, `$queryEmbedding` (reset to null)
+- Config: `chunkSize` (500), `chunkOverlap` (50), `minChunkLength` (10), `timeout` (60000ms)
 - Peer dep: `@huggingface/transformers`
 
-**searchNode({ topK? })**
-- Reads: `$query`, `$chunks`, `$queryEmbedding`
+**searchNode({ topK?, keywordBoost? })**
+- Reads: `$query`, `$chunks`, `$queryEmbedding` (or `$embedFn`)
 - Writes: `$context` (joined text), `$matchedChunks`
-- Cosine similarity + keyword boost
+- Config: `topK` (5), `keywordBoost` (0.05 per keyword match)
 
 ### @obieg-zero/llm
 
-**llmNode({ modelUrl, nCtx?, nPredict?, temperature? })**
-- Reads: `$prompt` OR (`$query` + `$context`), optional `$onToken` callback
+**llmNode({ modelUrl, nCtx?, nPredict?, temperature?, topP?, topK?, timeout?, wasmPaths? })**
+- Reads: `$prompt`, optional `$onToken` callback
 - Writes: `$answer`, `$llmReady` (after first model load)
-- Defaults: `nCtx=8192`, `nPredict=1024`, `temperature=0.3`
+- Config: `nCtx` (8192), `nPredict` (256), `temperature` (0.3), `topP` (0.9), `topK` (40), `timeout` (300000ms)
+- `wasmPaths` overrides default CDN URLs for wllama WASM
 - Peer dep: `@wllama/wllama`
+
+## Auto-Cache
+
+Nodes that declare `reads` and `writes` are automatically cached via IndexedDB. Cache key = hash of (nodeId + input values). On cache hit, node is skipped entirely.
+
+```ts
+import { createIdbCache } from '@obieg-zero/storage'
+
+const flow = createFlow()
+flow.cache(createIdbCache('my-project'))  // one line — caching enabled
+
+// Nodes with reads/writes are cached automatically:
+// ocrNode:  reads=['file'], writes=['pages']
+// llmNode:  reads=['prompt'], writes=['answer']
+// Second run with same file → OCR skipped, pages from cache
+```
+
+- `flow.clearCache()` — wipe all cached results for the project
+- Non-serializable outputs (functions, Workers) are never cached
+- File inputs are hashed by name+size+lastModified (not content)
+
+## Model Registry
+
+```ts
+import { listModels, registerModel, removeModel, totalModelSize } from '@obieg-zero/storage'
+
+await listModels()       // → [{ url, size, downloadedAt }]
+await totalModelSize()   // → bytes
+await removeModel(url)   // removes from registry + Cache API
+```
+
+## Performance Rule: Minimize LLM Calls
+
+This runs on a Q4 GGUF model in the browser via WebAssembly on a weak laptop. Every token costs seconds. Design accordingly:
+
+- **Search is free, LLM is expensive** — use search to narrow down, send only the minimum context to LLM
+- **Never re-run a node whose output already exists** — if `$context` is set, don't re-run search
+- **Smallest possible prompt** — trim context to what's needed, not "all chunks"
+- **topK should be low** (2-3) — more chunks = more tokens = slower inference, worse output
+- **nPredict should be low** — ask for structured output (JSON), not essays
+- **Zero waste** — no duplicate embeddings, no redundant inference, no silent re-computation
+
+When building pipelines: search a lot, ask LLM once, with minimal input.
 
 ## Conventions
 

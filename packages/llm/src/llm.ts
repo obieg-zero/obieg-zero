@@ -5,82 +5,101 @@ export interface LlmConfig {
   nCtx?: number;
   nPredict?: number;
   temperature?: number;
+  topP?: number;
+  topK?: number;
+  timeout?: number;
+  wasmPaths?: Record<string, string>;
 }
 
-const WASM_CDN = {
-  'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.7/src/single-thread/wllama.wasm',
-  'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.7/src/multi-thread/wllama.wasm',
-};
-
 export function llmNode(config: LlmConfig): NodeDef {
-  const { modelUrl, nCtx = 8192, nPredict = 256, temperature = 0.3 } = config;
-  let wllamaInstance: any = null;
+  const {
+    modelUrl, nCtx = 2048, nPredict = 512,
+    temperature = 0.3, topP = 0.9, topK = 40,
+    timeout = 300_000, wasmPaths,
+  } = config;
+  let wllama: any = null;
 
   return {
+    reads: ['prompt'],
+    writes: ['answer'],
     dispose() {
-      if (wllamaInstance) {
-        wllamaInstance.exit().catch(() => {});
-        wllamaInstance = null;
-      }
+      if (wllama) { wllama.exit().catch(() => {}); wllama = null; }
     },
     async run(ctx) {
       const prompt = ctx.get('prompt');
       if (!prompt) throw new Error('llm: needs $prompt');
-      if (!modelUrl) throw new Error('llm: needs modelUrl');
 
-      if (!wllamaInstance) {
-        ctx.progress('Ładuję model…');
-        const { Wllama, LoggerWithoutDebug } = await import('@wllama/wllama');
-        const instance = new Wllama(WASM_CDN, {
-          logger: LoggerWithoutDebug,
-          allowOffline: true,
-        });
-
-        try {
-          await instance.loadModelFromUrl(modelUrl, {
-            n_ctx: nCtx,
-            n_batch: 256,
-            progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
-              const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-              ctx.progress(`Pobieranie modelu ${pct}%`, pct);
-            },
-          });
-        } catch (err) {
-          instance.exit().catch(() => {});
-          throw err;
-        }
-
-        wllamaInstance = instance;
-        ctx.set('llmReady', true);
-        ctx.progress('Model gotowy');
+      // guard: estimate tokens (~4 chars/token for latin, ~2 for polish)
+      const estimatedTokens = Math.ceil(prompt.length / 3);
+      const ctxSize = ctx.get('nCtx') ?? nCtx;
+      const np = ctx.get('nPredict') ?? nPredict;
+      if (estimatedTokens + np > ctxSize) {
+        throw new Error(`llm: prompt too long (~${estimatedTokens} tokens) + nPredict(${np}) > nCtx(${ctxSize}). Trim context or raise nCtx.`);
       }
 
-      ctx.progress('Generuję odpowiedź…');
+      if (!wllama) {
+        ctx.progress('Loading model…');
+        const { Wllama } = await import('@wllama/wllama');
+        const paths = wasmPaths ?? {
+          'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
+          'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
+        };
+        wllama = new Wllama(paths as any);
+        await wllama.loadModelFromUrl(modelUrl, {
+          n_ctx: ctxSize,
+          progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
+            ctx.progress(`Downloading model ${total > 0 ? Math.round((loaded / total) * 100) : 0}%`);
+          },
+        });
+        ctx.set('llmReady', true);
+      }
 
+      ctx.progress(`Generating… (prompt: ${prompt.length} chars, max tokens: ${np})`);
       const onToken = ctx.get('onToken');
       let fullText = '';
+      let tokenCount = 0;
 
-      const LLM_TIMEOUT = 5 * 60_000; // 5 min
-      const completion = wllamaInstance.createChatCompletion(
+      const t = ctx.get('timeout') ?? timeout;
+      let timedOut = false;
+
+      const completion = wllama.createChatCompletion(
         [{ role: 'user', content: prompt }] as any,
         {
-          nPredict,
-          sampling: { temp: temperature, top_p: 0.9, top_k: 40 },
-          useCache: true,
+          nPredict: np,
+          sampling: {
+            temp: ctx.get('temperature') ?? temperature,
+            top_p: ctx.get('topP') ?? topP,
+            top_k: ctx.get('topK') ?? topK,
+          },
           onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
             fullText = currentText;
+            tokenCount++;
+            ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
             if (onToken) onToken(currentText);
           },
         } as any,
       );
 
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('llm: timeout (5 min)')), LLM_TIMEOUT));
+      const timer = setTimeout(() => { timedOut = true; }, t);
+      const result = await Promise.race([
+        completion,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(
+          `llm: timeout (${Math.round(t / 1000)}s, ${tokenCount} tokens generated)`
+        )), t)),
+      ]);
+      clearTimeout(timer);
 
-      const result = await Promise.race([completion, timeout]);
-      const answer = typeof result === 'string' ? result : fullText;
+      if (timedOut) {
+        // kill stuck inference
+        wllama.exit().catch(() => {});
+        wllama = null;
+      }
+
+      const answer = typeof result === 'string' ? result
+        : result && typeof result === 'object' && 'response' in result ? (result as any).response
+        : fullText;
       ctx.set('answer', answer);
-      ctx.progress('Gotowe');
+      ctx.progress('Done');
     },
   };
 }

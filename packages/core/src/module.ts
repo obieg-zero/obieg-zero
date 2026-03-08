@@ -6,21 +6,21 @@ export interface SettingDef {
   default: string | number | boolean;
 }
 
-export interface ModuleDef<S extends Record<string, any> = Record<string, any>> {
+export interface ModuleDef {
   id: string;
   label: string;
-  settings: { [K in keyof S]: SettingDef };
-  nodes: (config: S) => Record<string, NodeDef>;
+  settings: Record<string, SettingDef>;
+  nodes: (config: Record<string, any>) => Record<string, NodeDef>;
 }
 
-export function defineModule<S extends Record<string, any>>(def: ModuleDef<S>): ModuleDef<S> {
+export function defineModule(def: ModuleDef): ModuleDef {
   return def;
 }
 
-export function getDefaults<S extends Record<string, any>>(mod: ModuleDef<S>): S {
-  const out: any = {};
+export function getDefaults(mod: ModuleDef): Record<string, any> {
+  const out: Record<string, any> = {};
   for (const [key, s] of Object.entries(mod.settings)) {
     out[key] = s.default;
   }
-  return out as S;
+  return out;
 }

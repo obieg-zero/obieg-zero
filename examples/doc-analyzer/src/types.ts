@@ -1,4 +1,10 @@
-export type StepType = 'search' | 'classify' | 'extract' | 'llm' | 'template'
+export type StepType = 'ocr' | 'embed' | 'search' | 'llm' | 'template'
+
+export interface StepDef {
+  icon: string; label: string; color: string; desc: string
+  ph: string; needsInput: boolean
+  nodes: string[]
+}
 
 export interface Step {
   id: number
@@ -9,49 +15,86 @@ export interface Step {
   meta?: string
 }
 
-export interface ChunkConfig { chunkSize: number; chunkOverlap: number; topK: number }
-
 export type Log = { t: string; text: string; level: 'info' | 'ok' | 'err' | 'dim' }
 
 export interface S {
   logs: Log[]
   pct: number
-  phase: 'idle' | 'ingest' | 'ready' | 'running'
-  doc: { name: string; pages: number; chars: number; chunks: number } | null
+  phase: 'idle' | 'ready' | 'running'
+  file: File | null
+  fileName: string
   steps: Step[]
   nextId: number
   streaming: string
   logOpen: boolean
   chunksOpen: boolean
-  chunkCfg: ChunkConfig
+  modulesOpen: boolean
 }
 
 export const INIT: S = {
-  logs: [], pct: 0, phase: 'idle', doc: null, steps: [], nextId: 1,
-  streaming: '', logOpen: false, chunksOpen: false,
-  chunkCfg: { chunkSize: 200, chunkOverlap: 30, topK: 3 },
+  logs: [], pct: 0, phase: 'idle', file: null, fileName: '',
+  steps: [], nextId: 1, streaming: '', logOpen: false, chunksOpen: false, modulesOpen: false,
 }
 
-export const STEPS: Record<StepType, { icon: string; label: string; color: string; desc: string; ph: string }> = {
-  search:   { icon: '⌕', label: 'Szukaj',     color: 'success',   desc: 'Znajdź fragmenty dokumentu',     ph: 'np. marża banku, kwota kredytu' },
-  classify: { icon: '◈', label: 'Klasyfikuj', color: 'secondary', desc: 'Określ typ dokumentu',            ph: 'np. Czy to umowa kredytowa, aneks czy regulamin?' },
-  extract:  { icon: '⊞', label: 'Wyciągnij',  color: 'accent',   desc: 'Ekstrakcja pól → JSON',           ph: 'np. Podaj jako JSON: marża, WIBOR, kwota, okres' },
-  llm:      { icon: '◎', label: 'Pytaj AI',   color: 'warning',  desc: 'Dowolne pytanie do Bielika',      ph: 'np. Jaka jest marża banku?' },
-  template: { icon: '⎗', label: 'Szablon',    color: 'info',     desc: 'Złóż tekst z {{zmiennych}}',      ph: 'np. Typ: {{docType}}\nMarża: {{answer}}' },
+export const STEP_DEFS: Record<StepType, StepDef> = {
+  ocr: {
+    icon: '📄', label: 'OCR', color: 'primary',
+    desc: 'PDF text extraction, Tesseract fallback',
+    ph: '', needsInput: false, nodes: ['ocr'],
+  },
+  embed: {
+    icon: '🔢', label: 'Embed', color: 'secondary',
+    desc: 'Chunking + vector embeddings',
+    ph: '', needsInput: false, nodes: ['embed'],
+  },
+  search: {
+    icon: '🔍', label: 'Search', color: 'success',
+    desc: 'Cosine similarity + keyword boost → top-K',
+    ph: 'e.g. bank margin, loan amount', needsInput: true, nodes: ['search'],
+  },
+  llm: {
+    icon: '🤖', label: 'LLM', color: 'warning',
+    desc: 'Local inference (wllama/GGUF)',
+    ph: 'e.g. What is the bank margin?', needsInput: true, nodes: ['qa-prompt', 'llm'],
+  },
+  template: {
+    icon: '📝', label: 'Template', color: 'info',
+    desc: 'Compose text from {{variables}}',
+    ph: 'e.g. Type: {{docType}}\nMargin: {{answer}}', needsInput: true, nodes: [],
+  },
 }
 
 export interface Preset { name: string; desc: string; steps: { type: StepType; input: string }[] }
 
 export const PRESETS: Preset[] = [
-  { name: 'Klasyfikacja + ekstrakcja', desc: 'Pełny pipeline WIBOR', steps: [
-    { type: 'classify', input: 'Czy to umowa kredytowa, aneks, regulamin, czy inny dokument? Odpowiedz jednym słowem.' },
-    { type: 'extract', input: 'Podaj w formacie JSON: {"marza": "...", "wibor": "...", "kwota": "...", "okres": "..."}' },
-    { type: 'template', input: 'Typ dokumentu: {{docType}}\n\nParametry:\n{{extracted}}' },
-  ]},
-  { name: 'Szybkie pytanie', desc: 'Search + AI', steps: [
-    { type: 'llm', input: '' },
-  ]},
-  { name: 'Tylko search', desc: 'Instant, bez AI', steps: [
-    { type: 'search', input: '' },
-  ]},
+  {
+    name: 'PDF analysis (no LLM)',
+    desc: 'OCR → Embed → Search — fast, deterministic',
+    steps: [
+      { type: 'ocr', input: '' },
+      { type: 'embed', input: '' },
+      { type: 'search', input: 'bank margin loan amount' },
+    ],
+  },
+  {
+    name: 'Full WIBOR analysis',
+    desc: 'OCR → Embed → Search → LLM → Template',
+    steps: [
+      { type: 'ocr', input: '' },
+      { type: 'embed', input: '' },
+      { type: 'search', input: 'margin WIBOR amount period loan' },
+      { type: 'llm', input: 'Return JSON: {"margin": "...", "wibor": "...", "amount": "...", "period": "..."}' },
+      { type: 'template', input: 'Contract parameters:\n{{answer}}' },
+    ],
+  },
+  {
+    name: 'Quick question',
+    desc: 'OCR → Embed → Search → LLM',
+    steps: [
+      { type: 'ocr', input: '' },
+      { type: 'embed', input: '' },
+      { type: 'search', input: '' },
+      { type: 'llm', input: '' },
+    ],
+  },
 ]

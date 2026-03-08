@@ -8,29 +8,16 @@ export function extractNode(config?: { output?: string }): NodeDef {
       if (!answer) throw new Error('extract: needs $answer');
 
       ctx.set('extractError', null);
-
-      // find first { or [ and try to parse from there
       const start = answer.search(/[{\[]/);
-      if (start === -1) {
-        ctx.set('extractError', 'No JSON found in answer');
-        ctx.set(output, null);
-        return;
-      }
+      if (start === -1) { ctx.set('extractError', 'No JSON found in answer'); ctx.set(output, null); return; }
 
       let parsed: any = null;
       for (let i = answer.length; i > start; i--) {
-        try {
-          parsed = JSON.parse(answer.slice(start, i));
-          break;
-        } catch { /* try shorter slice */ }
+        try { parsed = JSON.parse(answer.slice(start, i)); break; } catch {}
       }
 
-      if (parsed !== null) {
-        ctx.set(output, parsed);
-      } else {
-        ctx.set('extractError', 'Failed to parse JSON');
-        ctx.set(output, null);
-      }
+      ctx.set(output, parsed);
+      if (parsed === null) ctx.set('extractError', 'Failed to parse JSON');
     },
   };
 }

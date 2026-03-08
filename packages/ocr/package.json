@@ -1,11 +1,13 @@
 {
   "name": "@obieg-zero/ocr",
-  "version": "0.1.2",
+  "version": "0.1.6",
   "description": "PDF parsing and OCR node for obieg-zero flows.",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "peerDependencies": {
     "@obieg-zero/core": ">=0.1.0",
     "pdfjs-dist": ">=4.0.0",

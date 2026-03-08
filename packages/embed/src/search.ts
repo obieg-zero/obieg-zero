@@ -1,16 +1,13 @@
 import type { NodeDef } from '@obieg-zero/core';
+
 function cosineSim(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
 }
 
-export function searchNode(config?: { topK?: number }): NodeDef {
-  const topK = config?.topK ?? 5;
+export function searchNode(config?: { topK?: number; keywordBoost?: number }): NodeDef {
+  const { topK = 5, keywordBoost = 0.05 } = config ?? {};
 
   return {
     async run(ctx) {
@@ -18,30 +15,26 @@ export function searchNode(config?: { topK?: number }): NodeDef {
       const chunks: { text: string; page: number; embedding: number[] }[] = ctx.get('chunks');
       if (!query || !chunks?.length) throw new Error('search: needs $query and $chunks');
 
-      let queryEmbedding: number[] = ctx.get('queryEmbedding');
-      if (!queryEmbedding) {
-        const embedFn = ctx.get('embedFn');
-        if (!embedFn) throw new Error('search: needs $queryEmbedding or $embedFn (run embed node first)');
-        queryEmbedding = await embedFn(query);
-      }
-
-      ctx.progress('Szukam…');
+      const embedFn = ctx.get('embedFn');
+      if (!embedFn) throw new Error('search: needs $embedFn (run embed node first)');
+      ctx.progress('Embedding query…');
+      const queryEmbedding: number[] = await embedFn(query);
 
       const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const boost = ctx.get('keywordBoost') ?? keywordBoost;
 
-      const scored = chunks.map((chunk) => {
-        const sim = cosineSim(queryEmbedding, chunk.embedding);
-        const lower = chunk.text.toLowerCase();
-        const keywordBoost = queryWords.filter(w => lower.includes(w)).length * 0.05;
-        return { ...chunk, score: sim + keywordBoost };
-      });
+      const scored = chunks
+        .map((chunk) => {
+          const sim = cosineSim(queryEmbedding, chunk.embedding);
+          const kw = queryWords.filter(w => chunk.text.toLowerCase().includes(w)).length * boost;
+          return { ...chunk, score: sim + kw };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, ctx.get('topK') ?? topK);
 
-      scored.sort((a, b) => b.score - a.score);
-      const matched = scored.slice(0, topK);
-
-      ctx.set('context', matched.map(m => m.text).join('\n\n'));
-      ctx.set('matchedChunks', matched);
-      ctx.progress('Wyszukiwanie zakończone');
+      ctx.set('context', scored.map(m => m.text).join('\n\n'));
+      ctx.set('matchedChunks', scored);
+      ctx.progress(`Top ${scored.length} chunks (best: ${scored[0]?.score.toFixed(3) ?? '—'})`);
     },
   };
 }

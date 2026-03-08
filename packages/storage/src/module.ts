@@ -7,6 +7,8 @@ export const storageModule = defineModule({
   label: 'Storage (OPFS + IndexedDB)',
   settings: {
     persistKeys: { type: 'string', label: 'Klucze do zapisu (CSV)', default: 'pages,chunks,extracted' },
+    opfsRoot: { type: 'string', label: 'Katalog OPFS', default: 'obieg-zero' },
+    revokeTimeout: { type: 'number', label: 'URL revoke timeout (ms)', default: 60000 },
   },
   nodes: (config) => {
     const keys = typeof config.persistKeys === 'string'

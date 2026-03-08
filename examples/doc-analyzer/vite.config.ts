@@ -11,4 +11,7 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
+  optimizeDeps: {
+    force: true,
+  },
 })
