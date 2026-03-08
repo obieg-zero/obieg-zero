@@ -1,10 +1,9 @@
 import { useReducer, useEffect, useCallback, useState } from 'react'
-import { flow, NODES, TPL_OUTPUT } from './flow.ts'
-import { templateNode } from '@obieg-zero/core'
+import { flow, NODES } from './flow.ts'
 import type { FlowEvent } from '@obieg-zero/core'
 import { saveSettings, loadSettings, listModels, removeModel, totalModelSize, createOpfsCache, listProjectFiles, type ModelEntry, type OpfsEntry } from '@obieg-zero/storage'
 import type { S, Task, Step, Log, Preset } from './types.ts'
-import { INIT, STEP_DEFS } from './types.ts'
+import { INIT, STEP_DEFS, fetchPresets } from './types.ts'
 
 const TASKS_KEY = 'workbench:tasks'
 
@@ -37,8 +36,14 @@ export function useWorkbench() {
   const task = s.tasks.find(t => t.id === s.activeTaskId) ?? null
   const [models, setModels] = useState<{ list: ModelEntry[]; totalSize: number }>({ list: [], totalSize: 0 })
   const [opfsFiles, setOpfsFiles] = useState<OpfsEntry[]>([])
+  const [presets, setPresets] = useState<Preset[]>([])
 
   const log = useCallback((text: string, level: Log['level'] = 'info') => up({ _log: { text, level } }), [])
+
+  // Fetch task presets from GitHub
+  useEffect(() => {
+    fetchPresets().then(setPresets).catch(() => {})
+  }, [])
 
   // Load persisted tasks on mount
   useEffect(() => {
@@ -105,6 +110,12 @@ export function useWorkbench() {
     const t = s.tasks.find(t => t.id === taskId)
     if (!t) return
     switchProject(t.projectId)
+    // Restore per-task module overrides
+    if (t.modules) {
+      for (const [moduleId, settings] of Object.entries(t.modules)) {
+        flow.configure(moduleId, settings)
+      }
+    }
     if (t.fileName && !t.file) {
       flow.set('fileKey', t.fileName)
       try {
@@ -130,9 +141,15 @@ export function useWorkbench() {
     const newTask: Task = {
       id: taskId, name: p.name, desc: p.desc, steps,
       file: null, fileName: '', projectId: `task-${taskId}-${Date.now()}`,
-      status: 'idle',
+      status: 'idle', modules: p.modules,
     }
     switchProject(newTask.projectId)
+    // Apply per-task module overrides
+    if (p.modules) {
+      for (const [moduleId, settings] of Object.entries(p.modules)) {
+        flow.configure(moduleId, settings)
+      }
+    }
     up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, logOpen: true })
     log(`New task: ${p.name}`, 'ok')
   }
@@ -140,9 +157,11 @@ export function useWorkbench() {
   const removeTask = (id: number) => {
     const t = s.tasks.find(t => t.id === id)
     if (t) {
-      // Clean up OPFS project
-      flow.set('projectId', t.projectId)
-      flow.run(NODES.DELETE_PROJECT).catch(() => {})
+      // Clean up OPFS directly — avoid corrupting active task's projectId
+      navigator.storage.getDirectory()
+        .then(root => root.getDirectoryHandle('obieg-zero'))
+        .then(dir => dir.removeEntry(t.projectId, { recursive: true }))
+        .catch(() => {})
     }
     const next = s.tasks.filter(t => t.id !== id)
     up({ tasks: next, activeTaskId: s.activeTaskId === id ? (next[0]?.id ?? null) : s.activeTaskId })
@@ -151,7 +170,7 @@ export function useWorkbench() {
   const loadFile = async (file: File) => {
     if (!task) return
     // New file = clear derived state (pages, chunks, context from old file)
-    for (const key of ['pages', 'chunks', 'context', 'matchedChunks', 'embedFn', '_lastSearchQuery']) flow.set(key, null)
+    for (const key of ['pages', 'chunks', 'context', 'matchedChunks', 'embedFn']) flow.set(key, null)
     flow.set('file', file)
     flow.set('fileKey', file.name)
     updateTask(task.id, { file, fileName: file.name })
@@ -167,7 +186,7 @@ export function useWorkbench() {
 
   const loadText = (text: string) => {
     if (!task || !text.trim()) return
-    for (const key of ['chunks', 'context', 'matchedChunks', 'embedFn', '_lastSearchQuery']) flow.set(key, null)
+    for (const key of ['chunks', 'context', 'matchedChunks', 'embedFn']) flow.set(key, null)
     flow.set('pages', [{ page: 1, text }])
     const name = `Text (${text.length} chars)`
     const fakeFile = new File([text], 'paste.txt')
@@ -190,60 +209,12 @@ export function useWorkbench() {
     up({ phase: 'running' })
 
     try {
-      if (step.type === 'llm') {
-        flow.set('query', step.input)
-        let acc = ''
-        flow.set('onToken', (t: string) => { acc += t; up({ streaming: acc }) })
-        if (!flow.get('context') || flow.get('query') !== flow.get('_lastSearchQuery')) await flow.run(NODES.SEARCH)
-        await flow.run(...def.nodes)
-        flow.set('onToken', null)
-        up({ streaming: '' })
-        // Run extractNode to parse JSON from answer
-        await flow.run(NODES.EXTRACT)
-        const answer = flow.get('answer') ?? ''
-        const extracted = flow.get('extracted')
-        const extractError = flow.get('extractError')
-        updateTaskStep(task.id, step.id, {
-          output: answer, status: 'done',
-          meta: [
-            `context: ${(flow.get('context') ?? '').length} → prompt: ${(flow.get('prompt') ?? '').length} → answer: ${answer.length} chars`,
-            extracted ? `extracted: ${JSON.stringify(extracted).slice(0, 80)}` : null,
-            extractError ? `extract: ${extractError}` : null,
-          ].filter(Boolean).join(' | '),
-        })
-
-      } else if (step.type === 'search') {
-        flow.set('query', step.input)
-        flow.set('context', null) // force re-search
-        await flow.run(...def.nodes)
-        flow.set('_lastSearchQuery', step.input)
-        const matched: any[] = flow.get('matchedChunks') ?? []
-        updateTaskStep(task.id, step.id, {
-          output: matched.map((c: any, i: number) =>
-            `#${i + 1} [page ${c.page}, score ${c.score.toFixed(3)}]\n${c.text.slice(0, 200)}${c.text.length > 200 ? '…' : ''}`
-          ).join('\n\n'),
-          status: 'done',
-          meta: `${matched.length} chunks, scores: ${matched.map((c: any) => c.score.toFixed(3)).join(', ')}`,
-        })
-
-      } else if (step.type === 'template') {
-        flow.node(NODES.TPL, templateNode({ template: step.input, output: TPL_OUTPUT }))
-        await flow.run(NODES.TPL)
-        const tplResult = flow.get(TPL_OUTPUT)
-        updateTaskStep(task.id, step.id, { output: tplResult, status: 'done' })
-
-      } else {
-        await flow.run(...def.nodes)
-        if (step.type === 'ocr') {
-          const pages: any[] = flow.get('pages') ?? []
-          const chars = pages.reduce((a: number, p: any) => a + p.text.length, 0)
-          updateTaskStep(task.id, step.id, { output: `${pages.length} pages, ${chars} chars`, status: 'done' })
-        } else if (step.type === 'embed') {
-          const chunks: any[] = flow.get('chunks') ?? []
-          updateTaskStep(task.id, step.id, { output: `${chunks.length} chunks embedded`, status: 'done' })
-        }
-      }
-
+      def.prepare?.(flow, step.input, up)
+      await flow.run(...def.nodes)
+      flow.set('onToken', null)
+      up({ streaming: '' })
+      const result = def.format(flow)
+      updateTaskStep(task.id, step.id, { ...result, status: 'done' })
       up({ phase: 'ready' })
       updateTask(task.id, { status: 'done' })
       refreshOpfs()
@@ -265,6 +236,7 @@ export function useWorkbench() {
       const def = STEP_DEFS[step.type]
       if (def.needsInput && !step.input.trim()) continue
       await runStep({ ...step })
+      if (task.status === 'error') break
       up({ phase: 'running' }) // keep running between steps
     }
     up({ phase: 'ready' })
@@ -278,7 +250,7 @@ export function useWorkbench() {
   }
 
   return {
-    s, up, busy, task,
+    s, up, busy, task, presets,
     createTask, activateTask, removeTask,
     loadFile, loadText,
     updateTaskStep, runStep, runAll, configureMod,

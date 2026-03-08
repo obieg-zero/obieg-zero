@@ -1,4 +1,5 @@
-import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
+import { createFlow, templateNode, extractNode, type Flow } from '@obieg-zero/core'
+export type FlowInstance = Flow
 import { storageModule } from '@obieg-zero/storage'
 import { ocrModule } from '@obieg-zero/ocr'
 import { embedModule } from '@obieg-zero/embed'

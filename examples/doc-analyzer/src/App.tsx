@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode, type ComponentType } from 'react'
 import { useWorkbench } from './useWorkbench.ts'
-import { STEP_DEFS, PRESETS, type StepType } from './types.ts'
+import { STEP_DEFS, type StepType } from './types.ts'
 import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List, Database, HardDrive } from 'react-feather'
 
 const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
@@ -60,7 +60,8 @@ export default function App() {
       <Panel label="Tasks" icon={<List size={12} />} width="w-72">
         <div className="space-y-4">
           <Section label="New task">
-            {PRESETS.map((p, i) => (
+            {wb.presets.length === 0 && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
+            {wb.presets.map((p, i) => (
               <button key={i} onClick={() => wb.createTask(p)} disabled={busy}
                 className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
                 <div className="leading-tight">
