@@ -35,23 +35,30 @@ export function useWorkbench() {
     })
   }, [])
 
+  const resetSession = () => {
+    for (const key of Object.keys(flow.vars)) flow.set(key, null)
+    up({ steps: s.steps.map(st => ({ ...st, output: '', status: 'idle' as const, meta: undefined })), streaming: '' })
+  }
+
   const loadFile = (file: File) => {
+    resetSession()
     const pid = `doc-${file.name}-${file.size}-${file.lastModified}`
     flow.set('file', file)
     flow.set('projectId', pid)
     flow.set('fileKey', file.name)
     up({ file, fileName: file.name, logOpen: true })
-    log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) → ${pid}`, 'ok')
+    log(`Session: ${pid}`, 'ok')
   }
 
   const loadText = (text: string) => {
     if (!text.trim()) return
+    resetSession()
     const pid = `paste-${Date.now()}`
     flow.set('pages', [{ page: 1, text }])
     flow.set('projectId', pid)
     const name = `Text (${text.length} chars)`
     up({ file: new File([text], 'paste.txt'), fileName: name, logOpen: true })
-    log(`Text: ${text.length} chars → ${pid}`, 'ok')
+    log(`Session: ${pid}`, 'ok')
   }
 
   const addStep = (type: StepType) => {
