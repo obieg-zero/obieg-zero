@@ -1,3 +1,5 @@
+import { NODES } from './flow.ts'
+
 export type StepType = 'ocr' | 'embed' | 'search' | 'llm' | 'template'
 
 export interface StepDef {
@@ -41,22 +43,22 @@ export const STEP_DEFS: Record<StepType, StepDef> = {
   ocr: {
     label: 'OCR', color: 'primary',
     desc: 'PDF text extraction, Tesseract fallback',
-    ph: '', needsInput: false, nodes: ['ocr'],
+    ph: '', needsInput: false, nodes: [NODES.OCR],
   },
   embed: {
     label: 'Embed', color: 'secondary',
     desc: 'Chunking + vector embeddings',
-    ph: '', needsInput: false, nodes: ['embed'],
+    ph: '', needsInput: false, nodes: [NODES.EMBED],
   },
   search: {
     label: 'Search', color: 'success',
     desc: 'Cosine similarity + keyword boost → top-K',
-    ph: 'e.g. bank margin, loan amount', needsInput: true, nodes: ['search'],
+    ph: 'e.g. bank margin, loan amount', needsInput: true, nodes: [NODES.SEARCH],
   },
   llm: {
     label: 'LLM', color: 'warning',
     desc: 'Local inference (wllama/GGUF)',
-    ph: 'e.g. What is the bank margin?', needsInput: true, nodes: ['qa-prompt', 'llm'],
+    ph: 'e.g. What is the bank margin?', needsInput: true, nodes: [NODES.QA_PROMPT, NODES.LLM],
   },
   template: {
     label: 'Template', color: 'info',

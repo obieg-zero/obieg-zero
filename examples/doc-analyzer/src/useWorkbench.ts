@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useCallback } from 'react'
-import { flow } from './flow.ts'
+import { flow, NODES, TPL_OUTPUT } from './flow.ts'
 import { templateNode } from '@obieg-zero/core'
 import type { FlowEvent } from '@obieg-zero/core'
 import type { S, Step, StepType, Log, Preset } from './types.ts'
@@ -90,7 +90,7 @@ export function useWorkbench() {
       if (step.type === 'llm') {
         flow.set('query', step.input)
         flow.set('onToken', (t: string) => up({ streaming: t }))
-        if (!flow.get('context')) await flow.run('search')
+        if (!flow.get('context')) await flow.run(NODES.SEARCH)
         await flow.run(...def.nodes)
         flow.set('onToken', null)
         up({ streaming: '' })
@@ -113,9 +113,9 @@ export function useWorkbench() {
         })
 
       } else if (step.type === 'template') {
-        flow.node('tpl', templateNode({ template: step.input, output: 'templateResult' }))
-        await flow.run('tpl')
-        updateStep(step.id, { output: flow.get('templateResult'), status: 'done' })
+        flow.node(NODES.TPL, templateNode({ template: step.input, output: TPL_OUTPUT }))
+        await flow.run(NODES.TPL)
+        updateStep(step.id, { output: flow.get(TPL_OUTPUT), status: 'done' })
 
       } else {
         await flow.run(...def.nodes)

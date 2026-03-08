@@ -46,8 +46,8 @@ export function llmNode(config: LlmConfig): NodeDef {
         const { Wllama } = await import('@wllama/wllama');
         const paths = wasmPaths ?? {
           'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
-          'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
         };
+        log(`WASM paths: ${Object.keys(paths).join(', ')}`);
         wllama = new Wllama(paths as any);
         log(`Loading model from ${modelUrl.split('/').pop()}, nCtx=${ctxSize}`);
         await wllama.loadModelFromUrl(modelUrl, {
@@ -70,6 +70,7 @@ export function llmNode(config: LlmConfig): NodeDef {
       const t = ctx.get('timeout') ?? timeout;
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), t);
+      const heartbeat = setInterval(() => log(`… still processing (${((Date.now() - t0) / 1000).toFixed(0)}s)`), 10_000);
 
       let result: any;
       try {
@@ -100,6 +101,7 @@ export function llmNode(config: LlmConfig): NodeDef {
         throw err;
       } finally {
         clearTimeout(timer);
+        clearInterval(heartbeat);
       }
 
       log(`Done: ${tokenCount} tokens, result type=${typeof result}, fullText="${fullText.slice(0, 100)}"`);
