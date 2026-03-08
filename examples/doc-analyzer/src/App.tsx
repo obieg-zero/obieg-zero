@@ -90,16 +90,14 @@ export default function App() {
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-0">
-            {!task.file && (
-              <div className="bg-base-200 rounded-lg p-4 mb-4 space-y-2">
-                <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
-                  className="file-input file-input-bordered file-input-xs w-full" />
-                <textarea ref={pasteRef} placeholder="...or paste text" rows={3} disabled={busy}
-                  className="textarea textarea-bordered textarea-xs w-full font-mono" />
-                <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
-                  className="btn btn-outline btn-xs w-full">Load text</button>
-              </div>
-            )}
+            <div className="bg-base-200 rounded-lg p-4 mb-4 space-y-2">
+              <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
+                className="file-input file-input-bordered file-input-xs w-full" />
+              <textarea ref={pasteRef} placeholder="...or paste text" rows={3} disabled={busy}
+                className="textarea textarea-bordered textarea-xs w-full font-mono" />
+              <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
+                className="btn btn-outline btn-xs w-full">Load text</button>
+            </div>
             {task.steps.map((step, idx) => {
               const st = STEP_DEFS[step.type]
               const Icon = STEP_ICONS[step.type]
