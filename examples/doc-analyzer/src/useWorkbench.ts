@@ -105,9 +105,8 @@ export function useWorkbench() {
     const t = s.tasks.find(t => t.id === taskId)
     if (!t) return
     switchProject(t.projectId)
-    if (t.fileName) {
+    if (t.fileName && !t.file) {
       flow.set('fileKey', t.fileName)
-      // Try to restore file from OPFS
       try {
         await flow.run(NODES.LOAD_FILE)
         const file = flow.get('file')
@@ -151,16 +150,16 @@ export function useWorkbench() {
 
   const loadFile = async (file: File) => {
     if (!task) return
-    const pid = `task-${task.id}-${file.name}-${file.size}`
-    switchProject(pid)
+    // New file = clear derived state (pages, chunks, context from old file)
+    for (const key of ['pages', 'chunks', 'context', 'matchedChunks', 'embedFn', '_lastSearchQuery']) flow.set(key, null)
     flow.set('file', file)
     flow.set('fileKey', file.name)
-    updateTask(task.id, { file, fileName: file.name, projectId: pid })
+    updateTask(task.id, { file, fileName: file.name })
     // Persist to OPFS
     try {
       await flow.run(NODES.UPLOAD)
       log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) → OPFS`, 'ok')
-      refreshOpfs(pid)
+      refreshOpfs(task.projectId)
     } catch {
       log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) [OPFS failed]`, 'info')
     }
@@ -168,12 +167,11 @@ export function useWorkbench() {
 
   const loadText = (text: string) => {
     if (!task || !text.trim()) return
-    const pid = `task-${task.id}-paste-${Date.now()}`
-    switchProject(pid)
+    for (const key of ['chunks', 'context', 'matchedChunks', 'embedFn', '_lastSearchQuery']) flow.set(key, null)
     flow.set('pages', [{ page: 1, text }])
     const name = `Text (${text.length} chars)`
     const fakeFile = new File([text], 'paste.txt')
-    updateTask(task.id, { file: fakeFile, fileName: name, projectId: pid })
+    updateTask(task.id, { file: fakeFile, fileName: name })
     log(`Text: ${text.length} chars`, 'ok')
   }
 
@@ -194,8 +192,9 @@ export function useWorkbench() {
     try {
       if (step.type === 'llm') {
         flow.set('query', step.input)
-        flow.set('onToken', (t: string) => up({ streaming: t }))
-        if (!flow.get('context')) await flow.run(NODES.SEARCH)
+        let acc = ''
+        flow.set('onToken', (t: string) => { acc += t; up({ streaming: acc }) })
+        if (!flow.get('context') || flow.get('query') !== flow.get('_lastSearchQuery')) await flow.run(NODES.SEARCH)
         await flow.run(...def.nodes)
         flow.set('onToken', null)
         up({ streaming: '' })
@@ -215,7 +214,9 @@ export function useWorkbench() {
 
       } else if (step.type === 'search') {
         flow.set('query', step.input)
+        flow.set('context', null) // force re-search
         await flow.run(...def.nodes)
+        flow.set('_lastSearchQuery', step.input)
         const matched: any[] = flow.get('matchedChunks') ?? []
         updateTaskStep(task.id, step.id, {
           output: matched.map((c: any, i: number) =>
@@ -264,6 +265,7 @@ export function useWorkbench() {
       const def = STEP_DEFS[step.type]
       if (def.needsInput && !step.input.trim()) continue
       await runStep({ ...step })
+      up({ phase: 'running' }) // keep running between steps
     }
     up({ phase: 'ready' })
     updateTask(task.id, { status: 'done' })
