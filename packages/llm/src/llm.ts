@@ -54,40 +54,47 @@ export function llmNode(config: LlmConfig): NodeDef {
         ctx.set('llmReady', true);
       }
 
-      ctx.progress(`Generating… (prompt: ${prompt.length} chars, max tokens: ${np})`);
+      const estimatedPromptTokens = Math.ceil(prompt.length / 3);
+      ctx.progress(`Processing prompt (~${estimatedPromptTokens} tokens)… this may take a while`);
       const onToken = ctx.get('onToken');
       let fullText = '';
       let tokenCount = 0;
+      let firstTokenTime = 0;
 
       const t = ctx.get('timeout') ?? timeout;
-
-      const completion = wllama.createCompletion(prompt, {
-        nPredict: np,
-        sampling: {
-          temp: ctx.get('temperature') ?? temperature,
-          top_p: ctx.get('topP') ?? topP,
-          top_k: ctx.get('topK') ?? topK,
-        },
-        onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
-          fullText = currentText;
-          tokenCount++;
-          ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
-          if (onToken) onToken(currentText);
-        },
-      } as any);
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), t);
 
       let result: any;
       try {
-        result = await Promise.race([
-          completion,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error(
-            `llm: timeout (${Math.round(t / 1000)}s, ${tokenCount} tokens generated)`
-          )), t)),
-        ]);
+        result = await wllama.createCompletion(prompt, {
+          nPredict: np,
+          sampling: {
+            temp: ctx.get('temperature') ?? temperature,
+            top_p: ctx.get('topP') ?? topP,
+            top_k: ctx.get('topK') ?? topK,
+          },
+          abortSignal: abort.signal,
+          onNewToken: (_token: number, _piece: Uint8Array, currentText: string) => {
+            if (!firstTokenTime) {
+              firstTokenTime = Date.now();
+              ctx.progress(`Generating…`);
+            }
+            fullText = currentText;
+            tokenCount++;
+            ctx.progress(`Token ${tokenCount}/${np}`, (tokenCount / np) * 100);
+            if (onToken) onToken(currentText);
+          },
+        } as any);
       } catch (err) {
-        wllama.exit().catch(() => {});
-        wllama = null;
+        if (abort.signal.aborted) {
+          wllama.exit().catch(() => {});
+          wllama = null;
+          throw new Error(`llm: timeout (${Math.round(t / 1000)}s, ${tokenCount} tokens generated)`);
+        }
         throw err;
+      } finally {
+        clearTimeout(timer);
       }
 
       const answer = typeof result === 'string' ? result
