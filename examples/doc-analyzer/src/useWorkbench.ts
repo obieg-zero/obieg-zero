@@ -128,7 +128,7 @@ export function useWorkbench() {
         log(`File not in OPFS: ${t.fileName}`, 'dim')
       }
     }
-    up({ activeTaskId: taskId, logOpen: true })
+    up({ activeTaskId: taskId, rightPanel: 'log' })
     refreshOpfs(t.projectId)
     log(`Task: ${t.name}`, 'info')
   }
@@ -151,7 +151,7 @@ export function useWorkbench() {
         flow.configure(moduleId, settings)
       }
     }
-    up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, logOpen: true })
+    up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, rightPanel: 'log' })
     log(`New task: ${p.name}`, 'ok')
   }
 

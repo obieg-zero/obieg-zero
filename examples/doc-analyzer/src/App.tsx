@@ -121,8 +121,9 @@ export default function App() {
               {busy ? 'Running…' : `Run all (${task.steps.length})`}
             </button>
           )}
-          <button onClick={() => up({ modulesOpen: !s.modulesOpen })} className={`btn btn-ghost btn-xs btn-square ${s.modulesOpen ? 'btn-active' : ''}`}><Sliders size={13} /></button>
-          <button onClick={() => up({ logOpen: !s.logOpen })} className={`btn btn-ghost btn-xs btn-square ${s.logOpen ? 'btn-active' : ''}`}><Terminal size={13} /></button>
+          {task && <button onClick={() => up({ rightPanel: s.rightPanel === 'data' ? null : 'data' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'data' ? 'btn-active' : ''}`}><HardDrive size={13} /></button>}
+          <button onClick={() => up({ rightPanel: s.rightPanel === 'modules' ? null : 'modules' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'modules' ? 'btn-active' : ''}`}><Sliders size={13} /></button>
+          <button onClick={() => up({ rightPanel: s.rightPanel === 'log' ? null : 'log' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'log' ? 'btn-active' : ''}`}><Terminal size={13} /></button>
           <button onClick={() => { const dark = !s.dark; document.documentElement.dataset.theme = dark ? 'dracula' : 'corporate'; up({ dark }) }}
             className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
         </>}>
@@ -225,9 +226,9 @@ export default function App() {
         )}
       </Panel>
 
-      {/* RIGHT — Task data */}
-      {task && (
-        <Panel label={task.name} icon={<HardDrive size={12} />} width="w-72">
+      {/* RIGHT — switched panel */}
+      {s.rightPanel === 'data' && task && (
+        <Panel label={task.name} icon={<HardDrive size={12} />} width="w-72" onClose={() => up({ rightPanel: null })}>
           <div className="space-y-4">
             {wb.opfsFiles.length > 0 && (
               <Section label="OPFS files">
@@ -266,9 +267,8 @@ export default function App() {
         </Panel>
       )}
 
-      {/* OPTIONAL PANELS */}
-      {s.modulesOpen && (
-        <Panel label="Modules" icon={<Sliders size={12} />} onClose={() => up({ modulesOpen: false })}>
+      {s.rightPanel === 'modules' && (
+        <Panel label="Modules" icon={<Sliders size={12} />} onClose={() => up({ rightPanel: null })}>
           <div className="space-y-3">
             {wb.getModules().map(mod => (
               <div key={mod.def.id} className="bg-base-200 rounded p-2">
@@ -316,8 +316,8 @@ export default function App() {
         </Panel>
       )}
 
-      {s.logOpen && (
-        <Panel label="Log" icon={<Terminal size={12} />} onClose={() => up({ logOpen: false })} onClear={() => up({ logs: [] })}>
+      {s.rightPanel === 'log' && (
+        <Panel label="Log" icon={<Terminal size={12} />} onClose={() => up({ rightPanel: null })} onClear={() => up({ logs: [] })}>
           <div className="font-mono text-2xs space-y-0.5">
             {s.logs.length === 0 && <div className="text-base-content/20">—</div>}
             {s.logs.map((l, i) => (

@@ -46,15 +46,14 @@ export interface S {
   activeTaskId: number | null
   nextId: number
   streaming: string
-  logOpen: boolean
-  modulesOpen: boolean
+  rightPanel: 'data' | 'modules' | 'log' | null
   dark: boolean
 }
 
 export const INIT: S = {
   logs: [], pct: 0, phase: 'idle',
   tasks: [], activeTaskId: null, nextId: 1,
-  streaming: '', logOpen: false, modulesOpen: false, dark: true,
+  streaming: '', rightPanel: null, dark: true,
 }
 
 export const STEP_DEFS: Record<StepType, StepDef> = {
