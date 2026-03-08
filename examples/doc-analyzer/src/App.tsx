@@ -1,7 +1,7 @@
 import { useRef, type ReactNode, type ComponentType } from 'react'
 import { useWorkbench } from './useWorkbench.ts'
 import { STEP_DEFS, PRESETS, type StepType } from './types.ts'
-import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Layers, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List } from 'react-feather'
+import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, List, Database } from 'react-feather'
 
 const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
   ocr: FileText, embed: Grid, search: Search, llm: Cpu, template: Edit3,
@@ -90,14 +90,24 @@ export default function App() {
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-0">
-            <div className="bg-base-200 rounded-lg p-4 mb-4 space-y-2">
-              <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
-                className="file-input file-input-bordered file-input-xs w-full" />
-              <textarea ref={pasteRef} placeholder="...or paste text" rows={3} disabled={busy}
-                className="textarea textarea-bordered textarea-xs w-full font-mono" />
-              <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
-                className="btn btn-outline btn-xs w-full">Load text</button>
+            <div className="bg-base-200 rounded-lg p-4 border-l-4 border-accent">
+              <div className="flex items-center gap-2 mb-2">
+                <Upload size={14} />
+                <span className="badge badge-xs badge-accent">0</span>
+                <span className="font-semibold text-xs">Document</span>
+                <span className="text-2xs text-base-content/30">Input data for pipeline</span>
+                {task.file && <Check size={12} className="text-success" />}
+              </div>
+              <div className="space-y-2">
+                <input type="file" accept=".pdf" onChange={e => e.target.files?.[0] && wb.loadFile(e.target.files[0])} disabled={busy}
+                  className="file-input file-input-bordered file-input-xs w-full" />
+                <textarea ref={pasteRef} placeholder="...or paste text" rows={2} disabled={busy}
+                  className="textarea textarea-bordered textarea-xs w-full font-mono" />
+                <button onClick={() => wb.loadText(pasteRef.current?.value ?? '')} disabled={busy}
+                  className="btn btn-outline btn-xs w-full">Load text</button>
+              </div>
             </div>
+            {task.steps.length > 0 && <div className="flex justify-center py-1"><span className="text-base-content/10 text-lg">|</span></div>}
             {task.steps.map((step, idx) => {
               const st = STEP_DEFS[step.type]
               const Icon = STEP_ICONS[step.type]
@@ -219,6 +229,33 @@ export default function App() {
                 ))}
               </div>
             ))}
+            <div className="bg-base-200 rounded p-2">
+              <div className="text-xs font-semibold text-base-content/50 mb-2 flex items-center gap-1.5">
+                <Database size={11} /> Models
+                {wb.models.totalSize > 0 && (
+                  <span className="text-2xs text-base-content/30 font-normal ml-auto">
+                    {(wb.models.totalSize / 1024 / 1024).toFixed(0)} MB
+                  </span>
+                )}
+              </div>
+              {wb.models.list.length === 0 && (
+                <div className="text-2xs text-base-content/25">No models downloaded yet</div>
+              )}
+              {wb.models.list.map(m => (
+                <div key={m.url} className="flex items-center justify-between text-2xs mb-1">
+                  <span className="text-base-content/40 truncate mr-2 font-mono" title={m.url}>
+                    {m.url.split('/').pop()}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-base-content/25">{(m.size / 1024 / 1024).toFixed(0)} MB</span>
+                    <button onClick={() => wb.deleteModel(m.url)}
+                      className="btn btn-ghost btn-xs btn-square text-base-content/20 hover:text-error">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </Panel>
       )}

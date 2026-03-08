@@ -1,9 +1,12 @@
-import { useReducer, useEffect, useCallback } from 'react'
+import { useReducer, useEffect, useCallback, useState } from 'react'
 import { flow, NODES, TPL_OUTPUT } from './flow.ts'
 import { templateNode } from '@obieg-zero/core'
 import type { FlowEvent } from '@obieg-zero/core'
-import type { S, Task, Step, StepType, Log, Preset } from './types.ts'
+import { saveSettings, loadSettings, listModels, removeModel, totalModelSize, type ModelEntry } from '@obieg-zero/storage'
+import type { S, Task, Step, Log, Preset } from './types.ts'
 import { INIT, STEP_DEFS } from './types.ts'
+
+const TASKS_KEY = 'workbench:tasks'
 
 function ts() {
   const d = new Date()
@@ -16,24 +19,63 @@ function reducer(s: S, a: Partial<S> & { _log?: { text: string; level: Log['leve
   return next
 }
 
+// Serialize tasks for IDB (strip File objects)
+function serializeTasks(tasks: Task[]) {
+  return tasks.map(t => ({ ...t, file: null }))
+}
+
 export function useWorkbench() {
   const [s, up] = useReducer(reducer, INIT)
   const busy = s.phase === 'running'
   const task = s.tasks.find(t => t.id === s.activeTaskId) ?? null
+  const [models, setModels] = useState<{ list: ModelEntry[]; totalSize: number }>({ list: [], totalSize: 0 })
 
   const log = useCallback((text: string, level: Log['level'] = 'info') => up({ _log: { text, level } }), [])
+
+  // Load persisted tasks on mount
+  useEffect(() => {
+    loadSettings(TASKS_KEY).then((saved: any) => {
+      if (saved?.tasks?.length) {
+        up({ tasks: saved.tasks, nextId: saved.nextId ?? 1, activeTaskId: saved.activeTaskId })
+        console.log(`[workbench] Restored ${saved.tasks.length} tasks from IDB`)
+      }
+    }).catch(() => {})
+  }, [])
+
+  // Persist tasks on every change
+  useEffect(() => {
+    if (s.tasks.length > 0 || s.nextId > 1) {
+      saveSettings(TASKS_KEY, {
+        tasks: serializeTasks(s.tasks),
+        nextId: s.nextId,
+        activeTaskId: s.activeTaskId,
+      }).catch(() => {})
+    }
+  }, [s.tasks, s.nextId, s.activeTaskId])
+
+  // Refresh model registry
+  const refreshModels = useCallback(async () => {
+    const [list, size] = await Promise.all([listModels(), totalModelSize()])
+    setModels({ list, totalSize: size })
+  }, [])
+
+  useEffect(() => { refreshModels() }, [refreshModels])
 
   useEffect(() => {
     return flow.on((e: FlowEvent) => {
       if (e.type === 'node:start') log(`▶ ${e.id}`, 'info')
-      if (e.type === 'node:done') log(`✓ ${e.id}`, 'ok')
+      if (e.type === 'node:done') {
+        log(`✓ ${e.id}`, 'ok')
+        // Refresh models after LLM loads (model gets registered)
+        if (e.id === NODES.LLM) refreshModels()
+      }
       if (e.type === 'node:error') log(`✕ ${e.id}: ${e.error}`, 'err')
       if (e.type === 'progress') {
         log(`  ${e.id}: ${e.status}`, 'dim')
         if (e.pct != null) up({ pct: e.pct })
       }
     })
-  }, [])
+  }, [refreshModels])
 
   const updateTask = (id: number, patch: Partial<Task>) =>
     up({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })
@@ -44,23 +86,28 @@ export function useWorkbench() {
       : t
     ) })
 
-  // Switch active task — restore its flow vars
-  const activateTask = (taskId: number) => {
+  // Switch active task — restore file from OPFS if available
+  const activateTask = async (taskId: number) => {
     const t = s.tasks.find(t => t.id === taskId)
     if (!t) return
-    // Clear flow vars
     for (const key of Object.keys(flow.vars)) flow.set(key, null)
-    // Set task's context
-    if (t.file) {
-      flow.set('file', t.file)
-      flow.set('projectId', t.projectId)
+    flow.set('projectId', t.projectId)
+    if (t.fileName) {
       flow.set('fileKey', t.fileName)
+      // Try to restore file from OPFS
+      try {
+        await flow.run(NODES.LOAD_FILE)
+        const file = flow.get('file')
+        if (file) updateTask(taskId, { file })
+        log(`File restored from OPFS: ${t.fileName}`, 'ok')
+      } catch {
+        log(`File not in OPFS: ${t.fileName}`, 'dim')
+      }
     }
     up({ activeTaskId: taskId, logOpen: true })
     log(`Task: ${t.name}`, 'info')
   }
 
-  // Preset creates a task instance
   const createTask = (p: Preset) => {
     let nid = s.nextId
     const taskId = nid++
@@ -72,7 +119,6 @@ export function useWorkbench() {
       file: null, fileName: '', projectId: `task-${taskId}-${Date.now()}`,
       status: 'idle',
     }
-    // Clear flow vars for new task
     for (const key of Object.keys(flow.vars)) flow.set(key, null)
     flow.set('projectId', newTask.projectId)
     up({ tasks: [...s.tasks, newTask], activeTaskId: taskId, nextId: nid, logOpen: true })
@@ -80,18 +126,30 @@ export function useWorkbench() {
   }
 
   const removeTask = (id: number) => {
+    const t = s.tasks.find(t => t.id === id)
+    if (t) {
+      // Clean up OPFS project
+      flow.set('projectId', t.projectId)
+      flow.run('opfs-delete-project').catch(() => {})
+    }
     const next = s.tasks.filter(t => t.id !== id)
     up({ tasks: next, activeTaskId: s.activeTaskId === id ? (next[0]?.id ?? null) : s.activeTaskId })
   }
 
-  const loadFile = (file: File) => {
+  const loadFile = async (file: File) => {
     if (!task) return
     const pid = `task-${task.id}-${file.name}-${file.size}`
     flow.set('file', file)
     flow.set('projectId', pid)
     flow.set('fileKey', file.name)
     updateTask(task.id, { file, fileName: file.name, projectId: pid })
-    log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`, 'ok')
+    // Persist to OPFS
+    try {
+      await flow.run(NODES.UPLOAD)
+      log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) → OPFS`, 'ok')
+    } catch {
+      log(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB) [OPFS failed]`, 'info')
+    }
   }
 
   const loadText = (text: string) => {
@@ -127,10 +185,18 @@ export function useWorkbench() {
         await flow.run(...def.nodes)
         flow.set('onToken', null)
         up({ streaming: '' })
+        // Run extractNode to parse JSON from answer
+        await flow.run(NODES.EXTRACT)
         const answer = flow.get('answer') ?? ''
+        const extracted = flow.get('extracted')
+        const extractError = flow.get('extractError')
         updateTaskStep(task.id, step.id, {
           output: answer, status: 'done',
-          meta: `context: ${(flow.get('context') ?? '').length} → prompt: ${(flow.get('prompt') ?? '').length} → answer: ${answer.length} chars`,
+          meta: [
+            `context: ${(flow.get('context') ?? '').length} → prompt: ${(flow.get('prompt') ?? '').length} → answer: ${answer.length} chars`,
+            extracted ? `extracted: ${JSON.stringify(extracted).slice(0, 80)}` : null,
+            extractError ? `extract: ${extractError}` : null,
+          ].filter(Boolean).join(' | '),
         })
 
       } else if (step.type === 'search') {
@@ -187,11 +253,18 @@ export function useWorkbench() {
     updateTask(task.id, { status: 'done' })
   }
 
+  const deleteModel = async (url: string) => {
+    await removeModel(url)
+    await refreshModels()
+    log(`Model removed: ${url.split('/').pop()}`, 'ok')
+  }
+
   return {
     s, up, busy, task,
     createTask, activateTask, removeTask,
     loadFile, loadText,
     updateTaskStep, runStep, runAll, configureMod,
+    models, deleteModel, refreshModels,
     getModules: () => flow.modules(),
     getChunks: (): { text: string; page: number }[] => flow.get('chunks') ?? [],
     getVars: (): [string, any][] =>

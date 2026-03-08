@@ -1,5 +1,5 @@
-import { createFlow, templateNode } from '@obieg-zero/core'
-import { storageModule, createIdbCache } from '@obieg-zero/storage'
+import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
+import { storageModule, createIdbCache, opfsUpload, opfsRead } from '@obieg-zero/storage'
 import { ocrModule } from '@obieg-zero/ocr'
 import { embedModule } from '@obieg-zero/embed'
 import { llmModule } from '@obieg-zero/llm'
@@ -12,6 +12,9 @@ export const NODES = {
   QA_PROMPT: 'qa-prompt',
   LLM: 'llm',
   TPL: 'tpl',
+  UPLOAD: 'opfs-upload',
+  LOAD_FILE: 'opfs-read',
+  EXTRACT: 'extract',
 } as const
 
 export const TPL_OUTPUT = 'templateResult'
@@ -34,3 +37,6 @@ flow.node(NODES.QA_PROMPT, templateNode({
   template: `Context:\n{{context}}\n\nQuestion: {{query}}`,
   output: 'prompt',
 }))
+flow.node(NODES.UPLOAD, opfsUpload())
+flow.node(NODES.LOAD_FILE, opfsRead())
+flow.node(NODES.EXTRACT, extractNode())
