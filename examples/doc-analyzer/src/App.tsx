@@ -127,9 +127,22 @@ export default function App() {
             className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
         </>}>
         {!task ? (
-          <div className="flex flex-col items-center justify-center h-full text-base-content/20 gap-3">
-            <div className="text-4xl font-light">pipeline</div>
-            <p className="text-xs">Pick a task schema from the sidebar</p>
+          <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto gap-6 text-center">
+            <div>
+              <div className="text-3xl font-black text-primary tracking-tight">OBIEG-ZERO</div>
+              <div className="text-xs text-base-content/30 mt-1">Browser-native document analysis pipeline</div>
+            </div>
+            <div className="text-sm text-base-content/50 leading-relaxed space-y-3">
+              <p>Upload a PDF. Extract text. Search semantically. Run local LLM inference. All in your browser — no server, no API keys, no data leaves your machine.</p>
+              <div className="flex justify-center gap-6 text-2xs text-base-content/25">
+                <span><FileText size={11} className="inline -mt-0.5" /> OCR</span>
+                <span><Grid size={11} className="inline -mt-0.5" /> Embed</span>
+                <span><Search size={11} className="inline -mt-0.5" /> Search</span>
+                <span><Cpu size={11} className="inline -mt-0.5" /> LLM</span>
+                <span><Edit3 size={11} className="inline -mt-0.5" /> Template</span>
+              </div>
+            </div>
+            <div className="text-2xs text-base-content/20">Pick a task from the sidebar to start.</div>
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-0">
