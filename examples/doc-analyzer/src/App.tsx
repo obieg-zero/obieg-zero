@@ -60,9 +60,9 @@ export default function App() {
       {/* LEFT — Tasks + Presets */}
       <Panel label="Tasks" icon={<List size={12} />} width="w-72" footer={
         <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
-          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">obieg-zero</a> — zero backend, zero API, zero cloud</div>
+          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — zero backend, zero API, zero cloud</div>
           <div className="text-base-content/80">Your data never leaves your machine.</div>
-          <div><a href="https://www.npmjs.com/org/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">npm</a> · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">source</a> · MIT</div>
+          <div><a href="https://www.npmjs.com/org/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">npm</a> · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">source</a> · MIT</div>
         </div>
       }>
         <div className="space-y-4">
