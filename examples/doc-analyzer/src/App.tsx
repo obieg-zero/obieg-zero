@@ -9,9 +9,9 @@ const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
 const LOG_COLORS: Record<string, string> = { info: 'text-info', ok: 'text-success', err: 'text-error', dim: 'text-base-content/30' }
 const STATUS_COLORS: Record<string, string> = { idle: 'bg-base-content/20', running: 'bg-warning', done: 'bg-success', error: 'bg-error' }
 
-function Panel({ label, icon, onClose, onClear, actions, children, width = 'w-72' }: {
+function Panel({ label, icon, onClose, onClear, actions, children, footer, width = 'w-72' }: {
   label: string; icon?: ReactNode; onClose?: () => void; onClear?: () => void; actions?: ReactNode
-  children: ReactNode; width?: string
+  children: ReactNode; footer?: ReactNode; width?: string
 }) {
   return (
     <div className={`${width} bg-base-100 border-r border-base-300 flex flex-col min-h-0`}>
@@ -24,6 +24,7 @@ function Panel({ label, icon, onClose, onClear, actions, children, width = 'w-72
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3">{children}</div>
+      {footer}
     </div>
   )
 }
@@ -57,7 +58,13 @@ export default function App() {
   return (
     <div className="h-screen bg-base-200 flex overflow-hidden text-sm">
       {/* LEFT — Tasks + Presets */}
-      <Panel label="Tasks" icon={<List size={12} />} width="w-72">
+      <Panel label="Tasks" icon={<List size={12} />} width="w-72" footer={
+        <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
+          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">obieg-zero</a> — zero backend, zero API, zero cloud</div>
+          <div>Your data never leaves your machine.</div>
+          <div><a href="https://www.npmjs.com/org/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">npm</a> · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="hover:text-base-content/50">source</a> · MIT</div>
+        </div>
+      }>
         <div className="space-y-4">
           <Section label="New task">
             {wb.presets.length === 0 && !wb.presetsRateLimited && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
