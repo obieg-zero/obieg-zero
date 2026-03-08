@@ -134,8 +134,19 @@ export interface Preset {
 
 const ORG = 'obieg-zero'
 const TOPIC = 'obieg-zero-task'
+const CACHE_KEY = 'obieg-zero:presets'
+const CACHE_TTL = 24 * 60 * 60 * 1000 // 24h
 
 export async function fetchPresets(): Promise<Preset[]> {
+  // Check localStorage cache
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (cached) {
+      const { ts, data } = JSON.parse(cached)
+      if (Date.now() - ts < CACHE_TTL) return data
+    }
+  } catch { /* ignore */ }
+
   const res = await fetch(`https://api.github.com/orgs/${ORG}/repos?per_page=100`)
   if (!res.ok) return []
   const repos: any[] = await res.json()
@@ -149,5 +160,8 @@ export async function fetchPresets(): Promise<Preset[]> {
       presets.push({ ...task, repo: repo.full_name })
     } catch { /* skip broken repos */ }
   }
+
+  // Cache result
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: presets })) } catch { /* ignore */ }
   return presets
 }
