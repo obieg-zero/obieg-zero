@@ -152,6 +152,7 @@ export function useWorkbench() {
     loadFile, loadText,
     addStep, updateStep, removeStep, loadPreset,
     runStep, runAll, configureMod,
+    clearCache: async () => { await flow.clearCache(); log('Cache cleared', 'ok') },
     getModules: () => flow.modules(),
     getChunks: (): { text: string; page: number }[] => flow.get('chunks') ?? [],
     getVars: (): [string, any][] =>

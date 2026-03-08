@@ -1,7 +1,7 @@
 import { useRef, type ReactNode, type ComponentType } from 'react'
 import { useWorkbench } from './useWorkbench.ts'
 import { STEP_DEFS, PRESETS, type StepType } from './types.ts'
-import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Layers, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun } from 'react-feather'
+import { FileText, Grid, Search, Cpu, Edit3, Play, X, Sliders, Layers, Terminal, Trash2, Check, AlertCircle, Upload, Moon, Sun, RefreshCw } from 'react-feather'
 
 const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
   ocr: FileText, embed: Grid, search: Search, llm: Cpu, template: Edit3,
@@ -115,6 +115,7 @@ export default function App() {
           <button onClick={() => up({ modulesOpen: !s.modulesOpen })} className={`btn btn-ghost btn-xs btn-square ${s.modulesOpen ? 'btn-active' : ''}`}><Sliders size={13} /></button>
           <button onClick={() => up({ chunksOpen: !s.chunksOpen })} className={`btn btn-ghost btn-xs btn-square ${s.chunksOpen ? 'btn-active' : ''}`}><Layers size={13} /></button>
           <button onClick={() => up({ logOpen: !s.logOpen })} className={`btn btn-ghost btn-xs btn-square ${s.logOpen ? 'btn-active' : ''}`}><Terminal size={13} /></button>
+          <button onClick={wb.clearCache} disabled={busy} className="btn btn-ghost btn-xs btn-square" title="Clear cache"><RefreshCw size={13} /></button>
           <button onClick={() => { const dark = !s.dark; document.documentElement.dataset.theme = dark ? 'dracula' : 'corporate'; up({ dark }) }}
             className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
         </>}>
