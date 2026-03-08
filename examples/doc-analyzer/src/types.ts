@@ -1,7 +1,7 @@
 export type StepType = 'ocr' | 'embed' | 'search' | 'llm' | 'template'
 
 export interface StepDef {
-  icon: string; label: string; color: string; desc: string
+  label: string; color: string; desc: string
   ph: string; needsInput: boolean
   nodes: string[]
 }
@@ -29,36 +29,37 @@ export interface S {
   logOpen: boolean
   chunksOpen: boolean
   modulesOpen: boolean
+  dark: boolean
 }
 
 export const INIT: S = {
   logs: [], pct: 0, phase: 'idle', file: null, fileName: '',
-  steps: [], nextId: 1, streaming: '', logOpen: false, chunksOpen: false, modulesOpen: false,
+  steps: [], nextId: 1, streaming: '', logOpen: false, chunksOpen: false, modulesOpen: false, dark: true,
 }
 
 export const STEP_DEFS: Record<StepType, StepDef> = {
   ocr: {
-    icon: '📄', label: 'OCR', color: 'primary',
+    label: 'OCR', color: 'primary',
     desc: 'PDF text extraction, Tesseract fallback',
     ph: '', needsInput: false, nodes: ['ocr'],
   },
   embed: {
-    icon: '🔢', label: 'Embed', color: 'secondary',
+    label: 'Embed', color: 'secondary',
     desc: 'Chunking + vector embeddings',
     ph: '', needsInput: false, nodes: ['embed'],
   },
   search: {
-    icon: '🔍', label: 'Search', color: 'success',
+    label: 'Search', color: 'success',
     desc: 'Cosine similarity + keyword boost → top-K',
     ph: 'e.g. bank margin, loan amount', needsInput: true, nodes: ['search'],
   },
   llm: {
-    icon: '🤖', label: 'LLM', color: 'warning',
+    label: 'LLM', color: 'warning',
     desc: 'Local inference (wllama/GGUF)',
     ph: 'e.g. What is the bank margin?', needsInput: true, nodes: ['qa-prompt', 'llm'],
   },
   template: {
-    icon: '📝', label: 'Template', color: 'info',
+    label: 'Template', color: 'info',
     desc: 'Compose text from {{variables}}',
     ph: 'e.g. Type: {{docType}}\nMargin: {{answer}}', needsInput: true, nodes: [],
   },
@@ -85,16 +86,6 @@ export const PRESETS: Preset[] = [
       { type: 'search', input: 'margin WIBOR amount period loan' },
       { type: 'llm', input: 'Return JSON: {"margin": "...", "wibor": "...", "amount": "...", "period": "..."}' },
       { type: 'template', input: 'Contract parameters:\n{{answer}}' },
-    ],
-  },
-  {
-    name: 'Quick question',
-    desc: 'OCR → Embed → Search → LLM',
-    steps: [
-      { type: 'ocr', input: '' },
-      { type: 'embed', input: '' },
-      { type: 'search', input: '' },
-      { type: 'llm', input: '' },
     ],
   },
 ]

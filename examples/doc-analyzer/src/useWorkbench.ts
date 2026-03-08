@@ -154,6 +154,7 @@ export function useWorkbench() {
     runStep, runAll, configureMod,
     getModules: () => flow.modules(),
     getChunks: (): { text: string; page: number }[] => flow.get('chunks') ?? [],
-    getVar: (k: string) => flow.get(k),
+    getVars: (): [string, any][] =>
+      Object.entries(flow.vars).filter(([, v]) => v != null && typeof v !== 'function' && !(v instanceof File) && !(v instanceof Blob)),
   }
 }
