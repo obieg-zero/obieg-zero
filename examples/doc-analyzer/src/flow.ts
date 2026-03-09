@@ -1,4 +1,4 @@
-import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
+import { createFlow, extractNode } from '@obieg-zero/core'
 import { storageModule } from '@obieg-zero/storage'
 import { ocrModule } from '@obieg-zero/ocr'
 import { embedModule } from '@obieg-zero/embed'
@@ -9,16 +9,15 @@ export const flow = createFlow()
 flow.use(storageModule)
 flow.use(ocrModule)
 flow.use(embedModule, {
-  topK: 3, chunkSize: 200, chunkOverlap: 30, maxContextChars: 1500,
   workerFactory: () => new Worker(
     new URL('@obieg-zero/embed/src/embedding-worker.ts', import.meta.url),
     { type: 'module' },
   ),
 })
-flow.use(llmModule, { nCtx: 2048, nPredict: 256 })
-
-flow.node('qa-prompt', templateNode({
-  template: `Context:\n{{context}}\n\nQuestion: {{query}}`,
-  output: 'prompt',
-}))
+flow.use(llmModule, {
+  wasmPaths: {
+    'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
+    'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
+  },
+})
 flow.node('extract', extractNode())

@@ -73,20 +73,6 @@ function isSerializable(val: any): boolean {
   return false;
 }
 
-function buildNodes(reg: RegisteredModule, nodes: Map<string, NodeDef>) {
-  for (const key of reg.nodeKeys) {
-    const old = nodes.get(key);
-    if (old?.dispose) old.dispose();
-    nodes.delete(key);
-  }
-  reg.nodeKeys = [];
-  const built = reg.def.nodes(reg.config);
-  for (const [id, def] of Object.entries(built)) {
-    nodes.set(id, def);
-    reg.nodeKeys.push(id);
-  }
-}
-
 export function createFlow(opts?: { debug?: boolean }): Flow {
   const debug = opts?.debug ?? (typeof location !== 'undefined' && location.hostname === 'localhost');
   const vars: Vars = {};
@@ -97,6 +83,14 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
 
   function emit(event: FlowEvent) {
     for (const fn of listeners) fn(event);
+  }
+
+  // Find module config for a node by its base id
+  function moduleConfigFor(baseId: string): Record<string, any> {
+    for (const [, reg] of mods) {
+      if (reg.nodeKeys.includes(baseId)) return reg.config;
+    }
+    return {};
   }
 
   const flow: Flow = {
@@ -111,9 +105,14 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
     async clearCache() { if (cacheAdapter) await cacheAdapter.clear(); },
 
     use(mod, overrides?) {
-      const reg: RegisteredModule = { def: mod, config: { ...getDefaults(mod), ...overrides }, nodeKeys: [] };
-      mods.set(mod.id, reg);
-      buildNodes(reg, nodes);
+      const config = { ...getDefaults(mod), ...overrides };
+      const built = mod.nodes(config);
+      const nodeKeys = Object.keys(built);
+      // Dispose old nodes if re-registering
+      const old = mods.get(mod.id);
+      if (old) for (const key of old.nodeKeys) { nodes.get(key)?.dispose?.(); nodes.delete(key); }
+      for (const [id, def] of Object.entries(built)) nodes.set(id, def);
+      mods.set(mod.id, { def: mod, config, nodeKeys });
       return flow;
     },
 
@@ -124,7 +123,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
       const reg = mods.get(moduleId);
       if (!reg) throw new Error(`Module "${moduleId}" not registered`);
       Object.assign(reg.config, settings);
-      buildNodes(reg, nodes);
+      // NO rebuild — nodes read config through ctx.get() fallback
     },
 
     async run(...ids) {
@@ -141,6 +140,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
         }
 
         const ns = (key: string) => scope ? `${key}:${scope}` : key;
+        const modConfig = moduleConfigFor(baseId);
 
         // build cache key from inputs
         const canCache = cacheAdapter && node.reads?.length && node.writes?.length;
@@ -165,7 +165,13 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
         const ctx: FlowContext = {
           get: (key) => {
             const nsKey = ns(key);
-            return nsKey !== key && vars[nsKey] !== undefined ? vars[nsKey] : vars[key];
+            // 1. namespaced flow var
+            if (nsKey !== key && vars[nsKey] !== undefined) return vars[nsKey];
+            // 2. global flow var
+            if (vars[key] !== undefined) return vars[key];
+            // 3. module config (from task.json via configure / use overrides)
+            if (key in modConfig) return modConfig[key];
+            return undefined;
           },
           set: (key, value) => {
             const actual = ns(key);
@@ -179,7 +185,7 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
         try {
           await node.run(ctx);
 
-          // cache store (reuse cacheKey from above)
+          // cache store
           if (canCache && cacheKey) {
             const outputs: Record<string, any> = {};
             let store = true;

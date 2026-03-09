@@ -76,8 +76,8 @@ export default function App() {
           </span>
           <div className="flex items-center gap-1">
             {task && <button onClick={() => up({ panel: rp === 'data' ? null : 'data' })} className={`btn btn-ghost btn-xs btn-square ${rp === 'data' ? 'btn-active' : ''}`}><HardDrive size={13} /></button>}
-            <button onClick={() => up({ panel: rp === 'modules' ? null : 'modules' })} className={`btn btn-ghost btn-xs btn-square ${rp === 'modules' ? 'btn-active' : ''}`}><Sliders size={13} /></button>
-            <button onClick={() => up({ panel: rp === 'log' ? null : 'log' })} className={`btn btn-ghost btn-xs btn-square ${rp === 'log' ? 'btn-active' : ''}`}><Terminal size={13} /></button>
+            {task && <button onClick={() => up({ panel: rp === 'modules' ? null : 'modules' })} className={`btn btn-ghost btn-xs btn-square ${rp === 'modules' ? 'btn-active' : ''}`}><Sliders size={13} /></button>}
+            {task && <button onClick={() => up({ panel: rp === 'log' ? null : 'log' })} className={`btn btn-ghost btn-xs btn-square ${rp === 'log' ? 'btn-active' : ''}`}><Terminal size={13} /></button>}
             <button onClick={() => { const d = !s.dark; document.documentElement.dataset.theme = d ? 'dracula' : 'corporate'; up({ dark: d }) }}
               className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
           </div>
@@ -157,7 +157,7 @@ export default function App() {
               </div>
 
               {/* Extract — structured extraction from template */}
-              {task.extract && task.extract.length > 0 && ready.length > 0 && (
+              {task.extract && task.extract.length > 0 && task.promptTemplate && task.extractPrompt && ready.length > 0 && (
                 <div className="bg-base-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export default function App() {
               )}
 
               {/* Query — free-form question */}
-              {ready.length > 0 && (
+              {task.promptTemplate && ready.length > 0 && (
                 <div className="bg-base-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Search size={14} />
@@ -274,7 +274,7 @@ export default function App() {
                       <label key={key} className="flex items-center justify-between text-xs mb-1">
                         <span className="text-base-content/40 truncate mr-2">{def.label}</span>
                         <input type={def.type === 'number' ? 'number' : 'text'}
-                          value={def.type === 'number' ? Number(mod.config[key] ?? def.default) : String(mod.config[key] ?? def.default)}
+                          value={mod.config[key] != null ? (def.type === 'number' ? Number(mod.config[key]) : String(mod.config[key])) : ''}
                           onChange={e => st.configure(mod.def.id, key, def.type === 'number' ? +e.target.value : e.target.value)}
                           className={`input input-bordered input-xs text-right font-mono ${def.type === 'string' ? 'w-32 text-2xs' : 'w-20'}`} />
                       </label>

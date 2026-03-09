@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/embed",
-  "version": "0.1.9",
+  "version": "0.1.12",
   "description": "Embedding and semantic search nodes for obieg-zero flows.",
   "type": "module",
   "main": "src/index.ts",

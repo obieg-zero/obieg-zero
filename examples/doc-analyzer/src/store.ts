@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useCallback, useState } from 'react'
 import { flow } from './flow.ts'
-import { classifyNode } from '@obieg-zero/core'
+import { classifyNode, templateNode } from '@obieg-zero/core'
 import { saveSettings, loadSettings, createOpfsCache, listProjectFiles, listModels, removeModel, totalModelSize } from '@obieg-zero/storage'
 import type { FlowEvent } from '@obieg-zero/core'
 
@@ -38,6 +38,8 @@ interface Task {
   desc: string
   docs: Doc[]
   projectId: string
+  promptTemplate?: string
+  extractPrompt?: string
   modules?: Record<string, Record<string, any>>
   documents?: DocSlot[]
   extract?: ExtractField[]
@@ -97,6 +99,8 @@ const DB_KEY = 'obieg:tasks:v2'
 export interface Preset {
   name: string
   desc: string
+  promptTemplate?: string
+  extractPrompt?: string
   modules?: Record<string, Record<string, any>>
   documents?: DocSlot[]
   extract?: ExtractField[]
@@ -119,7 +123,7 @@ async function loadPresets(): Promise<{ presets: Preset[]; limited: boolean }> {
       const raw = await fetch(`https://raw.githubusercontent.com/${r.full_name}/${r.default_branch}/task.json`)
       if (raw.ok) {
         const t = await raw.json()
-        presets.push({ name: t.name, desc: t.desc, modules: t.modules, documents: t.documents, extract: t.extract })
+        presets.push({ name: t.name, desc: t.desc, promptTemplate: t.promptTemplate, extractPrompt: t.extractPrompt, modules: t.modules, documents: t.documents, extract: t.extract })
       }
     } catch {}
   }
@@ -200,6 +204,7 @@ export function useStore() {
     const t: Task = {
       id, name: p.name, desc: p.desc, docs: [],
       projectId: `t-${id}-${Date.now()}`,
+      promptTemplate: p.promptTemplate, extractPrompt: p.extractPrompt,
       modules: p.modules, documents: p.documents, extract: p.extract,
     }
     for (const k of Object.keys(flow.vars)) flow.set(k, null)
@@ -230,9 +235,8 @@ export function useStore() {
     up({ nextId: s.nextId + 1, tasks: s.tasks.map(t => t.id === task.id ? { ...t, docs: [...t.docs, doc] } : t) })
 
     flow.set(`file:${scope}`, file)
-    flow.set('file', file)
-    flow.set('fileKey', file.name)
-    try { await flow.run('upload') } catch {}
+    flow.set(`fileKey:${scope}`, file.name)
+    try { await flow.run(`upload:${scope}`) } catch {}
 
     try {
       up({ running: true })
@@ -294,7 +298,7 @@ export function useStore() {
   }
 
   async function ask(query: string) {
-    if (!task || !query.trim()) return
+    if (!task?.promptTemplate || !query.trim()) return
     const ready = task.docs.filter(d => d.status === 'ready')
     if (!ready.length) return
 
@@ -308,6 +312,8 @@ export function useStore() {
         if (ctx) parts.push(`[${doc.name}]\n${ctx}`)
       }
       flow.set('context', parts.join('\n\n'))
+
+      flow.node('qa-prompt', templateNode({ template: task.promptTemplate, output: 'prompt' }))
 
       let acc = ''
       flow.set('onToken', (t: string) => { acc = t; up({ streaming: acc }) })
@@ -326,9 +332,12 @@ export function useStore() {
   }
 
   async function runExtract() {
-    if (!task?.extract?.length) return
+    if (!task?.extract?.length || !task.promptTemplate || !task.extractPrompt) return
     const ready = task.docs.filter(d => d.status === 'ready')
     if (!ready.length) return
+
+    const maxChars = Number(flow.module('embed')?.config.maxContextChars)
+    const perFieldChars = Math.floor(maxChars / task.extract.length)
 
     up({ running: true, streaming: '' })
     try {
@@ -346,15 +355,17 @@ export function useStore() {
         log(`Search: ${field.label}`, 'ok')
       }
 
-      // Build ONE prompt for all fields
+      // Build context from search results, limit per field from config
       const contextBlock = task.extract.map(f =>
-        `[${f.label}]\n${fieldContexts[f.key]?.slice(0, 500) ?? '(brak)'}`
+        `[${f.label}]\n${fieldContexts[f.key]?.slice(0, perFieldChars) ?? '(brak)'}`
       ).join('\n\n')
 
       const fieldsJson = task.extract.map(f => `"${f.key}": "<${f.label}>"`).join(', ')
 
       flow.set('context', contextBlock)
-      flow.set('query', `Wyciągnij dane. Podaj TYLKO JSON:\n{${fieldsJson}}`)
+      flow.set('query', task.extractPrompt.replace('%fields%', fieldsJson))
+
+      flow.node('qa-prompt', templateNode({ template: task.promptTemplate, output: 'prompt' }))
 
       let acc = ''
       flow.set('onToken', (t: string) => { acc = t; up({ streaming: acc }) })

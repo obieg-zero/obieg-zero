@@ -6,9 +6,7 @@ function cosineSim(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
 }
 
-export function searchNode(config?: { topK?: number; keywordBoost?: number; maxContextChars?: number }): NodeDef {
-  const { topK = 5, keywordBoost = 0.05, maxContextChars = 2000 } = config ?? {};
-
+export function searchNode(): NodeDef {
   return {
     reads: ['query', 'chunks'],
     writes: ['context', 'matchedChunks'],
@@ -23,21 +21,22 @@ export function searchNode(config?: { topK?: number; keywordBoost?: number; maxC
       const queryEmbedding: number[] = await embedFn(query);
 
       const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-      const boost = ctx.get('keywordBoost') ?? keywordBoost;
+      const keywordBoost = ctx.get('keywordBoost');
+      const topK = ctx.get('topK');
+      const maxContextChars = ctx.get('maxContextChars');
 
       const scored = chunks
         .map((chunk) => {
           const sim = cosineSim(queryEmbedding, chunk.embedding);
-          const kw = queryWords.filter(w => chunk.text.toLowerCase().includes(w)).length * boost;
+          const kw = queryWords.filter(w => chunk.text.toLowerCase().includes(w)).length * keywordBoost;
           return { ...chunk, score: sim + kw };
         })
         .sort((a, b) => b.score - a.score)
-        .slice(0, ctx.get('topK') ?? topK);
+        .slice(0, topK);
 
-      const maxChars = ctx.get('maxContextChars') ?? maxContextChars;
       let context = '';
       for (const m of scored) {
-        if (context.length + m.text.length > maxChars) break;
+        if (context.length + m.text.length > maxContextChars) break;
         context += (context ? '\n\n' : '') + m.text;
       }
       ctx.set('context', context);

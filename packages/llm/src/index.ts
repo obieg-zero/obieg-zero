@@ -1,2 +1,2 @@
-export { llmNode, type LlmConfig } from './llm.js';
+export { llmNode } from './llm.js';
 export { llmModule } from './module.js';

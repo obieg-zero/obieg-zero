@@ -3,7 +3,6 @@ import type { NodeDef } from './flow.js';
 export interface SettingDef {
   type: 'string' | 'number' | 'boolean';
   label: string;
-  default: string | number | boolean;
 }
 
 export interface ModuleDef {
@@ -17,10 +16,6 @@ export function defineModule(def: ModuleDef): ModuleDef {
   return def;
 }
 
-export function getDefaults(mod: ModuleDef): Record<string, any> {
-  const out: Record<string, any> = {};
-  for (const [key, s] of Object.entries(mod.settings)) {
-    out[key] = s.default;
-  }
-  return out;
+export function getDefaults(_mod: ModuleDef): Record<string, any> {
+  return {};
 }

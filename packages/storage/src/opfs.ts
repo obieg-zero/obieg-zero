@@ -61,7 +61,7 @@ export function opfsDeleteProject(): NodeDef {
 
       try {
         const root = await navigator.storage.getDirectory();
-        const projects = await root.getDirectoryHandle(ctx.get('opfsRoot') ?? 'obieg-zero');
+        const projects = await root.getDirectoryHandle(ctx.get('opfsRoot'));
         await projects.removeEntry(projectId, { recursive: true });
       } catch {
         throw new Error(`opfsDeleteProject: project "${projectId}" not found`);
@@ -83,7 +83,7 @@ export function opfsOpen(): NodeDef {
       const url = URL.createObjectURL(file);
       ctx.set('fileUrl', url);
       window.open(url, '_blank');
-      const revoke = ctx.get('revokeTimeout') ?? 60_000;
+      const revoke = ctx.get('revokeTimeout');
       setTimeout(() => URL.revokeObjectURL(url), revoke);
     },
   };

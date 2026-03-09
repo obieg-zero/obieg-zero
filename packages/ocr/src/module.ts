@@ -5,11 +5,11 @@ export const ocrModule = defineModule({
   id: 'ocr',
   label: 'OCR (PDF + Tesseract)',
   settings: {
-    language: { type: 'string', label: 'Język OCR', default: 'pol' },
-    ocrThreshold: { type: 'number', label: 'Min. znaków (poniżej = OCR)', default: 20 },
-    scale: { type: 'number', label: 'Skala renderowania', default: 2 },
+    language: { type: 'string', label: 'Język OCR' },
+    ocrThreshold: { type: 'number', label: 'Min. znaków (poniżej = OCR)' },
+    scale: { type: 'number', label: 'Skala renderowania' },
   },
-  nodes: (config) => ({
-    'ocr': ocrNode(config),
+  nodes: () => ({
+    'ocr': ocrNode(),
   }),
 });

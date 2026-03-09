@@ -40,73 +40,71 @@ A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
 - `{ type: 'node:start' | 'node:done' | 'node:error', id }` — node lifecycle
 - `{ type: 'progress', id, status, pct? }` — progress update
 
+## Config Model — Single Source of Truth
+
+**Task template (task.json) is the single source of truth.** All config flows through one path:
+
+```
+task.json → flow.configure() → module config → ctx.get() → node
+```
+
+### How it works:
+1. `defineModule({ settings })` — declares what params exist and their defaults
+2. `flow.use(mod, overrides)` — merges defaults + overrides into `reg.config`
+3. `flow.configure(modId, settings)` — updates `reg.config` (does NOT rebuild nodes)
+4. `ctx.get(key)` in node — lookup chain: **namespaced var → global var → module config**
+
+### Rules:
+- **Nodes take NO config in constructor** — `ocrNode()`, `llmNode()`, `searchNode()` — zero params
+- **Nodes read ALL params via `ctx.get()`** — one source, always
+- **`configure()` never rebuilds nodes** — just updates the config map that ctx.get() reads from
+- **Module settings = schema declaration** — what task.json CAN contain, with defaults
+
 ## Node Reference — Variables Contract
 
-All config params are also overridable at runtime via `ctx.get('paramName')`.
+Nodes take no constructor arguments. All config comes from module settings → ctx.get().
 
 ### @obieg-zero/core
 
-**templateNode({ template, output? })**
+**templateNode({ template, output? })** — exception: template is structural, not runtime config
 - Reads: any `{{varName}}` referenced in template string — **throws on missing variable**
 - Writes: `$output` (default: `prompt`)
 
-**extractNode({ output? })**
+**extractNode({ output? })** — exception: output key is structural
 - Reads: `$answer`
 - Writes: `$output` (default: `extracted`), `$extractError`
-- Parses first JSON object/array from answer string
+
+**classifyNode({ rules })** — exception: rules are structural
+- Reads: `$pages`
+- Writes: `$docType`, `$docParent`
 
 ### @obieg-zero/storage
 
-All OPFS nodes read `$opfsRoot` (default: `obieg-zero`) for root directory name.
-
-**opfsUpload()**
-- Reads: `$projectId`, `$fileKey`, `$file` (File object)
-- Writes: `$storedFile` ({ projectId, fileKey, name, size })
-
-**opfsRead()**
-- Reads: `$projectId`, `$fileKey`
-- Writes: `$file` (File object from OPFS)
-
-**opfsDelete()** — Reads: `$projectId`, `$fileKey`
-
-**opfsDeleteProject()** — Reads: `$projectId`
-
-**opfsOpen()**
-- Reads: `$projectId`, `$fileKey`, `$revokeTimeout` (default: 60000ms)
-- Writes: `$fileUrl` — opens file in new tab
-
-**persistSave/Load/Delete({ keys })** — Reads: `$projectId`, saves/loads/deletes keys from IndexedDB
+**opfsUpload/Read/Delete/DeleteProject/Open()** — reads `$opfsRoot`, `$revokeTimeout` from config
+**persistSave/Load/Delete()** — reads `$persistKeys` from config
 
 ### @obieg-zero/ocr
 
-**ocrNode({ language?, ocrThreshold?, scale? })**
-- Reads: `$file` (File/Blob)
-- Writes: `$pages` — array of `{ page: number, text: string }`
-- Config: `language` (default: `pol`), `ocrThreshold` (default: 20 chars), `scale` (default: 2)
-- Uses pdfjs-dist for text layer, falls back to Tesseract OCR when text < threshold
-- Peer deps: `pdfjs-dist`, `tesseract.js`
+**ocrNode()** — no constructor params
+- Reads: `$file`, config: `language`, `ocrThreshold`, `scale`
+- Writes: `$pages`
 
 ### @obieg-zero/embed
 
-**embedNode({ model, dtype?, chunkSize?, chunkOverlap?, minChunkLength?, timeout?, workerFactory })**
-- Reads: `$pages` (from OCR)
-- Writes: `$chunks`, `$embedFn`, `$queryEmbedding` (reset to null)
-- Config: `chunkSize` (500), `chunkOverlap` (50), `minChunkLength` (10), `timeout` (60000ms)
-- Peer dep: `@huggingface/transformers`
+**embedNode()** — no constructor params
+- Reads: `$pages`, config: `model`, `dtype`, `chunkSize`, `chunkOverlap`, `minChunkLength`, `embedTimeout`, `workerFactory`
+- Writes: `$chunks`, `$embedFn`
 
-**searchNode({ topK?, keywordBoost? })**
-- Reads: `$query`, `$chunks`, `$queryEmbedding` (or `$embedFn`)
-- Writes: `$context` (joined text), `$matchedChunks`
-- Config: `topK` (5), `keywordBoost` (0.05 per keyword match)
+**searchNode()** — no constructor params
+- Reads: `$query`, `$chunks`, `$embedFn`, config: `topK`, `keywordBoost`, `maxContextChars`
+- Writes: `$context`, `$matchedChunks`
 
 ### @obieg-zero/llm
 
-**llmNode({ modelUrl, nCtx?, nPredict?, temperature?, topP?, topK?, timeout?, wasmPaths? })**
-- Reads: `$prompt`, optional `$onToken` callback
-- Writes: `$answer`, `$llmReady` (after first model load)
-- Config: `nCtx` (8192), `nPredict` (256), `temperature` (0.3), `topP` (0.9), `topK` (40), `timeout` (300000ms)
-- `wasmPaths` overrides default CDN URLs for wllama WASM
-- Peer dep: `@wllama/wllama`
+**llmNode()** — no constructor params
+- Reads: `$prompt`, `$onToken`, config: `modelUrl`, `chatTemplate`, `nCtx`, `nPredict`, `temperature`, `topP`, `topK`, `timeout`, `wasmPaths`
+- Writes: `$answer`, `$llmReady`
+- `chatTemplate: true` — wraps prompt in model's chat template (required for Instruct models)
 
 ## Auto-Cache
 
@@ -164,10 +162,11 @@ When building pipelines: search a lot, ask LLM once, with minimal input.
 ## Adding a New Node
 
 1. Create `packages/<pkg>/src/myNode.ts`
-2. Export factory: `export function myNode(config): NodeDef`
-3. Document reads/writes in this file
-4. Re-export from `packages/<pkg>/src/index.ts`
-5. Bump version in `package.json`, publish with `npm publish --access public`
+2. Export factory: `export function myNode(): NodeDef` — **no config parameter**
+3. Node reads ALL config via `ctx.get()` — never from constructor closure
+4. Document reads/writes in this file
+5. Re-export from `packages/<pkg>/src/index.ts`
+6. Bump version in `package.json`, publish with `npm publish --access public`
 
 ## Adding a New Package
 
