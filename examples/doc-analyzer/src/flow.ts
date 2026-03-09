@@ -1,29 +1,11 @@
-import { createFlow, templateNode, extractNode, type Flow } from '@obieg-zero/core'
-export type FlowInstance = Flow
+import { createFlow, templateNode, extractNode } from '@obieg-zero/core'
 import { storageModule } from '@obieg-zero/storage'
 import { ocrModule } from '@obieg-zero/ocr'
 import { embedModule } from '@obieg-zero/embed'
 import { llmModule } from '@obieg-zero/llm'
 
-// single source of truth for node IDs — match module-registered names
-export const NODES = {
-  OCR: 'ocr',
-  EMBED: 'embed',
-  SEARCH: 'search',
-  QA_PROMPT: 'qa-prompt',
-  LLM: 'llm',
-  TPL: 'tpl',
-  UPLOAD: 'upload',
-  LOAD_FILE: 'read-file',
-  DELETE_PROJECT: 'delete-project',
-  EXTRACT: 'extract',
-} as const
-
-export const TPL_OUTPUT = 'templateResult'
-
 export const flow = createFlow()
 
-// cache set per-task in useWorkbench (activateTask / createTask / loadFile / loadText)
 flow.use(storageModule)
 flow.use(ocrModule)
 flow.use(embedModule, {
@@ -35,8 +17,8 @@ flow.use(embedModule, {
 })
 flow.use(llmModule, { nCtx: 2048, nPredict: 256 })
 
-flow.node(NODES.QA_PROMPT, templateNode({
+flow.node('qa-prompt', templateNode({
   template: `Context:\n{{context}}\n\nQuestion: {{query}}`,
   output: 'prompt',
 }))
-flow.node(NODES.EXTRACT, extractNode())
+flow.node('extract', extractNode())

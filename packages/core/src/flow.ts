@@ -130,18 +130,24 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
     async run(...ids) {
       if (debug) console.group(`[flow] run(${ids.join(', ')})`);
       for (const id of ids) {
-        const node = nodes.get(id);
+        // namespace: 'ocr:umowa' → baseId='ocr', scope='umowa'
+        const colonIdx = id.indexOf(':');
+        const scope = colonIdx >= 0 ? id.slice(colonIdx + 1) : '';
+        const baseId = colonIdx >= 0 ? id.slice(0, colonIdx) : id;
+        const node = nodes.get(id) ?? (scope ? nodes.get(baseId) : undefined);
         if (!node) {
           if (debug) console.groupEnd();
           throw new Error(`Node "${id}" not found`);
         }
+
+        const ns = (key: string) => scope ? `${key}:${scope}` : key;
 
         // build cache key from inputs
         const canCache = cacheAdapter && node.reads?.length && node.writes?.length;
         let cacheKey: string | undefined;
         if (canCache) {
           const inputs: Record<string, any> = {};
-          for (const key of node.reads!) inputs[key] = hashable(vars[key]);
+          for (const key of node.reads!) inputs[key] = hashable(vars[ns(key)] ?? vars[key]);
           cacheKey = await computeHash(id, inputs);
           const cached = await cacheAdapter!.get(cacheKey);
           if (cached) {
@@ -157,11 +163,15 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
         emit({ type: 'node:start', id });
 
         const ctx: FlowContext = {
-          get: (key) => vars[key],
+          get: (key) => {
+            const nsKey = ns(key);
+            return nsKey !== key && vars[nsKey] !== undefined ? vars[nsKey] : vars[key];
+          },
           set: (key, value) => {
-            vars[key] = value;
-            if (debug) console.log(`[flow]   set ${key} =`, typeof value === 'string' ? value.slice(0, 120) : value);
-            emit({ type: 'vars', key, value });
+            const actual = ns(key);
+            vars[actual] = value;
+            if (debug) console.log(`[flow]   set ${actual} =`, typeof value === 'string' ? value.slice(0, 120) : value);
+            emit({ type: 'vars', key: actual, value });
           },
           progress: (status, pct) => emit({ type: 'progress', id, status, pct }),
         };
@@ -174,8 +184,9 @@ export function createFlow(opts?: { debug?: boolean }): Flow {
             const outputs: Record<string, any> = {};
             let store = true;
             for (const key of node.writes!) {
-              if (!isSerializable(vars[key])) { store = false; break; }
-              outputs[key] = vars[key];
+              const actual = ns(key);
+              if (!isSerializable(vars[actual])) { store = false; break; }
+              outputs[actual] = vars[actual];
             }
             if (store) await cacheAdapter!.set(cacheKey, outputs);
           }

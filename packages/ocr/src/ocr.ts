@@ -4,7 +4,7 @@ export function ocrNode(config?: { language?: string; ocrThreshold?: number; sca
   const { language = 'pol', ocrThreshold = 20, scale = 2 } = config ?? {};
 
   return {
-    reads: ['file', 'language', 'ocrThreshold', 'scale'],
+    reads: ['file'],
     writes: ['pages'],
     async run(ctx) {
       const file: File | undefined = ctx.get('file');
