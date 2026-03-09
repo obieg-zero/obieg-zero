@@ -9,12 +9,12 @@ const STEP_ICONS: Record<StepType, ComponentType<{ size?: number }>> = {
 const LOG_COLORS: Record<string, string> = { info: 'text-info', ok: 'text-success', err: 'text-error', dim: 'text-base-content/30' }
 const STATUS_COLORS: Record<string, string> = { idle: 'bg-base-content/20', running: 'bg-warning', done: 'bg-success', error: 'bg-error' }
 
-function Panel({ label, icon, onClose, onClear, actions, children, footer, width = 'w-72' }: {
+function Panel({ label, icon, onClose, onClear, actions, children, footer, className = '' }: {
   label: string; icon?: ReactNode; onClose?: () => void; onClear?: () => void; actions?: ReactNode
-  children: ReactNode; footer?: ReactNode; width?: string
+  children: ReactNode; footer?: ReactNode; className?: string
 }) {
   return (
-    <div className={`${width} bg-base-100 border-r border-base-300 flex-col min-h-0`}>
+    <div className={`flex flex-col bg-base-100 border-r border-base-300 min-h-0 ${className}`}>
       <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
         <span className="text-xs font-semibold text-base-content/40 flex items-center gap-1.5">{icon}{label}</span>
         <div className="flex items-center gap-1">
@@ -55,64 +55,71 @@ export default function App() {
     } catch { setPreviewContent('Failed to read file') ; setPreviewFile(name) }
   }
 
-  const mv = s.mobileView
-  const setMv = (v: typeof mv) => up({ mobileView: v })
+  const toggleRight = (p: 'data' | 'modules' | 'log') => {
+    up({ rightPanel: s.rightPanel === p ? null : p })
+  }
+
+  const [leftOpen, setLeftOpen] = useState(true)
+  const rp = s.rightPanel
+  const rpOpen = rp !== null
 
   return (
-    <div className="h-screen bg-base-200 flex flex-col md:flex-row overflow-hidden text-sm">
-      {/* LEFT — Tasks + Presets */}
-      <Panel label="Tasks" icon={<List size={12} />} width={`${mv === 'tasks' ? 'flex' : 'hidden'} md:flex w-full md:w-72`} footer={
-        <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
-          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — zero backend, zero API, zero cloud</div>
-          <div className="text-base-content/80">Your data never leaves your machine.</div>
-          <div><a href="https://www.npmjs.com/org/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">npm</a> · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">source</a> · MIT</div>
-        </div>
-      }>
-        <div className="space-y-4">
-          <Section label="New task">
-            {wb.presets.length === 0 && !wb.presetsRateLimited && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
-            {wb.presetsRateLimited && <div className="text-2xs text-warning/70">GitHub API rate limit exceeded. This is a free, budget-zero app — no API keys, no backend. Try again in ~1 hour.</div>}
-            {wb.presets.map((p, i) => (
-              <button key={i} onClick={() => { wb.createTask(p); setMv('pipeline') }} disabled={busy}
-                className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
-                <div className="leading-tight">
-                  <div className="text-xs font-semibold">{p.name}</div>
-                  <div className="text-2xs text-base-content/30">{p.desc}</div>
-                </div>
-              </button>
-            ))}
-          </Section>
-
-          {s.tasks.length > 0 && (
-            <Section label={`Active (${s.tasks.length})`}>
-              {s.tasks.map(t => (
-                <div key={t.id} onClick={() => { wb.activateTask(t.id); setMv('pipeline') }}
-                  className={`w-full text-left rounded p-2 cursor-pointer ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[t.status]}`} />
-                      <span className="text-xs font-semibold truncate">{t.name}</span>
+    <div className="h-screen bg-base-200 flex flex-row overflow-hidden text-sm relative">
+      {/* LEFT — Tasks (sliding) */}
+      <div className={`w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0 transition-[margin,transform] duration-300 ease-in-out z-20
+        max-md:absolute max-md:inset-y-0 max-md:left-0 ${leftOpen ? 'md:ml-0 max-md:translate-x-0' : 'md:-ml-72 max-md:-translate-x-full'}`}>
+          <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
+            <span className="text-xs font-semibold text-base-content/40 flex items-center gap-1.5"><List size={12} />Tasks</span>
+            <button onClick={() => setLeftOpen(false)} className="btn btn-ghost btn-xs btn-square text-base-content/30"><X size={12} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="space-y-4">
+              <Section label="New task">
+                {wb.presets.length === 0 && !wb.presetsRateLimited && <div className="text-2xs text-base-content/25">Loading tasks from GitHub…</div>}
+                {wb.presetsRateLimited && <div className="text-2xs text-warning/70">GitHub API rate limit exceeded. This is a free, budget-zero app — no API keys, no backend. Try again in ~1 hour.</div>}
+                {wb.presets.map((p, i) => (
+                  <button key={i} onClick={() => wb.createTask(p)} disabled={busy}
+                    className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1">
+                    <div className="leading-tight">
+                      <div className="text-xs font-semibold">{p.name}</div>
+                      <div className="text-2xs text-base-content/30">{p.desc}</div>
                     </div>
-                    <button onClick={e => { e.stopPropagation(); wb.removeTask(t.id) }}
-                      className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
-                  </div>
-                  {t.fileName && (
-                    <div className="text-2xs text-base-content/40 truncate ml-4">{t.fileName}</div>
-                  )}
-                  <div className="text-2xs text-base-content/25 ml-4">
-                    {t.steps.filter(s => s.status === 'done').length}/{t.steps.length} steps
-                  </div>
-                </div>
-              ))}
-            </Section>
-          )}
-        </div>
-      </Panel>
+                  </button>
+                ))}
+              </Section>
 
-      {/* CENTER — Active task */}
-      <Panel
-        label="workbench" icon={<span className="font-black text-primary">OBIEG-ZERO</span>}
-        width={`${mv === 'pipeline' ? 'flex' : 'hidden'} md:flex flex-1`}
+              {s.tasks.length > 0 && (
+                <Section label={`Active (${s.tasks.length})`}>
+                  {s.tasks.map(t => (
+                    <div key={t.id} onClick={() => wb.activateTask(t.id)}
+                      className={`w-full text-left rounded p-2 cursor-pointer ${t.id === s.activeTaskId ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[t.status]}`} />
+                          <span className="text-xs font-semibold truncate">{t.name}</span>
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); wb.removeTask(t.id) }}
+                          className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
+                      </div>
+                      {t.fileName && <div className="text-2xs text-base-content/40 truncate ml-4">{t.fileName}</div>}
+                      <div className="text-2xs text-base-content/25 ml-4">
+                        {t.steps.filter(s => s.status === 'done').length}/{t.steps.length} steps
+                      </div>
+                    </div>
+                  ))}
+                </Section>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
+            <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — zero backend, zero API, zero cloud</div>
+            <div className="text-base-content/80">Your data never leaves your machine.</div>
+            <div><a href="https://www.npmjs.com/org/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">npm</a> · <a href="https://github.com/obieg-zero/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">source</a> · MIT</div>
+          </div>
+      </div>
+
+      {/* CENTER — Workbench */}
+      <Panel label="workbench" icon={<>{!leftOpen && <button onClick={() => setLeftOpen(true)} className="btn btn-ghost btn-xs btn-square mr-1"><List size={13} /></button>}<span className="font-black text-primary">OBIEG-ZERO</span></>} className="flex-1"
         actions={<>
           {task?.fileName && (
             <div className="flex items-center gap-2 text-xs text-base-content/50 mr-2">
@@ -125,9 +132,9 @@ export default function App() {
               {busy ? 'Running…' : `Run all (${task.steps.length})`}
             </button>
           )}
-          {task && <button onClick={() => up({ rightPanel: s.rightPanel === 'data' ? null : 'data' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'data' ? 'btn-active' : ''}`}><HardDrive size={13} /></button>}
-          <button onClick={() => up({ rightPanel: s.rightPanel === 'modules' ? null : 'modules' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'modules' ? 'btn-active' : ''}`}><Sliders size={13} /></button>
-          <button onClick={() => up({ rightPanel: s.rightPanel === 'log' ? null : 'log' })} className={`btn btn-ghost btn-xs btn-square ${s.rightPanel === 'log' ? 'btn-active' : ''}`}><Terminal size={13} /></button>
+          {task && <button onClick={() => toggleRight('data')} className={`btn btn-ghost btn-xs btn-square ${rp === 'data' ? 'btn-active' : ''}`}><HardDrive size={13} /></button>}
+          <button onClick={() => toggleRight('modules')} className={`btn btn-ghost btn-xs btn-square ${rp === 'modules' ? 'btn-active' : ''}`}><Sliders size={13} /></button>
+          <button onClick={() => toggleRight('log')} className={`btn btn-ghost btn-xs btn-square ${rp === 'log' ? 'btn-active' : ''}`}><Terminal size={13} /></button>
           <button onClick={() => { const dark = !s.dark; document.documentElement.dataset.theme = dark ? 'dracula' : 'corporate'; up({ dark }) }}
             className="btn btn-ghost btn-xs btn-square">{s.dark ? <Sun size={13} /> : <Moon size={13} />}</button>
         </>}>
@@ -230,118 +237,114 @@ export default function App() {
         )}
       </Panel>
 
-      {/* RIGHT — switched panel */}
-      {s.rightPanel === 'data' && task && (
-        <Panel label={task.name} icon={<HardDrive size={12} />}
-          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })}>
-          <div className="space-y-4">
-            {wb.opfsFiles.length > 0 && (
-              <Section label="OPFS files">
-                {wb.opfsFiles.map(f => (
-                  <div key={f.name}>
-                    <div onClick={() => f.name.endsWith('.json') ? openOpfsFile(f.name) : null}
-                      className={`text-2xs text-base-content/30 font-mono flex items-center justify-between ${f.name.endsWith('.json') ? 'cursor-pointer hover:text-base-content/60' : ''}`}>
-                      <span className="truncate" title={f.name}>
-                        {previewFile === f.name ? '- ' : f.name.endsWith('.json') ? '+ ' : '  '}{f.name}
-                      </span>
-                      <span className="text-base-content/20 shrink-0 ml-1">{f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(0)} KB`}</span>
-                    </div>
-                    {previewFile === f.name && (
-                      <pre className="text-2xs text-base-content/50 bg-base-200 rounded p-2 mt-1 mb-2 max-h-60 overflow-auto whitespace-pre-wrap break-all font-mono">
-                        {previewContent.slice(0, 5000)}{previewContent.length > 5000 ? '\n…truncated' : ''}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-              </Section>
-            )}
-
-            {wb.getVars().length > 0 && (
-              <Section label="Flow vars">
-                {wb.getVars().map(([k, v]) => {
-                  const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
-                  return (
-                    <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
-                      <span className="text-base-content/50">${k}</span> = {display}
-                    </div>
-                  )
-                })}
-              </Section>
-            )}
-          </div>
-        </Panel>
-      )}
-
-      {s.rightPanel === 'modules' && (
-        <Panel label="Modules" icon={<Sliders size={12} />}
-          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })}>
-          <div className="space-y-3">
-            {wb.getModules().map(mod => (
-              <div key={mod.def.id} className="bg-base-200 rounded p-2">
-                <div className="text-xs font-semibold text-base-content/50 mb-2">{mod.def.label}</div>
-                {Object.entries(mod.def.settings).map(([key, def]) => (
-                  <label key={key} className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-base-content/40 truncate mr-2">{def.label}</span>
-                    <input
-                      type={def.type === 'number' ? 'number' : 'text'}
-                      value={def.type === 'number' ? Number(mod.config[key] ?? def.default) : String(mod.config[key] ?? def.default)}
-                      onChange={e => wb.configureMod(mod.def.id, key, def.type === 'number' ? +e.target.value : e.target.value)}
-                      className={`input input-bordered input-xs text-right font-mono ${def.type === 'string' ? 'w-32 text-2xs' : 'w-20'}`} />
-                  </label>
-                ))}
-              </div>
-            ))}
-            <div className="bg-base-200 rounded p-2">
-              <div className="text-xs font-semibold text-base-content/50 mb-2 flex items-center gap-1.5">
-                <Database size={11} /> Models
-                {wb.models.totalSize > 0 && (
-                  <span className="text-2xs text-base-content/30 font-normal ml-auto">
-                    {(wb.models.totalSize / 1024 / 1024).toFixed(0)} MB
-                  </span>
-                )}
-              </div>
-              {wb.models.list.length === 0 && (
-                <div className="text-2xs text-base-content/25">No models downloaded yet</div>
-              )}
-              {wb.models.list.map(m => (
-                <div key={m.url} className="flex items-center justify-between text-2xs mb-1">
-                  <span className="text-base-content/40 truncate mr-2 font-mono" title={m.url}>
-                    {m.url.split('/').pop()}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-base-content/25">{(m.size / 1024 / 1024).toFixed(0)} MB</span>
-                    <button onClick={() => wb.deleteModel(m.url)}
-                      className="btn btn-ghost btn-xs btn-square text-base-content/20 hover:text-error">
-                      <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+      {/* RIGHT — sliding panel */}
+      <div className={`w-72 shrink-0 flex flex-col bg-base-100 border-l border-base-300 min-h-0 transition-[margin,transform] duration-300 ease-in-out z-20
+        max-md:absolute max-md:inset-y-0 max-md:right-0 ${rpOpen ? 'md:mr-0 max-md:translate-x-0' : 'md:-mr-72 max-md:translate-x-full'}`}>
+          <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
+            <span className="text-xs font-semibold text-base-content/40 flex items-center gap-1.5">
+              {rp === 'data' && <><HardDrive size={12} />{task?.name}</>}
+              {rp === 'modules' && <><Sliders size={12} />Modules</>}
+              {rp === 'log' && <><Terminal size={12} />Log</>}
+            </span>
+            <div className="flex items-center gap-1">
+              {rp === 'log' && <button onClick={() => up({ logs: [] })} className="btn btn-ghost btn-xs btn-square text-base-content/30"><Trash2 size={12} /></button>}
+              <button onClick={() => up({ rightPanel: null })} className="btn btn-ghost btn-xs btn-square text-base-content/30"><X size={12} /></button>
             </div>
           </div>
-        </Panel>
-      )}
+          <div className="flex-1 overflow-y-auto p-3">
+            {rp === 'data' && task && (
+              <div className="space-y-4">
+                {wb.opfsFiles.length > 0 && (
+                  <Section label="OPFS files">
+                    {wb.opfsFiles.map(f => (
+                      <div key={f.name}>
+                        <div onClick={() => f.name.endsWith('.json') ? openOpfsFile(f.name) : null}
+                          className={`text-2xs text-base-content/30 font-mono flex items-center justify-between ${f.name.endsWith('.json') ? 'cursor-pointer hover:text-base-content/60' : ''}`}>
+                          <span className="truncate" title={f.name}>
+                            {previewFile === f.name ? '- ' : f.name.endsWith('.json') ? '+ ' : '  '}{f.name}
+                          </span>
+                          <span className="text-base-content/20 shrink-0 ml-1">{f.size < 1024 ? `${f.size} B` : `${(f.size / 1024).toFixed(0)} KB`}</span>
+                        </div>
+                        {previewFile === f.name && (
+                          <pre className="text-2xs text-base-content/50 bg-base-200 rounded p-2 mt-1 mb-2 max-h-60 overflow-auto whitespace-pre-wrap break-all font-mono">
+                            {previewContent.slice(0, 5000)}{previewContent.length > 5000 ? '\n…truncated' : ''}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                  </Section>
+                )}
+                {wb.getVars().length > 0 && (
+                  <Section label="Flow vars">
+                    {wb.getVars().map(([k, v]) => {
+                      const display = Array.isArray(v) ? `[${v.length}]` : typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v).slice(0, 30)
+                      return (
+                        <div key={k} className="text-2xs text-base-content/30 truncate font-mono" title={typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v)}>
+                          <span className="text-base-content/50">${k}</span> = {display}
+                        </div>
+                      )
+                    })}
+                  </Section>
+                )}
+              </div>
+            )}
 
-      {s.rightPanel === 'log' && (
-        <Panel label="Log" icon={<Terminal size={12} />}
-          width={`${mv === 'panel' ? 'flex' : 'hidden'} md:flex w-full md:w-72`}
-          onClose={() => up({ rightPanel: null, mobileView: 'pipeline' })} onClear={() => up({ logs: [] })}>
-          <div className="font-mono text-2xs space-y-0.5">
-            {s.logs.length === 0 && <div className="text-base-content/20">—</div>}
-            {s.logs.map((l, i) => (
-              <div key={i} className={LOG_COLORS[l.level]}><span className="text-base-content/15">{l.t}</span> {l.text}</div>
-            ))}
+            {rp === 'modules' && (
+              <div className="space-y-3">
+                {wb.getModules().map(mod => (
+                  <div key={mod.def.id} className="bg-base-200 rounded p-2">
+                    <div className="text-xs font-semibold text-base-content/50 mb-2">{mod.def.label}</div>
+                    {Object.entries(mod.def.settings).map(([key, def]) => (
+                      <label key={key} className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-base-content/40 truncate mr-2">{def.label}</span>
+                        <input
+                          type={def.type === 'number' ? 'number' : 'text'}
+                          value={def.type === 'number' ? Number(mod.config[key] ?? def.default) : String(mod.config[key] ?? def.default)}
+                          onChange={e => wb.configureMod(mod.def.id, key, def.type === 'number' ? +e.target.value : e.target.value)}
+                          className={`input input-bordered input-xs text-right font-mono ${def.type === 'string' ? 'w-32 text-2xs' : 'w-20'}`} />
+                      </label>
+                    ))}
+                  </div>
+                ))}
+                <div className="bg-base-200 rounded p-2">
+                  <div className="text-xs font-semibold text-base-content/50 mb-2 flex items-center gap-1.5">
+                    <Database size={11} /> Models
+                    {wb.models.totalSize > 0 && (
+                      <span className="text-2xs text-base-content/30 font-normal ml-auto">
+                        {(wb.models.totalSize / 1024 / 1024).toFixed(0)} MB
+                      </span>
+                    )}
+                  </div>
+                  {wb.models.list.length === 0 && (
+                    <div className="text-2xs text-base-content/25">No models downloaded yet</div>
+                  )}
+                  {wb.models.list.map(m => (
+                    <div key={m.url} className="flex items-center justify-between text-2xs mb-1">
+                      <span className="text-base-content/40 truncate mr-2 font-mono" title={m.url}>
+                        {m.url.split('/').pop()}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-base-content/25">{(m.size / 1024 / 1024).toFixed(0)} MB</span>
+                        <button onClick={() => wb.deleteModel(m.url)}
+                          className="btn btn-ghost btn-xs btn-square text-base-content/20 hover:text-error">
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {rp === 'log' && (
+              <div className="font-mono text-2xs space-y-0.5">
+                {s.logs.length === 0 && <div className="text-base-content/20">—</div>}
+                {s.logs.map((l, i) => (
+                  <div key={i} className={LOG_COLORS[l.level]}><span className="text-base-content/15">{l.t}</span> {l.text}</div>
+                ))}
+              </div>
+            )}
           </div>
-        </Panel>
-      )}
-
-      {/* Mobile bottom nav */}
-      <div className="md:hidden btm-nav btm-nav-xs bg-base-100 border-t border-base-300">
-        <button onClick={() => setMv('tasks')} className={mv === 'tasks' ? 'active' : ''}><List size={16} /></button>
-        <button onClick={() => setMv('pipeline')} className={mv === 'pipeline' ? 'active' : ''}><Play size={16} /></button>
-        <button onClick={() => { setMv('panel'); if (!s.rightPanel) up({ rightPanel: 'log' }) }} className={mv === 'panel' ? 'active' : ''}><Sliders size={16} /></button>
       </div>
     </div>
   )
