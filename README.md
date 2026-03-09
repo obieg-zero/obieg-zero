@@ -1,45 +1,49 @@
 # obieg-zero
 
-Browser-native document flow engine. Zero backend, zero config, zero barrier.
+Browser-native document analysis. Zero backend, zero config, zero barrier.
 
 ## Packages
 
 | Package | Description |
 |---|---|
-| `@obieg-zero/core` | Flow engine — nodes, variables, events |
-| `@obieg-zero/storage` | OPFS file storage + IndexedDB persistence |
-| `@obieg-zero/ocr` | PDF parsing + Tesseract OCR |
-| `@obieg-zero/embed` | HuggingFace embeddings + semantic search |
-| `@obieg-zero/llm` | Local LLM inference (wllama/GGUF) |
+| `@obieg-zero/ocr-v2` | PDF text extraction + Tesseract OCR fallback |
+| `@obieg-zero/embed-v2` | Embeddings + semantic search (transformers.js) |
+| `@obieg-zero/llm-v2` | Local LLM inference (wllama/GGUF) |
+| `@obieg-zero/graph-v2` | Graph database on IndexedDB |
 
 ## Quick start
 
 ```ts
-import { createFlow, templateNode } from '@obieg-zero/core';
-import { ocrNode } from '@obieg-zero/ocr';
-import { llmNode } from '@obieg-zero/llm';
+import { ocrFile } from '@obieg-zero/ocr-v2'
+import { createEmbedder, search } from '@obieg-zero/embed-v2'
+import { createLlm } from '@obieg-zero/llm-v2'
+import { createGraphDB } from '@obieg-zero/graph-v2'
 
-const flow = createFlow();
+const pages = await ocrFile(pdf, { language: 'pol' })
 
-flow.node('ocr', ocrNode({ language: 'pol' }));
-flow.node('prompt', templateNode({
-  template: 'Summarize: {{context}}',
-}));
-flow.node('llm', llmNode({
-  modelUrl: '/models/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf',
-}));
+const embedder = await createEmbedder({ model: 'Xenova/multilingual-e5-small', dtype: 'q8' })
+const index = await embedder.createIndex(pages, { chunkSize: 200 })
+const hits = await search(index.chunks, 'kwota kredytu', index.embed, { topK: 3 })
 
-// Upload a PDF, OCR it, generate a summary
-flow.set('file', pdfFile);
-await flow.run('ocr', 'prompt', 'llm');
-console.log(flow.get('answer'));
+const llm = await createLlm({ modelUrl: '...gguf', wasmPaths: { ... } })
+const answer = await llm.ask(`Podaj kwotę: "${hits.map(h => h.text).join(' ')}"`)
+
+const db = await createGraphDB('case-1')
+await db.addNode({ id: 'n:1', type: 'credit', label: 'Kredyt', data: { amount: answer } })
 ```
+
+## Examples
+
+| Example | Description |
+|---|---|
+| `examples/playground` | Interactive pipeline demo — upload PDF, see graph |
+| `examples/doc-analyzer` | Document analyzer app |
 
 ## Philosophy
 
-- **Zero backend** — everything runs in the browser (OPFS, IndexedDB, WebAssembly)
-- **Zero config** — sensible defaults, just plug in nodes
-- **Zero barrier** — no accounts, no API keys, no server setup
+- **Zero backend** — everything runs in the browser (IndexedDB, WebAssembly)
+- **Zero config** — no accounts, no API keys, no server setup
+- **Uniform API** — stateful `createX(opts) → Handle { dispose() }`, stateless `fn(input, opts) → output`
 
 ## License
 

@@ -4,59 +4,42 @@ import { classifyNode, templateNode } from '@obieg-zero/core'
 import { saveSettings, loadSettings, createOpfsCache, listProjectFiles, listModels, removeModel, totalModelSize } from '@obieg-zero/storage'
 import type { FlowEvent } from '@obieg-zero/core'
 
-// --- Data model ---
+// --- Types ---
 
 export interface DocSlot {
-  type: string
-  label: string
-  required?: boolean
-  multiple?: boolean
-  parent?: string
-  patterns: string[]
+  type: string; label: string; required?: boolean
+  multiple?: boolean; parent?: string; patterns: string[]
 }
 
-export interface ExtractField {
-  key: string
-  label: string
-  query: string
-}
+export interface ExtractField { key: string; label: string; query: string }
 
 interface Doc {
-  id: number
-  name: string
-  scope: string
+  id: number; name: string; scope: string
   status: 'processing' | 'ready' | 'error'
-  error?: string
-  pages?: number
-  chunks?: number
-  docType?: string
+  error?: string; pages?: number; chunks?: number; docType?: string
 }
 
 interface Task {
-  id: number
-  name: string
-  desc: string
-  docs: Doc[]
-  projectId: string
-  promptTemplate?: string
-  extractPrompt?: string
+  id: number; name: string; desc: string; docs: Doc[]; projectId: string
+  promptTemplate?: string; extractPrompt?: string
   modules?: Record<string, Record<string, any>>
-  documents?: DocSlot[]
-  extract?: ExtractField[]
+  documents?: DocSlot[]; extract?: ExtractField[]
   extracted?: Record<string, string>
 }
 
+export interface Preset {
+  name: string; desc: string; promptTemplate?: string; extractPrompt?: string
+  modules?: Record<string, Record<string, any>>
+  documents?: DocSlot[]; extract?: ExtractField[]
+}
+
+// --- State ---
+
 interface State {
-  tasks: Task[]
-  activeId: number | null
-  nextId: number
+  tasks: Task[]; activeId: number | null; nextId: number
   logs: { t: string; text: string; lvl: 'i' | 'ok' | 'err' | 'dim' }[]
-  running: boolean
-  query: string
-  answer: string
-  streaming: string
-  panel: 'data' | 'modules' | 'log' | null
-  dark: boolean
+  running: boolean; query: string; answer: string; streaming: string
+  panel: 'data' | 'modules' | 'log' | null; dark: boolean
   progress: Record<string, string>
 }
 
@@ -94,17 +77,7 @@ function toScope(name: string): string {
 
 const DB_KEY = 'obieg:tasks:v2'
 
-// --- Presets from GitHub ---
-
-export interface Preset {
-  name: string
-  desc: string
-  promptTemplate?: string
-  extractPrompt?: string
-  modules?: Record<string, Record<string, any>>
-  documents?: DocSlot[]
-  extract?: ExtractField[]
-}
+// --- Presets ---
 
 const PRESET_CACHE_KEY = 'obieg-zero:presets'
 const PRESET_TTL = 24 * 60 * 60 * 1000
@@ -123,12 +96,46 @@ async function loadPresets(): Promise<{ presets: Preset[]; limited: boolean }> {
       const raw = await fetch(`https://raw.githubusercontent.com/${r.full_name}/${r.default_branch}/task.json`)
       if (raw.ok) {
         const t = await raw.json()
-        presets.push({ name: t.name, desc: t.desc, promptTemplate: t.promptTemplate, extractPrompt: t.extractPrompt, modules: t.modules, documents: t.documents, extract: t.extract })
+        if (t.name && t.desc) presets.push({ name: t.name, desc: t.desc, promptTemplate: t.promptTemplate, extractPrompt: t.extractPrompt, modules: t.modules, documents: t.documents, extract: t.extract })
       }
     } catch {}
   }
   try { localStorage.setItem(PRESET_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: presets })) } catch {}
   return { presets, limited: false }
+}
+
+// --- Flow helpers ---
+
+function initFlow(task: { projectId: string; modules?: Record<string, Record<string, any>> }) {
+  flow.reset()
+  flow.cache(createOpfsCache(task.projectId))
+  flow.set('projectId', task.projectId)
+  if (task.modules) for (const [mid, cfg] of Object.entries(task.modules)) flow.configure(mid, cfg)
+}
+
+function searchAcrossDocs(docs: Doc[]): Promise<string[]> {
+  const parts: string[] = []
+  return (async () => {
+    for (const doc of docs) {
+      await flow.run(`search:${doc.scope}`)
+      const ctx = flow.get(`context:${doc.scope}`)
+      if (ctx != null && ctx !== '') parts.push(ctx)
+    }
+    return parts
+  })()
+}
+
+async function runLlm(
+  template: string,
+  onStream: (text: string) => void,
+): Promise<void> {
+  flow.node('qa-prompt', templateNode({ template, output: 'prompt' }))
+  flow.set('onToken', (t: string) => onStream(t))
+  try {
+    await flow.run('qa-prompt', 'llm', 'extract')
+  } finally {
+    flow.set('onToken', null)
+  }
 }
 
 // --- Hook ---
@@ -143,7 +150,6 @@ export function useStore() {
 
   const task = s.tasks.find(t => t.id === s.activeId) ?? null
   const log = useCallback((text: string, lvl: State['logs'][0]['lvl'] = 'i') => up({ _log: { text, lvl } }), [])
-
   const setTask = (id: number, patch: Partial<Task>) => up({ _setTask: { id, patch } })
   const setDoc = (taskId: number, docId: number, patch: Partial<Doc>) => up({ _setDoc: { taskId, docId, patch } })
 
@@ -174,14 +180,15 @@ export function useStore() {
   }, [task?.projectId])
 
   useEffect(() => {
-    return flow.on((e: FlowEvent) => {
+    const unsub = flow.on((e: FlowEvent) => {
       if (e.type === 'vars') return
       const scope = e.id.includes(':') ? e.id.split(':').slice(1).join(':') : ''
-      if (e.type === 'node:start') { log(`▶ ${e.id}`, 'i'); if (scope) up({ progress: { ...s.progress, [scope]: `${e.id}…` } }) }
-      if (e.type === 'node:done') { log(`✓ ${e.id}`, 'ok'); if (scope) up({ progress: { ...s.progress, [scope]: '' } }); if (e.id === 'llm' || e.id.startsWith('llm:')) refreshModels() }
-      if (e.type === 'node:error') { log(`✕ ${e.id}: ${e.error}`, 'err'); if (scope) up({ progress: { ...s.progress, [scope]: '' } }) }
-      if (e.type === 'progress') { log(`  ${e.id}: ${e.status}`, 'dim'); if (scope) up({ progress: { ...s.progress, [scope]: e.status } }); else if (e.pct != null) up({}) }
+      if (e.type === 'node:start') { log(`> ${e.id}`, 'i'); if (scope) up({ progress: { ...s.progress, [scope]: `${e.id}…` } }) }
+      if (e.type === 'node:done') { log(`ok ${e.id}`, 'ok'); if (scope) up({ progress: { ...s.progress, [scope]: '' } }); if (e.id === 'llm' || e.id.startsWith('llm:')) refreshModels() }
+      if (e.type === 'node:error') { log(`err ${e.id}: ${e.error}`, 'err'); if (scope) up({ progress: { ...s.progress, [scope]: '' } }) }
+      if (e.type === 'progress') { log(`  ${e.id}: ${e.status}`, 'dim'); if (scope) up({ progress: { ...s.progress, [scope]: e.status } }) }
     })
+    return unsub
   }, [refreshModels])
 
   // --- Actions ---
@@ -189,10 +196,7 @@ export function useStore() {
   function activate(id: number) {
     const t = s.tasks.find(t => t.id === id)
     if (!t) return
-    for (const k of Object.keys(flow.vars)) flow.set(k, null)
-    flow.cache(createOpfsCache(t.projectId))
-    flow.set('projectId', t.projectId)
-    if (t.modules) for (const [mid, cfg] of Object.entries(t.modules)) flow.configure(mid, cfg)
+    initFlow(t)
     up({ activeId: id, panel: 'log', query: '', answer: '', streaming: '' })
     refreshOpfs(t.projectId)
     log(`Task: ${t.name}`, 'i')
@@ -207,10 +211,7 @@ export function useStore() {
       promptTemplate: p.promptTemplate, extractPrompt: p.extractPrompt,
       modules: p.modules, documents: p.documents, extract: p.extract,
     }
-    for (const k of Object.keys(flow.vars)) flow.set(k, null)
-    flow.cache(createOpfsCache(t.projectId))
-    flow.set('projectId', t.projectId)
-    if (p.modules) for (const [mid, cfg] of Object.entries(p.modules)) flow.configure(mid, cfg)
+    initFlow(t)
     up({ tasks: [...s.tasks, t], activeId: id, nextId: nid, panel: 'log', query: '', answer: '' })
     log(`New: ${p.name}`, 'ok')
   }
@@ -244,7 +245,6 @@ export function useStore() {
       const pages: any[] = flow.get(`pages:${scope}`) ?? []
       setDoc(task.id, docId, { pages: pages.length })
 
-      // Classify if task has document slots
       let docType: string | undefined
       if (task.documents?.length) {
         flow.node(`classify:${scope}`, classifyNode({
@@ -292,8 +292,6 @@ export function useStore() {
 
   function removeDoc(docId: number) {
     if (!task) return
-    const doc = task.docs.find(d => d.id === docId)
-    if (doc) for (const k of Object.keys(flow.vars)) if (k.endsWith(`:${doc.scope}`)) flow.set(k, null)
     setTask(task.id, { docs: task.docs.filter(d => d.id !== docId) })
   }
 
@@ -305,27 +303,17 @@ export function useStore() {
     up({ running: true, answer: '', streaming: '', query })
     try {
       flow.set('query', query)
-      const parts: string[] = []
-      for (const doc of ready) {
-        await flow.run(`search:${doc.scope}`)
-        const ctx = flow.get(`context:${doc.scope}`)
-        if (ctx) parts.push(`[${doc.name}]\n${ctx}`)
-      }
-      flow.set('context', parts.join('\n\n'))
-
-      flow.node('qa-prompt', templateNode({ template: task.promptTemplate, output: 'prompt' }))
+      const parts = await searchAcrossDocs(ready)
+      flow.set('context', parts.map((p, i) => `[${ready[i].name}]\n${p}`).join('\n\n'))
 
       let acc = ''
-      flow.set('onToken', (t: string) => { acc = t; up({ streaming: acc }) })
-      await flow.run('qa-prompt', 'llm', 'extract')
-      flow.set('onToken', null)
+      await runLlm(task.promptTemplate, t => { acc = t; up({ streaming: acc }) })
 
       const answer = flow.get('answer') ?? ''
       up({ running: false, answer, streaming: '' })
       refreshOpfs()
       log(`Done: ${answer.length} chars`, 'ok')
     } catch (e: any) {
-      flow.set('onToken', null)
       up({ running: false, streaming: '', answer: e.message })
       log(`Query: ${e.message}`, 'err')
     }
@@ -336,55 +324,41 @@ export function useStore() {
     const ready = task.docs.filter(d => d.status === 'ready')
     if (!ready.length) return
 
-    const maxChars = Number(flow.module('embed')?.config.maxContextChars)
+    const maxChars = Number(flow.module('embed')?.config?.maxContextChars) || 1500
     const perFieldChars = Math.floor(maxChars / task.extract.length)
 
     up({ running: true, streaming: '' })
     try {
-      // Search per field, collect contexts
       const fieldContexts: Record<string, string> = {}
       for (const field of task.extract) {
         flow.set('query', field.query)
-        const parts: string[] = []
-        for (const doc of ready) {
-          await flow.run(`search:${doc.scope}`)
-          const ctx = flow.get(`context:${doc.scope}`)
-          if (ctx) parts.push(ctx)
-        }
+        const parts = await searchAcrossDocs(ready)
         fieldContexts[field.key] = parts.join('\n')
         log(`Search: ${field.label}`, 'ok')
       }
 
-      // Build context from search results, limit per field from config
       const contextBlock = task.extract.map(f =>
         `[${f.label}]\n${fieldContexts[f.key]?.slice(0, perFieldChars) ?? '(brak)'}`
       ).join('\n\n')
-
       const fieldsJson = task.extract.map(f => `"${f.key}": "<${f.label}>"`).join(', ')
 
       flow.set('context', contextBlock)
       flow.set('query', task.extractPrompt.replace('%fields%', fieldsJson))
 
-      flow.node('qa-prompt', templateNode({ template: task.promptTemplate, output: 'prompt' }))
-
       let acc = ''
-      flow.set('onToken', (t: string) => { acc = t; up({ streaming: acc }) })
-      await flow.run('qa-prompt', 'llm', 'extract')
-      flow.set('onToken', null)
+      await runLlm(task.promptTemplate, t => { acc = t; up({ streaming: acc }) })
 
       const extracted = flow.get('extracted')
       if (extracted && typeof extracted === 'object') {
         setTask(task.id, { extracted })
         log(`Extracted: ${Object.keys(extracted).length} fields`, 'ok')
       } else {
-        const err = flow.get('extractError') ?? 'No JSON in answer'
-        log(`Extract failed: ${err}`, 'err')
+        log(`Extract failed: ${flow.get('extractError') ?? 'No JSON in answer'}`, 'err')
       }
 
       up({ running: false, streaming: '' })
       refreshOpfs()
     } catch (e: any) {
-      flow.set('onToken', null)
       up({ running: false, streaming: '' })
       log(`Extract: ${e.message}`, 'err')
     }
