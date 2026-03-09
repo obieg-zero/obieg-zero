@@ -1,0 +1,14 @@
+{
+  "name": "@obieg-zero/graph-v2",
+  "version": "1.1.0",
+  "description": "Browser-native graph database on Dexie/IndexedDB. Nodes, edges, traversal, Graph RAG context.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "dexie": "^4.3.0"
+  }
+}

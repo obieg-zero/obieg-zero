@@ -5,14 +5,8 @@
   "description": "Browser-native document flow engine. Zero backend, zero config, zero barrier.",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/mini-playground",
+    "examples/playground"
   ],
-  "license": "MIT",
-  "devDependencies": {
-    "pdfjs-dist": "^4.10.38",
-    "tesseract.js": "^6.0.1"
-  },
-  "dependencies": {
-    "@obieg-zero/llm": "^0.1.32"
-  }
+  "license": "MIT"
 }

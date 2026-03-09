@@ -1,0 +1,14 @@
+{
+  "name": "@obieg-zero/embed-v2",
+  "version": "1.0.0",
+  "description": "Embeddings + semantic search with keyword boost. Pure functions.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": ">=3.0.0"
+  }
+}

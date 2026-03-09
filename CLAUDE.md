@@ -1,217 +1,91 @@
-# obieg-zero — Architecture Guide
+# obieg-zero
 
-Browser-native document flow engine. Zero backend, zero API, zero cloud. Everything runs in the browser: OPFS, IndexedDB, WebAssembly, Web Workers.
+Browser-native document analysis workbench. Zero backend, zero API, zero cloud.
 
-**CRITICAL CONSTRAINT: LLM runs as Q4 GGUF via WASM on a weak laptop. Every token costs seconds. Every wasted computation = wasted energy. Design everything to minimize LLM input: search a lot, send minimum context, ask LLM once. Never re-run nodes whose output already exists. Never send more chunks than needed. This is not a cloud app with unlimited GPU — this is a browser app with a carbon footprint goal of near zero.**
+## Kluczowe ograniczenie
 
-## Monorepo Structure
+LLM dziala jako Q4 GGUF przez WASM na slabym laptopie. Rozumie JEDEN akapit. Kazdy token kosztuje sekundy. Projektuj wszystko tak, zeby LLM dostal minimum inputu i odpowiedzial raz. Search jest darmowy, LLM jest drogi.
+
+## Architektura: szyna OPFS + Dexie
+
+```
+OPFS (pliki)                    Dexie (dane)
+─────────────                   ────────────────────
+sprawa-1/                       projekty, strony, chunki,
+  umowa.pdf                     embeddingi, encje, graf,
+  aneks.pdf                     trace, konfiguracje
+sprawa-2/
+  rachunek.pdf
+
+Upload → OPFS
+OCR    ← OPFS  → Dexie (strony, tekst)
+Embed  ← Dexie → Dexie (chunki, wektory)
+LLM    ← Dexie → Dexie (fakty, ekstrakcje)
+Graf   ← Dexie → Dexie (encje, relacje)
+```
+
+**OPFS = pliki. Dexie = dane. To jest szyna pracy.**
+
+Sprawa (case) = folder w OPFS + dane w Dexie. Upload wrzuca plik do OPFS. OCR czyta z OPFS. Wszystkie dane strukturalne (tekst, chunki, embeddingi, graf) ida do Dexie.
+
+## Pakiety (klockI)
+
+Kazdy pakiet to niezalezny klocek. Czyta z szyny, pisze do szyny. Playground NIE narzuca pipeline'u — uzytkownik go komponuje.
 
 ```
 packages/
-├── core/       # @obieg-zero/core    — flow engine, template, extract
-├── storage/    # @obieg-zero/storage — OPFS files + IndexedDB persistence
-├── ocr/        # @obieg-zero/ocr     — PDF parsing + Tesseract OCR
-├── embed/      # @obieg-zero/embed   — HuggingFace embeddings + semantic search
-└── llm/        # @obieg-zero/llm     — local LLM (wllama/GGUF, e.g. Bielik)
+├── store-v2/   # @obieg-zero/store-v2  — OPFS pliki + Dexie dane (szyna)
+├── ocr-v2/     # @obieg-zero/ocr-v2    — PDF → strony tekstu
+├── embed-v2/   # @obieg-zero/embed-v2  — tekst → chunki + wektory + search
+├── llm-v2/     # @obieg-zero/llm-v2    — prompt → odpowiedz (lokalny GGUF)
+└── graph-v2/   # @obieg-zero/graph-v2  — encje + relacje (graf na Dexie)
 ```
 
-## Core Concepts
+Kazdy klocek to pure functions + handle pattern:
+- `createOpfs() → OpfsHandle` → `listProjects()`, `writeFile()`, `readFile()`
+- `createStoreDB() → StoreDB` → projekty, dokumenty, strony, chunki (Dexie)
+- `ocrFile(file, opts) → Page[]`
+- `createEmbedder(opts) → EmbedHandle` → `handle.createIndex(pages) → EmbedIndex`
+- `search(chunks, query, embedFn, opts) → SearchResult[]`
+- `createLlm(opts) → LlmHandle` → `handle.ask(prompt) → AskResult { text, tokenCount, durationMs }`
+- `createGraphDB(name) → GraphDB` → `addNodes()`, `getContext(id, hops)`, `queryNodes()`
 
-### Flow
-Central orchestrator. Holds **variables** (shared state) and **nodes** (processing steps).
+## Playground = modularny workbench
 
-```ts
-const flow = createFlow();
-flow.node('myNode', myNodeDef);   // register
-flow.set('key', value);           // set variable
-flow.get('key');                   // read variable
-await flow.run('node1', 'node2'); // execute sequentially
-flow.on(event => { ... });        // listen to events
-```
+Playground to narzedzie do budowania systemow analizy dokumentow. Uzytkownik sam sklada pipeline z klockow:
 
-### NodeDef
-A node is `{ run(ctx: FlowContext): Promise<void> }`. Context provides:
-- `ctx.get(key)` — read variable
-- `ctx.set(key, value)` — write variable (emits `vars` event)
-- `ctx.progress(status, pct?)` — emit progress event
+- **Tylko OCR** → przegladam tekst z PDF
+- **OCR → Embed** → szukam semantycznie po dokumentach
+- **OCR → LLM** → paragraf po paragrafie wyciagam fakty (bez embeddingu)
+- **OCR → Embed → LLM** → klasyczny RAG
+- **OCR → Embed → LLM → Graf** → Graph RAG z akumulacja wiedzy
+- **OPFS browser** → pracuje na plikach juz zapisanych, bez uploadu
+- Dowolna inna kombinacja
 
-### Events (FlowEvent)
-- `{ type: 'vars', key, value }` — variable changed
-- `{ type: 'node:start' | 'node:done' | 'node:error', id }` — node lifecycle
-- `{ type: 'progress', id, status, pct? }` — progress update
+Playground obsluguje DOWOLNE dokumenty: kredyty, rachunki za prad, mandaty, umowy najmu. Uzytkownik definiuje scenariusz (schemat encji, prompty) i iteruje.
 
-## Config Model — Single Source of Truth
+## Graph RAG — po co graf
 
-**Task template (task.json) is the single source of truth.** All config flows through one path:
+LLM jest slaby — rozumie jeden akapit. Ale potrafi z jednego akapitu wyciagnac: "bank: PKO", "kwota: 200000", "waluta: CHF".
 
-```
-task.json → flow.configure() → module config → ctx.get() → node
-```
+**Graf zbiera drobne fakty w calosc.** Setki malych ekstrakcji (kazda = jedno zapytanie do LLM na jednym akapicie) skladaja sie w wiedze o sprawie. Traversal po grafie daje odpowiedzi, ktorych LLM sam nigdy by nie dal.
 
-### How it works:
-1. `defineModule({ settings })` — declares what params exist and their defaults
-2. `flow.use(mod, overrides)` — merges defaults + overrides into `reg.config`
-3. `flow.configure(modId, settings)` — updates `reg.config` (does NOT rebuild nodes)
-4. `ctx.get(key)` in node — lookup chain: **namespaced var → global var → module config**
+To jak mrowki budujace mrowisko — kazda mrowka (jedno zapytanie) niesie jeden fakt, ale razem powstaje struktura.
 
-### Rules:
-- **Nodes take NO config in constructor** — `ocrNode()`, `llmNode()`, `searchNode()` — zero params
-- **Nodes read ALL params via `ctx.get()`** — one source, always
-- **`configure()` never rebuilds nodes** — just updates the config map that ctx.get() reads from
-- **Module settings = schema declaration** — what task.json CAN contain, with defaults
+## Konwencje
 
-## Node Reference — Variables Contract
+- TypeScript, ESM, published as `.ts` source (no build step)
+- Pakiety to pure functions + handle pattern — zero frameworka, zero klas
+- Ciezkie zaleznosci (pdfjs, tesseract, wllama, transformers) to peer deps, ladowane dynamicznie przez `await import()`
+- OPFS wymaga secure context (HTTPS lub localhost)
+- SharedArrayBuffer (wllama multi-thread) wymaga COOP/COEP headers
 
-Nodes take no constructor arguments. All config comes from module settings → ctx.get().
-
-### @obieg-zero/core
-
-**templateNode({ template, output? })** — exception: template is structural, not runtime config
-- Reads: any `{{varName}}` referenced in template string — **throws on missing variable**
-- Writes: `$output` (default: `prompt`)
-
-**extractNode({ output? })** — exception: output key is structural
-- Reads: `$answer`
-- Writes: `$output` (default: `extracted`), `$extractError`
-
-**classifyNode({ rules })** — exception: rules are structural
-- Reads: `$pages`
-- Writes: `$docType`, `$docParent`
-
-### @obieg-zero/storage
-
-**opfsUpload/Read/Delete/DeleteProject/Open()** — reads `$opfsRoot`, `$revokeTimeout` from config
-**persistSave/Load/Delete()** — reads `$persistKeys` from config
-
-### @obieg-zero/ocr
-
-**ocrNode()** — no constructor params
-- Reads: `$file`, config: `language`, `ocrThreshold`, `scale`
-- Writes: `$pages`
-
-### @obieg-zero/embed
-
-**embedNode()** — no constructor params
-- Reads: `$pages`, config: `model`, `dtype`, `chunkSize`, `chunkOverlap`, `minChunkLength`, `embedTimeout`, `workerFactory`
-- Writes: `$chunks`, `$embedFn`
-
-**searchNode()** — no constructor params
-- Reads: `$query`, `$chunks`, `$embedFn`, config: `topK`, `keywordBoost`, `maxContextChars`
-- Writes: `$context`, `$matchedChunks`
-
-### @obieg-zero/llm
-
-**llmNode()** — no constructor params
-- Reads: `$prompt`, `$onToken`, config: `modelUrl`, `chatTemplate`, `nCtx`, `nPredict`, `temperature`, `topP`, `topK`, `timeout`, `wasmPaths`
-- Writes: `$answer`, `$llmReady`
-- `chatTemplate: true` — wraps prompt in model's chat template (required for Instruct models)
-
-## Auto-Cache
-
-Nodes that declare `reads` and `writes` are automatically cached via IndexedDB. Cache key = hash of (nodeId + input values). On cache hit, node is skipped entirely.
-
-```ts
-import { createIdbCache } from '@obieg-zero/storage'
-
-const flow = createFlow()
-flow.cache(createIdbCache('my-project'))  // one line — caching enabled
-
-// Nodes with reads/writes are cached automatically:
-// ocrNode:  reads=['file'], writes=['pages']
-// llmNode:  reads=['prompt'], writes=['answer']
-// Second run with same file → OCR skipped, pages from cache
-```
-
-- `flow.clearCache()` — wipe all cached results for the project
-- Non-serializable outputs (functions, Workers) are never cached
-- File inputs are hashed by name+size+lastModified (not content)
-
-## Model Registry
-
-```ts
-import { listModels, registerModel, removeModel, totalModelSize } from '@obieg-zero/storage'
-
-await listModels()       // → [{ url, size, downloadedAt }]
-await totalModelSize()   // → bytes
-await removeModel(url)   // removes from registry + Cache API
-```
-
-## Performance Rule: Minimize LLM Calls
-
-This runs on a Q4 GGUF model in the browser via WebAssembly on a weak laptop. Every token costs seconds. Design accordingly:
-
-- **Search is free, LLM is expensive** — use search to narrow down, send only the minimum context to LLM
-- **Never re-run a node whose output already exists** — if `$context` is set, don't re-run search
-- **Smallest possible prompt** — trim context to what's needed, not "all chunks"
-- **topK should be low** (2-3) — more chunks = more tokens = slower inference, worse output
-- **nPredict should be low** — ask for structured output (JSON), not essays
-- **Zero waste** — no duplicate embeddings, no redundant inference, no silent re-computation
-
-When building pipelines: search a lot, ask LLM once, with minimal input.
-
-## Conventions
-
-- **Source format**: TypeScript, ESM (`"type": "module"`), published as `.ts` source (no build step)
-- **No runtime deps**: all heavy libs are peer dependencies (consumer installs what they need)
-- **Node factories**: always functions returning `NodeDef` — e.g. `ocrNode()`, not `class OcrNode`
-- **Variable names**: lowercase, colon-namespaced for scoping (e.g. `pages:contract`)
-- **Dynamic imports**: heavy deps (pdfjs, tesseract, wllama) loaded via `await import()` — no upfront cost
-- **Error handling**: nodes throw on missing required variables, caller catches
-- **Package exports**: each package has `src/index.ts` re-exporting public API
-
-## Adding a New Node
-
-1. Create `packages/<pkg>/src/myNode.ts`
-2. Export factory: `export function myNode(): NodeDef` — **no config parameter**
-3. Node reads ALL config via `ctx.get()` — never from constructor closure
-4. Document reads/writes in this file
-5. Re-export from `packages/<pkg>/src/index.ts`
-6. Bump version in `package.json`, publish with `npm publish --access public`
-
-## Adding a New Package
-
-1. `mkdir -p packages/<name>/src`
-2. Create `package.json` with `@obieg-zero/<name>` scope, peer dep on `@obieg-zero/core`
-3. Create `src/index.ts` with exports
-4. Add to root `package.json` workspaces
-5. Publish: `cd packages/<name> && npm publish --access public`
-
-## What This Project Is
-
-obieg-zero is a **framework published on npm**. The packages `@obieg-zero/*` are the product — people install them via `npm install`. The demo at `obieg-zero.github.io` is a showcase of the framework, not the project itself.
-
-## Workflow After Changing packages/
-
-Every change in `packages/` MUST be published. Local workspace symlinks are for development only — npm is the delivery mechanism.
+## Workflow
 
 ```bash
-# 1. Bump version in each changed package
-cd packages/<name> && npm version patch --no-git-tag-version
+# Dev
+cd examples/playground && npm run dev
 
-# 2. Publish each changed package
-cd packages/<name> && npm publish --access public
-
-# 3. Build demo
-cd examples/doc-analyzer && npx vite build
-
-# 4. Deploy demo
-npx gh-pages -d examples/doc-analyzer/dist -r https://github.com/obieg-zero/obieg-zero.github.io.git -b main
+# Publish zmian w pakietach
+cd packages/<name> && npm version patch --no-git-tag-version && npm publish --access public
 ```
-
-Do NOT skip step 2. Do NOT ask the user whether to publish — just do it.
-
-## Publishing
-
-```bash
-# From package directory:
-npm publish --access public
-# Requires npm token with org access (granular token + bypass 2FA)
-```
-
-## Known Constraints
-
-- `embedding-worker.ts` must be explicitly exported in package.json for Vite worker URL resolution
-- wllama `.ts` source conflicts with `erasableSyntaxOnly` — consumers should set `skipLibCheck: true`
-- OPFS requires secure context (HTTPS or localhost)
-- Cross-origin isolation headers needed for SharedArrayBuffer (wllama multi-thread):
-  `Cross-Origin-Embedder-Policy: require-corp` + `Cross-Origin-Opener-Policy: same-origin`
