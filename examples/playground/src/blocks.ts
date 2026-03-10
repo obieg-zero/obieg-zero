@@ -14,6 +14,7 @@ export async function blockUpload(project: string, files: File[], log: Log) {
   await opfs.createProject(project).catch(() => {})
   await db.addProject({ id: project, name: project, createdAt: Date.now() }).catch(() => {})
 
+  await db.clearProject(project)
   for (const file of files) {
     await opfs.writeFile(project, file.name, file)
     await db.addDocument({ id: `${project}:${file.name}`, projectId: project, filename: file.name, addedAt: Date.now() })
@@ -25,6 +26,17 @@ export async function blockUpload(project: string, files: File[], log: Log) {
 // --- Parse ← OPFS → Dexie pages ---
 
 export async function blockParse(project: string, language: string, log: Log) {
+  // Dexie cache
+  const docs = await db.listDocuments(project)
+  if (docs.length > 0) {
+    const cached: { page: number; text: string }[] = []
+    for (const doc of docs) { (await db.getPages(doc.id)).forEach(p => cached.push({ page: p.page, text: p.text })) }
+    if (cached.length > 0) {
+      log(`Parse: ${cached.length} stron z Dexie (cache)`)
+      return cached
+    }
+  }
+
   const files = await opfs.listFiles(project)
   if (files.length === 0) { log('Brak plikow w projekcie'); return [] }
 
@@ -74,6 +86,14 @@ export async function blockEmbed(project: string, pages: { page: number; text: s
 
   if (!embedder) {
     setEmbedder(await createEmbedder({ model, dtype: 'q8', onProgress: m => log(`  ${m}`) }))
+  }
+
+  // Dexie cache
+  const cached = await db.getChunksByProject(project)
+  if (cached.length > 0) {
+    log(`Embed: ${cached.length} chunków z Dexie (cache)`)
+    const chunks: Chunk[] = cached.map(c => ({ text: c.text, page: c.page, embedding: c.embedding }))
+    return { chunks, embedFn: (q: string) => embedder!.embed(q) }
   }
   const index = await embedder!.createIndex(pages, { chunkSize, onProgress: m => log(`  ${m}`) })
   log(`Embed: ${index.chunks.length} chunks po ~${chunkSize} zn.`)
