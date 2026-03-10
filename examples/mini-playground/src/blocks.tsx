@@ -35,7 +35,7 @@ export interface BlockDef {
 
 // --- singletons ---
 
-const opfs = createOpfs()
+export const opfs = createOpfs()
 
 // --- block definitions ---
 
@@ -44,7 +44,7 @@ export const BLOCK_DEFS: BlockDef[] = [
   // --- Upload → OPFS ---
   {
     type: 'upload',
-    label: 'Upload PDF',
+    label: 'Upload',
     color: '#6366f1',
     fields: [{ key: 'project', label: 'Projekt', default: 'default' }],
     defaults: { project: 'default' },
@@ -52,36 +52,61 @@ export const BLOCK_DEFS: BlockDef[] = [
       const project = config.project || 'default'
       await opfs.createProject(project).catch(() => {})
 
-      const file: File | undefined = (window as any).__miniCtxFile
-      if (!file) {
-        log('Brak pliku — wybierz PDF w karcie Upload')
-        return
-      }
-      delete (window as any).__miniCtxFile
+      const files: File[] = (window as any).__miniCtxFiles || []
+      if (files.length === 0) { log('Brak plikow — wybierz pliki w karcie Upload'); return }
+      delete (window as any).__miniCtxFiles
 
-      await opfs.writeFile(project, file.name, file)
+      for (const file of files) {
+        await opfs.writeFile(project, file.name, file)
+        log(`Zapisano ${file.name} → OPFS/${project}/`)
+      }
       ctx.data.project = project
-      ctx.data.filename = file.name
-      log(`Zapisano ${file.name} → OPFS/${project}/`)
+      log(`Upload: ${files.length} plikow → OPFS/${project}/`)
     },
   },
 
-  // --- OCR ← OPFS → ctx.pages ---
+  // --- Parse ← OPFS → ctx.pages (PDF→OCR, CSV/TXT→read) ---
   {
     type: 'ocr',
-    label: 'OCR',
+    label: 'Parse',
     color: '#ea580c',
-    fields: [{ key: 'language', label: 'Jezyk', default: 'pol' }],
+    fields: [{ key: 'language', label: 'Jezyk OCR', default: 'pol' }],
     defaults: { language: 'pol' },
     async run(config, ctx, log) {
       const project = ctx.data.project || 'default'
-      const filename = ctx.data.filename
-      if (!filename) { log('Brak pliku w kontekscie — dodaj Upload przed OCR'); return }
+      const files = await opfs.listFiles(project)
+      if (files.length === 0) { log('Brak plikow w projekcie'); return }
 
-      const file = await opfs.readFile(project, filename)
-      const pages = await ocrFile(file, { language: config.language || 'pol', onProgress: m => log(`  ${m}`) })
-      ctx.data.pages = pages
-      log(`${pages.length} stron, ${pages.reduce((s, p) => s + p.text.length, 0)} zn.`)
+      const allPages: { page: number; text: string }[] = []
+      let pageNum = 1
+
+      for (const filename of files) {
+        const ext = filename.split('.').pop()?.toLowerCase() || ''
+        log(`Parse: ${filename} (${ext})`)
+
+        if (ext === 'pdf') {
+          const file = await opfs.readFile(project, filename)
+          const pages = await ocrFile(file, { language: config.language || 'pol', onProgress: m => log(`  ${m}`) })
+          for (const p of pages) allPages.push({ page: pageNum++, text: `[${filename}] ${p.text}` })
+        } else if (ext === 'csv' || ext === 'tsv') {
+          const file = await opfs.readFile(project, filename)
+          const text = await file.text()
+          const lines = text.split('\n')
+          const header = lines[0] || ''
+          // chunk CSV: 20 rows per page
+          for (let i = 1; i < lines.length; i += 20) {
+            const chunk = [header, ...lines.slice(i, i + 20)].join('\n')
+            allPages.push({ page: pageNum++, text: `[${filename}] ${chunk}` })
+          }
+        } else {
+          const file = await opfs.readFile(project, filename)
+          const text = await file.text()
+          allPages.push({ page: pageNum++, text: `[${filename}] ${text}` })
+        }
+      }
+
+      ctx.data.pages = allPages
+      log(`Parse: ${allPages.length} stron, ${allPages.reduce((s, p) => s + p.text.length, 0)} zn.`)
     },
   },
 
@@ -107,7 +132,12 @@ export const BLOCK_DEFS: BlockDef[] = [
       })
       ctx.data.chunks = index.chunks
       ctx.data._embedFn = index.embed
-      log(`${index.chunks.length} chunks`)
+      log(`Embed: ${index.chunks.length} chunks po ~${config.chunkSize} zn. z ${ctx.data.pages.length} stron`)
+      // pokaz pierwsze 3 chunki
+      for (let i = 0; i < Math.min(3, index.chunks.length); i++) {
+        log(`  chunk[${i}]: "${index.chunks[i].text.slice(0, 100)}..."`)
+      }
+      if (index.chunks.length > 3) log(`  ...i ${index.chunks.length - 3} wiecej`)
     },
   },
 
@@ -169,43 +199,131 @@ export const BLOCK_DEFS: BlockDef[] = [
     },
   },
 
-  // --- Graph Store ← ctx.answer → graph-v2 ---
+  // --- Extract: LLM na KAZDYM chunku → fakty → Graph (mrowki) ---
+  {
+    type: 'extract',
+    label: 'Extract',
+    color: '#f59e0b',
+    fields: [
+      { key: 'prompt', label: 'Prompt ({{chunk}} = tekst chunka)' },
+      { key: 'modelUrl', label: 'Model URL', default: 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf' },
+    ],
+    defaults: {
+      prompt: 'Wypisz fakty z tekstu, kazdy w osobnej linii w formacie TYP: wartosc\nMozliwe typy: bank, kwota, marza, wibor, data, okres, rata, waluta, oprocentowanie\nJesli brak faktow — napisz: brak\n\nTekst: "{{chunk}}"\n\nFakty:',
+      modelUrl: 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf',
+    },
+    async run(config, ctx, log) {
+      if (!ctx.data.chunks?.length) { log('Brak chunks — dodaj Embed przed Extract'); return }
+
+      if (!ctx._llm) {
+        ctx._llm = await createLlm({
+          modelUrl: config.modelUrl,
+          wasmPaths: {
+            'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
+            'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
+          },
+          nCtx: 2048,
+          chatTemplate: true,
+          onProgress: m => log(`  ${m}`),
+        })
+      }
+
+      if (!ctx._graph) {
+        ctx._graph = await createGraphDB(`mini-${ctx.data.project || 'default'}`)
+      }
+
+      let extracted = 0, failed = 0
+      const chunks = ctx.data.chunks as Chunk[]
+      const t0 = Date.now()
+      let avgMs = 0
+      log(`Extract: ${chunks.length} chunkow`)
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]
+        const prompt = config.prompt.replace('{{chunk}}', chunk.text.slice(0, 400))
+        const eta = i > 0 ? ` | ETA: ${Math.round(avgMs * (chunks.length - i) / 1000)}s` : ''
+        log(`--- [${i + 1}/${chunks.length}]${eta} ---`)
+        log(`  IN: "${chunk.text.slice(0, 100)}..."`)
+
+        try {
+          const result = await ctx._llm.ask(prompt, { nPredict: 128, temperature: 0.1 })
+          avgMs = (Date.now() - t0) / (i + 1)
+          log(`  OUT (${result.tokenCount}tok ${(result.durationMs / 1000).toFixed(1)}s): ${result.text}`)
+
+          // parse lines with ":" — accept anything LLM produces
+          const facts = result.text.split('\n')
+            .map(l => l.trim().replace(/^\d+[\.\)]\s*/, '').replace(/^[-*]\s*/, ''))
+            .filter(l => l.includes(':'))
+            .map(line => {
+              const idx = line.indexOf(':')
+              return { type: line.slice(0, idx).trim().toLowerCase(), value: line.slice(idx + 1).trim() }
+            })
+            .filter(f => f.type && f.value)
+
+          if (facts.length === 0) { failed++; log(`  WYNIK: brak faktow`); continue }
+
+          const nodes = facts.map((f, j) => ({
+            id: `c${i}:e${j}:${Date.now()}`,
+            type: f.type,
+            label: f.type,
+            data: { value: f.value },
+            trace: { chunk: i, page: chunk.page },
+          }))
+          await ctx._graph.addNodes(nodes)
+
+          // co-occurrence edges
+          const edges = []
+          for (let a = 0; a < nodes.length; a++) {
+            for (let b = a + 1; b < nodes.length; b++) {
+              edges.push({ id: `e:${nodes[a].id}:${nodes[b].id}`, from: nodes[a].id, to: nodes[b].id, type: 'co-occurs', label: 'w tym samym chunku' })
+            }
+          }
+          if (edges.length) await ctx._graph.addEdges(edges)
+
+          extracted += nodes.length
+          log(`  WYNIK: ${facts.map(f => `${f.type}: ${f.value}`).join(' | ')}`)
+        } catch (e: any) {
+          failed++
+          log(`  BLAD: ${e.message}`)
+        }
+      }
+
+      ctx.data.extractStats = { extracted, failed, total: chunks.length }
+      log(`=== PODSUMOWANIE: ${extracted} faktow, ${failed} pustych, ${chunks.length} chunkow ===`)
+    },
+  },
+
+  // --- Graph View ---
   {
     type: 'graph',
     label: 'Graph',
     color: '#dc2626',
-    fields: [
-      { key: 'nodeType', label: 'Typ encji', default: 'fact' },
-      { key: 'field', label: 'Pole', default: 'value' },
-    ],
-    defaults: { nodeType: 'fact', field: 'value' },
-    async run(config, ctx, log) {
-      if (!ctx.data.answer) { log('Brak answer — dodaj LLM przed Graph'); return }
-      if (!ctx._graph) {
-        ctx._graph = await createGraphDB(`mini-${ctx.data.project || 'default'}`)
-      }
-      const id = `${config.nodeType}:${config.field}:${Date.now()}`
-      await ctx._graph.addNode({
-        id,
-        type: config.nodeType,
-        label: config.field,
-        data: { [config.field]: ctx.data.answer },
-      })
-      const all = await ctx._graph.getAllNodes()
-      log(`Graf: dodano ${id}, razem ${all.length} nodes`)
+    fields: [],
+    defaults: {},
+    async run(_config, ctx, log) {
+      if (!ctx._graph) { log('Brak grafu — dodaj Extract przed Graph'); return }
+      const graph = await ctx._graph.getGraph()
+      ctx.data.graph = graph
+
+      const byType = new Map<string, number>()
+      graph.nodes.forEach(n => byType.set(n.type, (byType.get(n.type) || 0) + 1))
+      log(`Graf: ${graph.nodes.length} encji, ${graph.edges.length} relacji`)
+      for (const [type, count] of byType) log(`  ${type}: ${count}`)
     },
   },
 ]
 
 // --- Block card UI ---
 
-export function BlockCard({ block, index, total, onRemove, onMove, onConfig }: {
+export function BlockCard({ block, index, total, running, onRemove, onMove, onConfig, onRun }: {
   block: Block
   index: number
   total: number
+  running?: boolean
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
   onConfig: (key: string, value: string) => void
+  onRun?: () => void
 }) {
   const def = BLOCK_DEFS.find(d => d.type === block.type)
   if (!def) return null
@@ -215,27 +333,26 @@ export function BlockCard({ block, index, total, onRemove, onMove, onConfig }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <span style={{ fontWeight: 700, color: def.color, fontSize: 13 }}>{index + 1}. {def.label}</span>
         <span style={{ flex: 1 }} />
+        {onRun && <button onClick={onRun} disabled={running} style={{ ...sm, color: def.color, fontWeight: 700 }}>▶</button>}
         {index > 0 && <button onClick={() => onMove(-1)} style={sm}>↑</button>}
         {index < total - 1 && <button onClick={() => onMove(1)} style={sm}>↓</button>}
         <button onClick={onRemove} style={{ ...sm, color: '#dc2626' }}>✕</button>
       </div>
 
-      {/* file picker for upload block */}
       {block.type === 'upload' && (
         <label style={{ display: 'inline-block', padding: '4px 10px', background: def.color, color: '#fff', borderRadius: 4, fontSize: 12, cursor: 'pointer', marginBottom: 6 }}>
-          Wybierz PDF
-          <input type="file" accept=".pdf" hidden onChange={e => {
-            const f = e.target.files?.[0]
-            if (f) {
-              // store file reference in a way the run can pick up
-              (window as any).__miniCtxFile = f
-              onConfig('_filename', f.name)
+          Wybierz pliki
+          <input type="file" accept=".pdf,.csv,.tsv,.txt,.json" multiple hidden onChange={e => {
+            const files = Array.from(e.target.files || [])
+            if (files.length) {
+              (window as any).__miniCtxFiles = files
+              onConfig('_files', files.map(f => f.name).join(', '))
             }
           }} />
         </label>
       )}
-      {block.type === 'upload' && block.config._filename && (
-        <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>{block.config._filename}</span>
+      {block.type === 'upload' && block.config._files && (
+        <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>{block.config._files}</span>
       )}
 
       {def.fields.map(f => (

@@ -114,9 +114,7 @@ export async function createEmbedder(opts: EmbedOpts): Promise<EmbedHandle> {
       return { chunks, embed: embedText }
     },
 
-    dispose() {
-      // pipeline is GC'd when handle is released
-    },
+    dispose() {},
   }
 }
 

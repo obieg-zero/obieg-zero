@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ProjectRecord, DocumentRecord } from '@obieg-zero/store-v2'
-import { getOpfs, getDB } from './store.ts'
+import { opfs, db } from './store.ts'
 
 export function useProjects() {
   const [projects, setProjects] = useState<ProjectRecord[]>([])
@@ -8,12 +8,12 @@ export function useProjects() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
 
   const refresh = useCallback(async () => {
-    const list = await getDB().listProjects()
+    const list = await db.listProjects()
     setProjects(list)
   }, [])
 
   const refreshDocs = useCallback(async (projectId: string) => {
-    const docs = await getDB().listDocuments(projectId)
+    const docs = await db.listDocuments(projectId)
     setDocuments(docs)
   }, [])
 
@@ -26,16 +26,16 @@ export function useProjects() {
 
   const createProject = useCallback(async (name: string) => {
     const id = `proj-${Date.now()}`
-    await getOpfs().createProject(id)
-    await getDB().addProject({ id, name, createdAt: Date.now() })
+    await opfs.createProject(id)
+    await db.addProject({ id, name, createdAt: Date.now() })
     await refresh()
     setCurrent(id)
     return id
   }, [refresh])
 
   const removeProject = useCallback(async (id: string) => {
-    await getOpfs().removeProject(id).catch(() => {})
-    await getDB().removeProject(id)
+    await opfs.removeProject(id).catch(() => {})
+    await db.removeProject(id)
     if (current === id) setCurrent(null)
     await refresh()
   }, [current, refresh])
@@ -46,9 +46,9 @@ export function useProjects() {
 
   const uploadFile = useCallback(async (file: File) => {
     if (!current) return
-    await getOpfs().writeFile(current, file.name, file)
+    await opfs.writeFile(current, file.name, file)
     const docId = `${current}:${file.name}`
-    await getDB().addDocument({
+    await db.addDocument({
       id: docId,
       projectId: current,
       filename: file.name,

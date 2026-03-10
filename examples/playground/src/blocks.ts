@@ -1,7 +1,7 @@
 // Pipeline blocks — each reads from bus (OPFS/Dexie), writes to bus
 // User composes them in any order in the playground
 
-import { getOpfs, getDB } from './store.ts'
+import { opfs, db } from './store.ts'
 import { ocrFile } from '@obieg-zero/ocr-v2'
 import { createEmbedder, search } from '@obieg-zero/embed-v2'
 import type { EmbedHandle, EmbedIndex, Chunk } from '@obieg-zero/embed-v2'
@@ -19,7 +19,7 @@ let llm: LlmHandle | null = null
 // Reads file from OPFS, writes pages to Dexie
 
 export async function blockOcr(projectId: string, documentId: string, filename: string, log: Log) {
-  const db = getDB()
+  const db = db
 
   if (await db.hasPages(documentId)) {
     log(`OCR: ${filename} — already done, skipping`)
@@ -27,7 +27,7 @@ export async function blockOcr(projectId: string, documentId: string, filename: 
   }
 
   log(`OCR: ${filename}`)
-  const file = await getOpfs().readFile(projectId, filename)
+  const file = await opfs.readFile(projectId, filename)
   const pages = await ocrFile(file, { language: 'pol', onProgress: msg => log(`  ${msg}`) })
 
   const pageRecords = pages.map(p => ({
@@ -59,7 +59,7 @@ export interface EmbedConfig {
 }
 
 export async function blockEmbed(projectId: string, documentId: string, config: EmbedConfig, log: Log) {
-  const db = getDB()
+  const db = db
 
   if (await db.hasChunks(documentId)) {
     log(`Embed: ${documentId} — already done, skipping`)
@@ -104,7 +104,7 @@ export async function blockEmbed(projectId: string, documentId: string, config: 
 // Reads chunks from Dexie, returns results (does not write to bus, returns to UI)
 
 export async function blockSearch(projectId: string, query: string, topK: number, log: Log) {
-  const db = getDB()
+  const db = db
   const chunkRecords = await db.getChunksByProject(projectId)
 
   if (chunkRecords.length === 0) {
@@ -155,7 +155,6 @@ export async function blockLlmAsk(prompt: string, config: LlmConfig, log: Log) {
   const result = await llm.ask(prompt, {
     nPredict: 64,
     temperature: 0.1,
-    onToken: () => {},
   })
 
   log(`LLM: ${result.tokenCount} tok, ${(result.durationMs / 1000).toFixed(1)}s`)
@@ -179,11 +178,3 @@ export async function blockRag(
   return { context, answer, hits: results }
 }
 
-// --- cleanup ---
-
-export async function disposeBlocks() {
-  embedder?.dispose()
-  embedder = null
-  await llm?.dispose()
-  llm = null
-}

@@ -72,7 +72,7 @@ class GraphDexie extends Dexie {
 export async function createGraphDB(name: string): Promise<GraphDB> {
   const db = new GraphDexie(name)
 
-  const h: GraphDB = {
+  return {
     async addNode(node) {
       await db.nodes.put(node)
     },
@@ -86,9 +86,8 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
     },
 
     async updateNode(id, patch) {
-      const count = await db.nodes.where('id').equals(id).count()
+      const count = await db.nodes.update(id, patch)
       if (count === 0) throw new Error(`Node ${id} not found`)
-      await db.nodes.update(id, patch)
     },
 
     async removeNode(id) {
@@ -136,13 +135,9 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
     },
 
     async getNeighbors(nodeId) {
-      const edges = await db.transaction('r', db.edges, db.nodes, async () => {
-        const from = await db.edges.where('from').equals(nodeId).toArray()
-        const to = await db.edges.where('to').equals(nodeId).toArray()
-        return [...from, ...to]
-      })
-      const ids = [...new Set(edges.flatMap(e => [e.from, e.to]).filter(id => id !== nodeId))]
-      if (ids.length === 0) return []
+      const from = await db.edges.where('from').equals(nodeId).toArray()
+      const to = await db.edges.where('to').equals(nodeId).toArray()
+      const ids = [...new Set([...from, ...to].flatMap(e => [e.from, e.to]).filter(id => id !== nodeId))]
       const nodes = await db.nodes.bulkGet(ids)
       return nodes.filter((n): n is GraphNode => n !== undefined)
     },
@@ -172,10 +167,8 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
         }
       }
 
-      const nodeIds = [...visitedNodes]
-      const edgeIds = [...visitedEdges]
-      const nodes = (await db.nodes.bulkGet(nodeIds)).filter((n): n is GraphNode => n !== undefined)
-      const edges = (await db.edges.bulkGet(edgeIds)).filter((e): e is GraphEdge => e !== undefined)
+      const nodes = (await db.nodes.bulkGet([...visitedNodes])).filter((n): n is GraphNode => n !== undefined)
+      const edges = (await db.edges.bulkGet([...visitedEdges])).filter((e): e is GraphEdge => e !== undefined)
       return { nodes, edges }
     },
 
@@ -202,6 +195,4 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
       db.close()
     },
   }
-
-  return h
 }

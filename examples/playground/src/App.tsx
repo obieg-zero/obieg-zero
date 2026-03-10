@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useProjects } from './useProjects.ts'
 import { useLog } from './useLog.ts'
-import { blockOcr, blockEmbed, blockSearch, blockRag, disposeBlocks } from './blocks.ts'
+import { blockOcr, blockEmbed, blockSearch, blockRag } from './blocks.ts'
 import type { EmbedConfig, LlmConfig } from './blocks.ts'
-import { getDB } from './store.ts'
+import { db } from './store.ts'
 import type { PageRecord, ChunkRecord } from '@obieg-zero/store-v2'
 
 const EMBED_CONFIG: EmbedConfig = {
@@ -91,7 +91,7 @@ export function App() {
 
   function handleViewPages(docId: string) {
     wrap(async () => {
-      const p = await getDB().getPages(docId)
+      const p = await db.getPages(docId)
       setPages(p)
       setTab('pages')
     })

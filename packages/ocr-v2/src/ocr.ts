@@ -26,10 +26,8 @@ export async function ocrFile(file: File, opts: OcrOpts = {}): Promise<Page[]> {
   }
 
   const pdfjsLib = await import('pdfjs-dist')
-  if (workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
-  } else if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc || new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
   }
 
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise
