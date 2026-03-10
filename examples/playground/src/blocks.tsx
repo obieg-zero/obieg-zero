@@ -186,34 +186,36 @@ export const BLOCK_DEFS: BlockDef[] = [
             'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
             'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
           },
-          nCtx: 2048,
+          nCtx: 512,
           chatTemplate: true,
           onProgress: m => log(`  ${m}`),
         })
       }
 
       const prompt = config.prompt.replace('{{context}}', ctx.data.context || '(brak kontekstu)')
-      const result = await ctx._llm.ask(prompt, { nPredict: 64, temperature: 0.1 })
+      const result = await ctx._llm.ask(prompt, { nPredict: 32, temperature: 0 })
       ctx.data.answer = result.text
       log(`Odpowiedz (${result.tokenCount} tok, ${(result.durationMs / 1000).toFixed(1)}s): ${result.text}`)
     },
   },
 
-  // --- Extract: LLM na KAZDYM chunku → fakty → Graph (mrowki) ---
+  // --- Extract: pytanie → search → LLM na trafionych chunkach → graf ---
   {
     type: 'extract',
     label: 'Extract',
     color: '#f59e0b',
     fields: [
-      { key: 'prompt', label: 'Prompt ({{chunk}} = tekst chunka)' },
+      { key: 'questions', label: 'Pytania (jedno na linie)' },
+      { key: 'topK', label: 'Chunkow na pytanie', default: '2' },
       { key: 'modelUrl', label: 'Model URL', default: 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf' },
     ],
     defaults: {
-      prompt: 'Wypisz fakty z tekstu, kazdy w osobnej linii w formacie TYP: wartosc\nMozliwe typy: bank, kwota, marza, wibor, data, okres, rata, waluta, oprocentowanie\nJesli brak faktow — napisz: brak\n\nTekst: "{{chunk}}"\n\nFakty:',
+      questions: 'Jaki bank udzielil kredytu?\nJaka jest kwota kredytu?\nJaka jest marza banku?\nJaki jest WIBOR?\nKiedy zawarto umowe?\nNa ile lat jest kredyt?\nJaka jest rata?\nJaka jest waluta kredytu?',
+      topK: '2',
       modelUrl: 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf',
     },
     async run(config, ctx, log) {
-      if (!ctx.data.chunks?.length) { log('Brak chunks — dodaj Embed przed Extract'); return }
+      if (!ctx.data.chunks?.length || !ctx.data._embedFn) { log('Brak chunks/embeddings — dodaj Embed przed Extract'); return }
 
       if (!ctx._llm) {
         ctx._llm = await createLlm({
@@ -222,74 +224,70 @@ export const BLOCK_DEFS: BlockDef[] = [
             'single-thread/wllama.wasm': new URL('@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url).href,
             'multi-thread/wllama.wasm': new URL('@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url).href,
           },
-          nCtx: 2048,
+          nCtx: 512,
           chatTemplate: true,
           onProgress: m => log(`  ${m}`),
         })
       }
 
-      if (!ctx._graph) {
-        ctx._graph = await createGraphDB(`mini-${ctx.data.project || 'default'}`)
+      ctx._graph = await createGraphDB(`mini-${ctx.data.project || 'default'}`)
+      await ctx._graph.clear()
+
+      const questions = config.questions.split('\n').map(q => q.trim()).filter(q => q)
+      const topK = parseInt(config.topK) || 2
+      const totalCalls = questions.length * topK
+
+      // mapa page→filename z chunków z prefixem [filename]
+      const pageFile = new Map<number, string>()
+      for (const c of ctx.data.chunks as Chunk[]) {
+        const m = c.text.match(/^\[([^\]]+)\]/)
+        if (m) pageFile.set(c.page, m[1])
       }
-
-      let extracted = 0, failed = 0
-      const chunks = ctx.data.chunks as Chunk[]
+      let callsDone = 0, extracted = 0
       const t0 = Date.now()
-      let avgMs = 0
-      log(`Extract: ${chunks.length} chunkow`)
 
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i]
-        const prompt = config.prompt.replace('{{chunk}}', chunk.text.slice(0, 400))
-        const eta = i > 0 ? ` | ETA: ${Math.round(avgMs * (chunks.length - i) / 1000)}s` : ''
-        log(`--- [${i + 1}/${chunks.length}]${eta} ---`)
-        log(`  IN: "${chunk.text.slice(0, 100)}..."`)
+      log(`Extract: ${questions.length} pytan × ${topK} chunkow = max ${totalCalls} wywolan`)
 
-        try {
-          const result = await ctx._llm.ask(prompt, { nPredict: 128, temperature: 0.1 })
-          avgMs = (Date.now() - t0) / (i + 1)
-          log(`  OUT (${result.tokenCount}tok ${(result.durationMs / 1000).toFixed(1)}s): ${result.text}`)
+      for (const question of questions) {
+        // search: znajdz najlepsze chunki dla tego pytania
+        const results = await search(ctx.data.chunks, question, ctx.data._embedFn, { topK, minWordLength: 2 })
+        log(`--- ${question} ---`)
+        log(`  search: ${results.map(r => `[${r.score.toFixed(3)}] str.${r.page}`).join(', ')}`)
 
-          // parse lines with ":" — accept anything LLM produces
-          const facts = result.text.split('\n')
-            .map(l => l.trim().replace(/^\d+[\.\)]\s*/, '').replace(/^[-*]\s*/, ''))
-            .filter(l => l.includes(':'))
-            .map(line => {
-              const idx = line.indexOf(':')
-              return { type: line.slice(0, idx).trim().toLowerCase(), value: line.slice(idx + 1).trim() }
-            })
-            .filter(f => f.type && f.value)
+        for (const hit of results) {
+          const prompt = `Dokoncz zdanie na podstawie tekstu.\n\nTekst: "${hit.text.slice(0, 300)}"\n\n${question}`
+          callsDone++
+          const avgMs = callsDone > 1 ? (Date.now() - t0) / (callsDone - 1) : 0
+          const eta = callsDone > 1 ? ` | ETA: ${Math.round(avgMs * (totalCalls - callsDone) / 1000)}s` : ''
+          log(`  [${callsDone}/${totalCalls}${eta}] chunk str.${hit.page} (score ${hit.score.toFixed(3)})`)
 
-          if (facts.length === 0) { failed++; log(`  WYNIK: brak faktow`); continue }
+          try {
+            const result = await ctx._llm.ask(prompt, { nPredict: 16, temperature: 0 })
+            const answer = result.text.trim()
+            log(`    → ${answer} (${result.tokenCount}tok ${(result.durationMs / 1000).toFixed(1)}s)`)
 
-          const nodes = facts.map((f, j) => ({
-            id: `c${i}:e${j}:${Date.now()}`,
-            type: f.type,
-            label: f.type,
-            data: { value: f.value },
-            trace: { chunk: i, page: chunk.page },
-          }))
-          await ctx._graph.addNodes(nodes)
+            // graf: document --pytanie--> odpowiedz
+            const filename = pageFile.get(hit.page) || 'unknown'
+            const docId = `doc:${filename}`
+            const qType = question.replace(/[?!]/g, '').trim().toLowerCase()
+            const valueId = `val:${qType}:${answer}`
 
-          // co-occurrence edges
-          const edges = []
-          for (let a = 0; a < nodes.length; a++) {
-            for (let b = a + 1; b < nodes.length; b++) {
-              edges.push({ id: `e:${nodes[a].id}:${nodes[b].id}`, from: nodes[a].id, to: nodes[b].id, type: 'co-occurs', label: 'w tym samym chunku' })
-            }
+            await ctx._graph.addNodes([
+              { id: docId, type: 'document', label: filename, data: {} },
+              { id: valueId, type: qType, label: answer, data: { source: filename, page: hit.page, score: hit.score } },
+            ]).catch(() => {})
+            await ctx._graph.addEdges([{
+              id: `e:${docId}:${valueId}`, from: docId, to: valueId, type: qType, label: qType,
+            }]).catch(() => {})
+            extracted++
+          } catch (e: any) {
+            log(`    BLAD: ${e.message}`)
           }
-          if (edges.length) await ctx._graph.addEdges(edges)
-
-          extracted += nodes.length
-          log(`  WYNIK: ${facts.map(f => `${f.type}: ${f.value}`).join(' | ')}`)
-        } catch (e: any) {
-          failed++
-          log(`  BLAD: ${e.message}`)
         }
       }
 
-      ctx.data.extractStats = { extracted, failed, total: chunks.length }
-      log(`=== PODSUMOWANIE: ${extracted} faktow, ${failed} pustych, ${chunks.length} chunkow ===`)
+      ctx.data.extractStats = { extracted, failed: totalCalls - extracted, total: totalCalls }
+      log(`=== PODSUMOWANIE: ${extracted}/${totalCalls} odpowiedzi, ${((Date.now() - t0) / 1000).toFixed(0)}s ===`)
     },
   },
 

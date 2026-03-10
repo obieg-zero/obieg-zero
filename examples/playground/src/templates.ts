@@ -22,7 +22,7 @@ export const TEMPLATES: Template[] = [
       { type: 'ocr', config: { language: 'pol' } },
       { type: 'embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
       { type: 'extract', config: {
-        prompt: 'Wypisz fakty z tekstu. Kazdy fakt w osobnej linii w formacie TYP: wartosc\n\nPrzyklad:\nosoba: Jan Kowalski\nkwota: 50000 PLN\ndata: 1 stycznia 2020\n\nTekst: "{{chunk}}"\n\nFakty:',
+        questions: 'Wlasciciel to\nNazwa firmy to\nMiejsce to\nData to\nGlowna kwota to',
         modelUrl: BIELIK,
       }},
       { type: 'graph', config: {} },
@@ -37,7 +37,7 @@ export const TEMPLATES: Template[] = [
       { type: 'ocr', config: { language: 'pol' } },
       { type: 'embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
       { type: 'extract', config: {
-        prompt: 'Wypisz fakty z tekstu. Kazdy fakt w osobnej linii w formacie TYP: wartosc\nMozliwe typy: bank, kwota, marza, wibor, data, okres, rata, waluta, oprocentowanie\n\nPrzyklad:\nbank: PKO BP\nkwota: 200000 PLN\nmarza: 2.5%\n\nTekst: "{{chunk}}"\n\nFakty:',
+        questions: 'Nazwa banku to\nKwota kredytu wynosi\nMarza banku wynosi\nStawka WIBOR wynosi\nUmowe podpisano dnia\nOkres kredytu to\nMiesieczna rata wynosi\nKredytobiorca to',
         modelUrl: BIELIK,
       }},
       { type: 'graph', config: {} },
