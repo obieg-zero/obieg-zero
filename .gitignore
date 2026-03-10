@@ -2,7 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+.env
 
 # prawdziwe dokumenty — nie commitowac
-WIBOR-PRZYKLAD/*.pdf
-WIBOR-PRZYKLAD/*.csv
+WIBOR-PRZYKLAD/

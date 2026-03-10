@@ -1,20 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
-import type { Block, BlockDef, RunContext } from './blocks.tsx'
-import { BLOCK_DEFS, BlockCard } from './blocks.tsx'
+import type { Block, BlockDef, RunContext } from './blocks'
+import { BLOCK_DEFS, BlockCard, opfs } from './blocks'
 import { TEMPLATES, type Template } from './templates.ts'
-import { opfs } from './blocks.tsx'
 
-// project = name + templateId + pipeline state
 interface Project { name: string; templateId: string; pipeline: Block[] }
 
 export function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [currentIdx, setCurrentIdx] = useState<number | null>(null)
   const [opfsFiles, setOpfsFiles] = useState<string[]>([])
-
-  // creation flow: step 1 = enter name, step 2 = pick template
-  const [creating, setCreating] = useState<string | null>(null) // null = not creating, string = name entered
-
+  const [creating, setCreating] = useState<string | null>(null)
   const [log, setLog] = useState<string[]>([])
   const [running, setRunning] = useState(false)
   const [rightPanel, setRightPanel] = useState<{ type: string; data: any } | null>(null)
@@ -22,8 +17,6 @@ export function App() {
 
   const addLog = (msg: string) => setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`])
   const current = currentIdx !== null ? projects[currentIdx] : null
-
-  // --- OPFS files refresh ---
 
   async function refreshFiles(name: string) {
     try { setOpfsFiles(await opfs.listFiles(name)) } catch { setOpfsFiles([]) }
@@ -34,26 +27,20 @@ export function App() {
     else setOpfsFiles([])
   }, [currentIdx])
 
-  // --- project creation: name → template → done ---
-
-  function startCreate() {
-    setCreating('')
-  }
+  function startCreate() { setCreating('') }
 
   async function finishCreate(template: Template) {
     const name = creating!.trim()
     if (!name) return
     await opfs.createProject(name)
-
     const pipeline = template.nodes.map((n, i) => ({
       id: `${n.type}-${i}`,
       type: n.type,
       config: { ...n.config, ...(n.config.project !== undefined ? { project: name } : {}) },
     }))
-
     const proj: Project = { name, templateId: template.id, pipeline }
     setProjects(p => [...p, proj])
-    setCurrentIdx(projects.length) // will be last
+    setCurrentIdx(projects.length)
     setCreating(null)
     setRightPanel(null)
     setLog([])
@@ -74,9 +61,6 @@ export function App() {
     if (currentIdx === idx) setCurrentIdx(null)
     else if (currentIdx !== null && currentIdx > idx) setCurrentIdx(currentIdx - 1)
   }
-
-
-  // --- pipeline ops (modify current project's pipeline) ---
 
   function updatePipeline(fn: (p: Block[]) => Block[]) {
     if (currentIdx === null) return
@@ -160,44 +144,39 @@ export function App() {
     }
   }
 
-  // --- render ---
-
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 300px 1fr', gridTemplateRows: '1fr auto', height: '100vh', fontFamily: 'system-ui', fontSize: 13 }}>
+    <div className="grid h-screen font-sans text-sm" style={{ gridTemplateColumns: '220px 300px 1fr', gridTemplateRows: '1fr auto' }}>
 
       {/* === LEFT === */}
-      <div style={{ borderRight: '1px solid #e2e8f0', overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="border-r border-base-300 overflow-auto p-3 flex flex-col gap-4">
 
         {/* Projects */}
         <section>
-          <h3 style={sectionH}>Projekty</h3>
+          <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Projekty</h3>
           {projects.map((p, i) => (
-            <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '5px 6px', marginBottom: 2, borderRadius: 4,
-              background: currentIdx === i ? '#eff6ff' : 'transparent',
-              border: currentIdx === i ? '1px solid #bfdbfe' : '1px solid transparent' }}>
+            <div key={i} className={`flex gap-1 items-center px-2 py-1 rounded mb-0.5 ${currentIdx === i ? 'bg-primary/10 border border-primary/30' : 'border border-transparent'}`}>
               <span onClick={() => selectProject(i)}
-                style={{ flex: 1, cursor: 'pointer', fontWeight: currentIdx === i ? 700 : 400 }}>{p.name}</span>
-              <span style={{ fontSize: 10, color: '#94a3b8' }}>{TEMPLATES.find(t => t.id === p.templateId)?.name}</span>
-              <button onClick={() => deleteProject(i)} style={btn('#dc2626', true)}>x</button>
+                className={`flex-1 cursor-pointer ${currentIdx === i ? 'font-bold' : ''}`}>{p.name}</span>
+              <span className="text-[10px] text-base-content/40">{TEMPLATES.find(t => t.id === p.templateId)?.name}</span>
+              <button onClick={() => deleteProject(i)} className="btn btn-xs btn-ghost text-error">x</button>
             </div>
           ))}
 
-          {/* Creation flow */}
           {creating === null ? (
-            <button onClick={startCreate} style={{ ...btn('#2563eb'), width: '100%', marginTop: 4 }}>+ Nowy projekt</button>
+            <button onClick={startCreate} className="btn btn-sm btn-primary w-full mt-1">+ Nowy projekt</button>
           ) : (
-            <div style={{ marginTop: 4, padding: 8, border: '2px solid #2563eb', borderRadius: 8, background: '#f8fafc' }}>
+            <div className="mt-1 p-2 border-2 border-primary rounded-lg bg-base-200">
               <input value={creating} onChange={e => setCreating(e.target.value)}
                 placeholder="Nazwa projektu" autoFocus
-                style={{ ...inputStyle, width: '100%', marginBottom: 8 }} />
+                className="input input-bordered input-sm w-full mb-2" />
               {TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => finishCreate(t)}
-                  style={{ padding: '6px 8px', borderRadius: 4, cursor: 'pointer', marginBottom: 2, border: '1px solid #e2e8f0', background: '#fff' }}>
-                  <div style={{ fontWeight: 600, fontSize: 12 }}>{t.name}</div>
-                  <div style={{ fontSize: 10, color: '#888' }}>{t.description}</div>
+                  className="p-2 rounded cursor-pointer mb-0.5 border border-base-300 bg-base-100 hover:bg-base-200">
+                  <div className="font-semibold text-xs">{t.name}</div>
+                  <div className="text-[10px] text-base-content/50">{t.description}</div>
                 </div>
               ))}
-              <button onClick={() => setCreating(null)} style={{ ...btn('#64748b', true), marginTop: 4 }}>Anuluj</button>
+              <button onClick={() => setCreating(null)} className="btn btn-xs btn-ghost mt-1">Anuluj</button>
             </div>
           )}
         </section>
@@ -205,26 +184,26 @@ export function App() {
         {/* OPFS files */}
         {current && (
           <section>
-            <h3 style={sectionH}>OPFS / {current.name}</h3>
-            {opfsFiles.length === 0 && <p style={{ color: '#aaa', fontSize: 12 }}>Brak plikow — uzyj Upload</p>}
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">OPFS / {current.name}</h3>
+            {opfsFiles.length === 0 && <p className="text-base-content/30 text-xs">Brak plikow — uzyj Upload</p>}
             {opfsFiles.map(f => (
-              <div key={f} style={{ padding: '3px 0', borderBottom: '1px solid #f1f5f9', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ flex: 1 }}>{f}</span>
+              <div key={f} className="flex items-center gap-1 py-0.5 border-b border-base-200 text-xs">
+                <span className="flex-1">{f}</span>
                 <button onClick={async () => { await opfs.removeFile(current.name, f); refreshFiles(current.name) }}
-                  style={{ ...btn('#dc2626', true), fontSize: 10, padding: '1px 5px' }}>x</button>
+                  className="btn btn-xs btn-ghost text-error">x</button>
               </div>
             ))}
           </section>
         )}
 
-        {/* Add block (only when project selected) */}
+        {/* Add block */}
         {current && (
           <section>
-            <h3 style={sectionH}>Dodaj blok</h3>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Dodaj blok</h3>
+            <div className="flex gap-1 flex-wrap">
               {BLOCK_DEFS.map(def => (
                 <button key={def.type} onClick={() => addBlock(def)}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: def.color + '22', color: def.color, fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                  className="btn btn-xs" style={{ background: def.color + '22', color: def.color, borderColor: def.color + '44' }}>
                   + {def.label}
                 </button>
               ))}
@@ -234,14 +213,14 @@ export function App() {
       </div>
 
       {/* === MIDDLE: Pipeline === */}
-      <div style={{ borderRight: '1px solid #e2e8f0', overflow: 'auto', padding: 12 }}>
-        {!current && <p style={{ color: '#aaa' }}>Utworz lub wybierz projekt</p>}
+      <div className="border-r border-base-300 overflow-auto p-3">
+        {!current && <p className="text-base-content/30">Utworz lub wybierz projekt</p>}
 
-        {current && current.pipeline.length === 0 && <p style={{ color: '#aaa' }}>Dodaj bloki z palety</p>}
+        {current && current.pipeline.length === 0 && <p className="text-base-content/30">Dodaj bloki z palety</p>}
 
         {current && current.pipeline.length > 0 && (
           <button onClick={runAll} disabled={running}
-            style={{ width: '100%', marginBottom: 12, padding: '8px 16px', background: running ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: running ? 'wait' : 'pointer' }}>
+            className={`btn btn-sm w-full mb-3 ${running ? 'btn-disabled' : 'btn-success'}`}>
             {running ? 'Dziala...' : '▶ Uruchom pipeline'}
           </button>
         )}
@@ -257,16 +236,16 @@ export function App() {
       </div>
 
       {/* === RIGHT: Results === */}
-      <div style={{ overflow: 'auto', padding: 12 }}>
-        {!rightPanel && <p style={{ color: '#aaa' }}>Uruchom blok aby zobaczyc wyniki</p>}
+      <div className="overflow-auto p-3">
+        {!rightPanel && <p className="text-base-content/30">Uruchom blok aby zobaczyc wyniki</p>}
 
         {rightPanel?.type === 'pages' && (
           <div>
-            <h3 style={sectionH}>Strony OCR ({rightPanel.data.length})</h3>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Strony OCR ({rightPanel.data.length})</h3>
             {rightPanel.data.map((p: any, i: number) => (
-              <details key={i} style={{ marginBottom: 4 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12 }}>Strona {p.page} — {p.text.length} zn.</summary>
-                <pre style={mono}>{p.text}</pre>
+              <details key={i} className="collapse collapse-arrow bg-base-200 mb-1">
+                <summary className="collapse-title text-xs py-2 min-h-0">Strona {p.page} — {p.text.length} zn.</summary>
+                <div className="collapse-content"><pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all">{p.text}</pre></div>
               </details>
             ))}
           </div>
@@ -274,11 +253,13 @@ export function App() {
 
         {rightPanel?.type === 'search' && (
           <div>
-            <h3 style={sectionH}>Wyniki ({rightPanel.data.length})</h3>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Wyniki ({rightPanel.data.length})</h3>
             {rightPanel.data.map((r: any, i: number) => (
-              <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 11, color: '#888' }}>str. {r.page} — score: {r.score.toFixed(4)}</div>
-                <pre style={mono}>{r.text}</pre>
+              <div key={i} className="card card-compact bg-base-200 mb-2">
+                <div className="card-body p-2">
+                  <div className="text-[11px] text-base-content/50">str. {r.page} — score: {r.score.toFixed(4)}</div>
+                  <pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all">{r.text}</pre>
+                </div>
               </div>
             ))}
           </div>
@@ -286,33 +267,35 @@ export function App() {
 
         {rightPanel?.type === 'answer' && (
           <div>
-            <h3 style={sectionH}>Odpowiedz LLM</h3>
-            <div style={{ padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>{rightPanel.data}</div>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Odpowiedz LLM</h3>
+            <div className="alert alert-success">{rightPanel.data}</div>
           </div>
         )}
 
         {rightPanel?.type === 'extract' && rightPanel.data && (
           <div>
-            <h3 style={sectionH}>Ekstrakcja</h3>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Ekstrakcja</h3>
             <p>{rightPanel.data.extracted} faktow wydobytych, {rightPanel.data.failed} bledow, {rightPanel.data.total} chunkow</p>
           </div>
         )}
 
         {rightPanel?.type === 'graph' && rightPanel.data && (
           <div>
-            <h3 style={sectionH}>Graf wiedzy ({rightPanel.data.nodes?.length} encji, {rightPanel.data.edges?.length} relacji)</h3>
+            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Graf wiedzy ({rightPanel.data.nodes?.length} encji, {rightPanel.data.edges?.length} relacji)</h3>
             {(() => {
               const g = rightPanel.data as { nodes: any[]; edges: any[] }
               const byType = new Map<string, any[]>()
               g.nodes?.forEach((n: any) => { const arr = byType.get(n.type) || []; arr.push(n); byType.set(n.type, arr) })
               return [...byType.entries()].map(([type, nodes]) => (
-                <details key={type} style={{ marginBottom: 4 }}>
-                  <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{type} ({nodes.length})</summary>
-                  {nodes.map((n: any) => (
-                    <div key={n.id} style={{ padding: '2px 0 2px 12px', fontSize: 12 }}>
-                      <strong>{n.label}</strong>{n.data?.value ? `: ${n.data.value}` : ''}
-                    </div>
-                  ))}
+                <details key={type} className="collapse collapse-arrow bg-base-200 mb-1">
+                  <summary className="collapse-title text-sm font-semibold py-2 min-h-0">{type} ({nodes.length})</summary>
+                  <div className="collapse-content">
+                    {nodes.map((n: any) => (
+                      <div key={n.id} className="text-xs pl-3 py-0.5">
+                        <strong>{n.label}</strong>{n.data?.value ? `: ${n.data.value}` : ''}
+                      </div>
+                    ))}
+                  </div>
                 </details>
               ))
             })()}
@@ -320,30 +303,22 @@ export function App() {
         )}
 
         {rightPanel?.type === 'info' && (
-          <div><h3 style={sectionH}>Status</h3><p>{rightPanel.data}</p></div>
+          <div><h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Status</h3><p>{rightPanel.data}</p></div>
         )}
       </div>
 
       {/* === LOG === */}
       {log.length > 0 && (
-        <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', maxHeight: 200, overflow: 'auto', padding: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: '#888' }}>Log ({log.length})</span>
-            <button onClick={() => setLog([])} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, border: '1px solid #ccc', cursor: 'pointer' }}>wyczysc</button>
+        <div className="col-span-full border-t border-base-300 max-h-52 overflow-auto p-2">
+          <div className="flex gap-2 items-center mb-1">
+            <span className="text-xs text-base-content/40">Log ({log.length})</span>
+            <button onClick={() => setLog([])} className="btn btn-xs btn-ghost">wyczysc</button>
           </div>
-          <pre style={{ ...mono, margin: 0 }}>{log.join('\n')}</pre>
+          <pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all m-0">{log.join('\n')}</pre>
         </div>
       )}
 
-      {running && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 3, background: '#2563eb', animation: 'pulse 1s infinite' }} />}
+      {running && <div className="fixed top-0 left-0 right-0 h-1 bg-primary animate-pulse" />}
     </div>
   )
-}
-
-const sectionH: React.CSSProperties = { fontSize: 12, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: 1, margin: '0 0 8px' }
-const inputStyle: React.CSSProperties = { padding: '4px 8px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }
-const mono: React.CSSProperties = { fontFamily: 'monospace', fontSize: 11, background: '#1e1e1e', color: '#d4d4d4', padding: 8, borderRadius: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }
-
-function btn(color: string, small = false): React.CSSProperties {
-  return { padding: small ? '3px 8px' : '6px 14px', background: color, color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: small ? 11 : 13 }
 }
