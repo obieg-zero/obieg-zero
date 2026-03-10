@@ -13,12 +13,12 @@ import {
 } from './blocks'
 
 const PALETTE = [
-  { type: 'upload', label: 'Upload', config: {} },
-  { type: 'parse', label: 'Parse', config: { language: 'pol' } },
-  { type: 'embed', label: 'Embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
-  { type: 'extract', label: 'Extract', config: { questions: '', topK: '2', modelUrl: BIELIK } },
-  { type: 'extract-api', label: 'Extract API', config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
-  { type: 'graph', label: 'Graph', config: {} },
+  { type: 'upload', label: 'Upload', icon: '↑', config: {} },
+  { type: 'parse', label: 'Parse', icon: '¶', config: { language: 'pol' } },
+  { type: 'embed', label: 'Embed', icon: '◈', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+  { type: 'extract', label: 'Extract', icon: '⊕', config: { questions: '', topK: '2', modelUrl: BIELIK } },
+  { type: 'extract-api', label: 'ExtractAPI', icon: '⊛', config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
+  { type: 'graph', label: 'Graph', icon: '◇', config: {} },
 ]
 
 export function App() {
@@ -29,7 +29,9 @@ export function App() {
   const [newName, setNewName] = useState('')
   const [log, setLog] = useState<string[]>([])
   const [running, setRunning] = useState(false)
-  const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const [leftOpen, setLeftOpen] = useState(false)
+  const [leftTab, setLeftTab] = useState<'templates' | 'blocks'>('templates')
+  const [showLog, setShowLog] = useState(false)
   const rfInstance = useRef<any>(null)
   const dataNodeSide = useRef(0)
 
@@ -39,7 +41,6 @@ export function App() {
   useEffect(() => { opfs.listProjects().then(setProjects).catch(() => {}) }, [])
   useEffect(() => { if (project) savePipeline(project, nodes, edges) }, [project, nodes, edges])
 
-  // --- persist pipeline to localStorage ---
   function savePipeline(p: string, n: Node[], e: Edge[]) {
     const pipe = n.filter(x => x.type !== 'data')
     const pipeIds = new Set(pipe.map(x => x.id))
@@ -239,96 +240,91 @@ export function App() {
   // --- render ---
 
   return (
-    <div className="flex h-screen font-sans text-xs">
+    <div className="h-screen bg-base-200 overflow-hidden text-xs">
+      <div className={`flex flex-row h-full transition-transform duration-300 ease-in-out ${leftOpen ? '' : 'max-md:-translate-x-72'}`}>
 
-      {/* === SIDEBAR === */}
-      <div className="w-52 shrink-0 border-r border-base-300 overflow-auto p-2 flex flex-col gap-3">
-
-        <section>
-          <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Projekt</h3>
-          {projects.map(name => (
-            <div key={name} className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${project === name ? 'bg-primary/10 font-bold' : 'hover:bg-base-200 cursor-pointer'}`}>
-              <span onClick={() => {
+      {/* === LEFT === */}
+      <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
+        <div className="navbar min-h-10 h-10 border-b border-base-300 text-xs font-semibold text-base-content/40">Projekty</div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <ul className="menu menu-sm p-0">
+            {projects.map(name => (
+              <li key={name}><a className={project === name ? 'active' : ''} onClick={() => {
                 setProject(name); setLog([])
                 const saved = loadPipeline(name)
-                if (saved) { setNodes(saved.nodes); setEdges(saved.edges) }
-                else { setNodes([]); setEdges([]) }
+                if (saved) { setNodes(saved.nodes); setEdges(saved.edges) } else { setNodes([]); setEdges([]) }
                 setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
-              }} className="flex-1">{name}</span>
-              <button onClick={async () => {
-                await opfs.removeProject(name).catch(() => {})
-                localStorage.removeItem(`pipeline:${name}`)
-                setProjects(p => p.filter(n => n !== name))
+              }}>{name}<button onClick={async (e) => {
+                e.stopPropagation(); await opfs.removeProject(name).catch(() => {})
+                localStorage.removeItem(`pipeline:${name}`); setProjects(p => p.filter(n => n !== name))
                 if (project === name) { setProject(null); setNodes([]); setEdges([]) }
-              }} className="opacity-20 hover:opacity-100 text-error">x</button>
-            </div>
-          ))}
-          <div className="flex gap-1 mt-1">
+              }} className="btn btn-ghost btn-xs text-error">✕</button></a></li>
+            ))}
+          </ul>
+          <div className="join w-full">
             <input value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createProject()}
-              placeholder="nowy..." className="input input-bordered input-xs flex-1" />
-            <button onClick={createProject} className="btn btn-xs btn-primary">+</button>
+              placeholder="nowy..." className="input input-bordered input-sm join-item flex-1" />
+            <button onClick={createProject} className="btn btn-sm btn-primary join-item">+</button>
           </div>
-        </section>
-
-        {project && <>
-          <section>
-            <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Szablony</h3>
-            {TEMPLATES.map(t => (
-              <div key={t.id} onClick={() => loadTemplate(t.id)}
-                className="px-1.5 py-0.5 rounded cursor-pointer hover:bg-base-200">{t.name}</div>
-            ))}
-          </section>
-
-          <section>
-            <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Bloki</h3>
-            <div className="flex flex-col gap-0.5">
-              {PALETTE.map(p => (
-                <div key={p.type} draggable
-                  onDragStart={e => onDragStart(e, p.type)}
-                  className="px-2 py-1 rounded border border-base-300 cursor-grab hover:bg-base-200">
-                  {p.label}
+          {project && <>
+            <div role="tablist" className="tabs tabs-bordered">
+              <button role="tab" className={`tab ${leftTab === 'templates' ? 'tab-active' : ''}`} onClick={() => setLeftTab('templates')}>Szablony</button>
+              <button role="tab" className={`tab ${leftTab === 'blocks' ? 'tab-active' : ''}`} onClick={() => setLeftTab('blocks')}>Bloki</button>
+            </div>
+            {leftTab === 'templates' ? (
+              <div className="space-y-2">{TEMPLATES.map(t => (
+                <div key={t.id} className="card card-compact bg-base-200 cursor-pointer hover:bg-base-300"
+                  onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}>
+                  <div className="card-body"><h3 className="card-title text-sm">{t.name}</h3>
+                    <p className="text-[10px] text-base-content/40">{t.nodes.map(n => n.data.label).join(' → ')}</p></div>
                 </div>
-              ))}
-            </div>
-          </section>
-
-          <button onClick={runPipeline} disabled={running}
-            className={`btn btn-sm w-full ${running ? 'btn-disabled' : 'btn-success'}`}>
-            {running ? 'Dziala...' : 'Analizuj'}
-          </button>
-        </>}
-      </div>
-
-      {/* === MAIN === */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1" ref={reactFlowWrapper}>
-          <ReactFlow
-            nodes={nodes} edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={instance => { rfInstance.current = instance }}
-            onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-            nodeTypes={nodeTypes}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          />
+              ))}</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">{PALETTE.map(p => (
+                <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
+                  className="card card-compact bg-base-200 cursor-grab hover:bg-base-300 items-center py-3">
+                  <span className="text-2xl">{p.icon}</span><span className="text-xs font-medium">{p.label}</span>
+                </div>
+              ))}</div>
+            )}
+            <button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running}
+              className={`btn btn-sm w-full ${running ? 'btn-disabled' : 'btn-success'}`}>
+              {running ? 'Dziala...' : 'Analizuj'}</button>
+          </>}
         </div>
-
-        {log.length > 0 && (
-          <div className="border-t border-base-300 max-h-44 overflow-auto p-2">
-            <div className="flex gap-2 items-center mb-1">
-              <span className="text-[10px] text-base-content/30">Log ({log.length})</span>
-              <button onClick={() => setLog([])} className="btn btn-xs btn-ghost">wyczysc</button>
-            </div>
-            <pre className="text-[11px] bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all m-0">{log.join('\n')}</pre>
-          </div>
-        )}
       </div>
 
-      {running && <div className="fixed top-0 left-0 right-0 h-1 bg-primary animate-pulse" />}
+      {/* === CENTER === */}
+      <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
+        <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
+          <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm md:hidden">{leftOpen ? '✕' : '☰'}</button>
+          <span className="flex-1 text-xs font-black text-primary">OBIEG-ZERO</span>
+          {log.length > 0 && <button onClick={() => setShowLog(!showLog)}
+            className={`btn btn-ghost btn-xs ${showLog ? 'btn-active' : ''}`}>Log ({log.length})</button>}
+        </div>
+        <div className="flex-1">
+          <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+            onConnect={onConnect} onInit={i => { rfInstance.current = i }} onDrop={onDrop}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
+        </div>
+      </div>
+
+      {/* === RIGHT — Log === */}
+      {showLog && (
+        <div className="w-72 shrink-0 flex flex-col bg-base-100 border-l border-base-300 min-h-0">
+          <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
+            <span className="flex-1 text-xs font-semibold text-base-content/40">Log</span>
+            <button onClick={() => setLog([])} className="btn btn-ghost btn-xs">wyczysc</button>
+            <button onClick={() => setShowLog(false)} className="btn btn-ghost btn-xs">✕</button>
+          </div>
+          <pre className="flex-1 overflow-y-auto p-3 text-[11px] font-mono whitespace-pre-wrap break-all text-base-content/60">{log.join('\n')}</pre>
+        </div>
+      )}
+
+      </div>
+      {running && <progress className="progress progress-primary w-full fixed top-0 left-0 z-50 h-1" />}
     </div>
   )
 }
