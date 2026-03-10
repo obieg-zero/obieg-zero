@@ -15,6 +15,7 @@
     "@obieg-zero/ocr-v2": "*",
     "@obieg-zero/store-v2": "*",
     "@wllama/wllama": "^2.2.0",
+    "@xyflow/react": "^12.10.1",
     "dexie": "^4.0.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",

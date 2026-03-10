@@ -1,322 +1,332 @@
-import { useState, useRef, useEffect } from 'react'
-import type { Block, BlockDef, RunContext } from './blocks'
-import { BLOCK_DEFS, BlockCard, opfs } from './blocks'
-import { TEMPLATES, type Template } from './templates.ts'
+import { useState, useCallback, useEffect, useRef, type DragEvent } from 'react'
+import {
+  ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
+  type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
+} from '@xyflow/react'
+import { opfs } from './store'
+import { TEMPLATES, BIELIK } from './templates'
+import { nodeTypes } from './nodes'
+import {
+  blockUpload, blockParse, blockEmbed,
+  blockExtract, blockExtractApi, blockGraph,
+  type Chunk, type Log,
+} from './blocks'
 
-interface Project { name: string; templateId: string; pipeline: Block[] }
+const PALETTE = [
+  { type: 'upload', label: 'Upload', config: {} },
+  { type: 'parse', label: 'Parse', config: { language: 'pol' } },
+  { type: 'embed', label: 'Embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+  { type: 'extract', label: 'Extract', config: { questions: '', topK: '2', modelUrl: BIELIK } },
+  { type: 'extract-api', label: 'Extract API', config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
+  { type: 'graph', label: 'Graph', config: {} },
+]
 
 export function App() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [currentIdx, setCurrentIdx] = useState<number | null>(null)
-  const [opfsFiles, setOpfsFiles] = useState<string[]>([])
-  const [creating, setCreating] = useState<string | null>(null)
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
+  const [project, setProject] = useState<string | null>(null)
+  const [projects, setProjects] = useState<string[]>([])
+  const [newName, setNewName] = useState('')
   const [log, setLog] = useState<string[]>([])
   const [running, setRunning] = useState(false)
-  const [rightPanel, setRightPanel] = useState<{ type: string; data: any } | null>(null)
-  const ctxRef = useRef<RunContext>({ data: {} })
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const rfInstance = useRef<any>(null)
+  const dataNodeSide = useRef(0)
 
-  const addLog = (msg: string) => setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`])
-  const current = currentIdx !== null ? projects[currentIdx] : null
+  const addLog: Log = useCallback((msg: string) =>
+    setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`]), [])
 
-  async function refreshFiles(name: string) {
-    try { setOpfsFiles(await opfs.listFiles(name)) } catch { setOpfsFiles([]) }
+  useEffect(() => { opfs.listProjects().then(setProjects).catch(() => {}) }, [])
+  useEffect(() => { if (project) savePipeline(project, nodes, edges) }, [project, nodes, edges])
+
+  // --- persist pipeline to localStorage ---
+  function savePipeline(p: string, n: Node[], e: Edge[]) {
+    const pipe = n.filter(x => x.type !== 'data')
+    const pipeIds = new Set(pipe.map(x => x.id))
+    const pipeEdges = e.filter(x => pipeIds.has(x.source) && pipeIds.has(x.target))
+    localStorage.setItem(`pipeline:${p}`, JSON.stringify({ nodes: pipe, edges: pipeEdges }))
+  }
+  function loadPipeline(p: string): { nodes: Node[]; edges: Edge[] } | null {
+    try { return JSON.parse(localStorage.getItem(`pipeline:${p}`) || 'null') } catch { return null }
   }
 
-  useEffect(() => {
-    if (current) refreshFiles(current.name)
-    else setOpfsFiles([])
-  }, [currentIdx])
+  const onNodesChange: OnNodesChange = useCallback(changes => setNodes(n => applyNodeChanges(changes, n)), [])
+  const onEdgesChange: OnEdgesChange = useCallback(changes => setEdges(e => applyEdgeChanges(changes, e)), [])
+  const onConnect = useCallback((c: Connection) => setEdges(e => addEdge(c, e)), [])
 
-  function startCreate() { setCreating('') }
+  // --- project ---
 
-  async function finishCreate(template: Template) {
-    const name = creating!.trim()
+  async function createProject() {
+    const name = newName.trim()
     if (!name) return
     await opfs.createProject(name)
-    const pipeline = template.nodes.map((n, i) => ({
-      id: `${n.type}-${i}`,
-      type: n.type,
-      config: { ...n.config, ...(n.config.project !== undefined ? { project: name } : {}) },
+    setProjects(p => [...p, name])
+    setProject(name)
+    setNewName('')
+    setNodes([]); setEdges([]); setLog([])
+  }
+
+  function loadTemplate(id: string) {
+    const tpl = TEMPLATES.find(t => t.id === id)
+    if (!tpl || !project) return
+    const n = tpl.nodes.map(n => ({ ...n, data: { ...n.data, config: { ...(n.data.config as any || {}) } } }))
+    const e = [...tpl.edges]
+    setNodes(n); setEdges(e)
+    setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
+  }
+
+  // --- DnD from palette ---
+
+  function onDragStart(e: DragEvent, type: string) {
+    e.dataTransfer.setData('application/reactflow', type)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault()
+    const type = e.dataTransfer.getData('application/reactflow')
+    if (!type || !rfInstance.current) return
+    const position = rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const entry = PALETTE.find(p => p.type === type)
+    if (!entry) return
+    const newNode: Node = {
+      id: `${type}-${Date.now()}`,
+      type,
+      position,
+      data: { label: entry.label, config: { ...entry.config } },
+    }
+    setNodes(n => [...n, newNode])
+  }
+
+  // --- runner ---
+
+  function topoSort(): string[] {
+    const pipeNodes = nodes.filter(n => n.type !== 'data')
+    const pipeIds = new Set(pipeNodes.map(n => n.id))
+    const inDeg = new Map<string, number>()
+    const adj = new Map<string, string[]>()
+    for (const n of pipeNodes) { inDeg.set(n.id, 0); adj.set(n.id, []) }
+    for (const e of edges.filter(e => pipeIds.has(e.source) && pipeIds.has(e.target))) { adj.get(e.source)!.push(e.target); inDeg.set(e.target, (inDeg.get(e.target) || 0) + 1) }
+    const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([id]) => id)
+    const result: string[] = []
+    while (queue.length) {
+      const id = queue.shift()!
+      result.push(id)
+      for (const next of adj.get(id) || []) {
+        inDeg.set(next, inDeg.get(next)! - 1)
+        if (!inDeg.get(next)) queue.push(next)
+      }
+    }
+    return result
+  }
+
+  function setNodeResult(id: string, status: string, result?: string) {
+    setNodes(ns => ns.map(n => n.id === id ? { ...n, data: { ...n.data, status, result: result || n.data.result } } : n))
+  }
+
+  function addDataNodes(parentId: string, items: { id: string; label: string; detail?: string }[]) {
+    const parent = nodes.find(n => n.id === parentId)
+    const right = dataNodeSide.current++ % 2 === 0
+    const px = parent ? parent.position.x + (right ? 200 : -180) : 500
+    const py = parent ? parent.position.y - ((items.length - 1) * 14) : 0
+
+    const newNodes: Node[] = items.map((item, i) => ({
+      id: item.id,
+      type: 'data',
+      position: { x: px, y: py + i * 28 },
+      data: { label: item.label, detail: item.detail },
     }))
-    const proj: Project = { name, templateId: template.id, pipeline }
-    setProjects(p => [...p, proj])
-    setCurrentIdx(projects.length)
-    setCreating(null)
-    setRightPanel(null)
-    setLog([])
-    ctxRef.current = { data: { project: name } }
+    const newEdges: Edge[] = items.map(item => ({
+      id: `e:${parentId}→${item.id}`,
+      source: parentId,
+      sourceHandle: right ? 'data' : 'data-left',
+      target: item.id,
+      targetHandle: right ? 'left' : 'right',
+      style: { strokeDasharray: '4 2', stroke: '#d1d5db' },
+    }))
+
+    setNodes(n => [...n, ...newNodes])
+    setEdges(e => [...e, ...newEdges])
   }
 
-  function selectProject(idx: number) {
-    setCurrentIdx(idx)
-    setRightPanel(null)
-    setLog([])
-    ctxRef.current = { data: { project: projects[idx].name } }
-  }
-
-  async function deleteProject(idx: number) {
-    const proj = projects[idx]
-    await opfs.removeProject(proj.name).catch(() => {})
-    setProjects(p => p.filter((_, i) => i !== idx))
-    if (currentIdx === idx) setCurrentIdx(null)
-    else if (currentIdx !== null && currentIdx > idx) setCurrentIdx(currentIdx - 1)
-  }
-
-  function updatePipeline(fn: (p: Block[]) => Block[]) {
-    if (currentIdx === null) return
-    setProjects(prev => prev.map((proj, i) =>
-      i === currentIdx ? { ...proj, pipeline: fn(proj.pipeline) } : proj
-    ))
-  }
-
-  function addBlock(def: BlockDef) {
-    const name = current?.name || 'default'
-    updatePipeline(p => [...p, {
-      id: `${def.type}-${Date.now()}`,
-      type: def.type,
-      config: { ...def.defaults, ...(def.defaults.project !== undefined ? { project: name } : {}) },
-    }])
-  }
-
-  function removeBlock(id: string) { updatePipeline(p => p.filter(b => b.id !== id)) }
-
-  function updateConfig(id: string, key: string, value: string) {
-    updatePipeline(p => p.map(b => b.id === id ? { ...b, config: { ...b.config, [key]: value } } : b))
-  }
-
-  function moveBlock(id: string, dir: -1 | 1) {
-    updatePipeline(p => {
-      const i = p.findIndex(b => b.id === id)
-      if (i < 0) return p
-      const j = i + dir
-      if (j < 0 || j >= p.length) return p
-      const next = [...p];
-      [next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
-  }
-
-  async function runSingle(block: Block) {
-    setRunning(true)
-    const ctx = ctxRef.current
-    const def = BLOCK_DEFS.find(d => d.type === block.type)
-    if (def) {
-      addLog(`>>> ${def.label}`)
-      try {
-        await def.run(block.config, ctx, addLog)
-        updateRightPanel(block.type, ctx)
-        if (current) refreshFiles(current.name)
-      } catch (e: any) { addLog(`ERROR: ${e.message}`) }
-    }
-    setRunning(false)
-  }
-
-  async function runAll() {
-    if (!current) return
+  async function runPipeline() {
+    if (!project) { addLog('Wybierz projekt'); return }
+    dataNodeSide.current = 0
     setRunning(true)
     setLog([])
-    const tpl = TEMPLATES.find(t => t.id === current.templateId)
-    addLog(`=== Pipeline: ${tpl?.name || current.templateId} | projekt: ${current.name} ===`)
-    const ctx = ctxRef.current
-    ctx.data = { project: current.name }
-    for (const block of current.pipeline) {
-      const def = BLOCK_DEFS.find(d => d.type === block.type)
-      if (!def) continue
-      addLog(`>>> ${def.label}`)
+    addLog(`=== Projekt: ${project} ===`)
+
+    // clear old data nodes
+    setNodes(n => n.filter(x => x.type !== 'data'))
+    setEdges(e => e.filter(x => !x.id.startsWith('e:') || !x.id.includes('→')))
+
+    const sorted = topoSort()
+    const ctx: Record<string, any> = { project }
+
+    for (const nodeId of sorted) {
+      const node = nodes.find(n => n.id === nodeId)
+      if (!node || node.type === 'data') continue
+      const cfg = (node.data.config || {}) as Record<string, string>
+
+      setNodeResult(nodeId, 'running')
+      addLog(`>>> ${node.data.label}`)
+
       try {
-        await def.run(block.config, ctx, addLog)
-        updateRightPanel(block.type, ctx)
-      } catch (e: any) { addLog(`ERROR: ${e.message}`); break }
+        switch (node.type) {
+          case 'upload': {
+            const files = (node.data._files || []) as File[]
+            if (!files.length) throw new Error('Brak plikow — kliknij "+ pliki"')
+            await blockUpload(project, files, addLog)
+            setNodeResult(nodeId, 'done', `${files.length} plikow: ${files.map(f => f.name).join(', ')}`)
+            addDataNodes(nodeId, files.map(f => ({ id: `d:file:${f.name}`, label: f.name })))
+            break
+          }
+          case 'parse': {
+            ctx.pages = await blockParse(project, cfg.language || 'pol', addLog)
+            const chars = ctx.pages.reduce((s: number, p: any) => s + p.text.length, 0)
+            setNodeResult(nodeId, 'done', `${ctx.pages.length} stron, ${chars} zn.`)
+            addDataNodes(nodeId, ctx.pages.slice(0, 5).map((p: any) => ({
+              id: `d:page:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.`,
+            })))
+            break
+          }
+          case 'embed': {
+            const r = await blockEmbed(project, ctx.pages || [], cfg.model, parseInt(cfg.chunkSize) || 200, addLog)
+            if (!r) throw new Error('Brak stron do embeddingu')
+            ctx.chunks = r.chunks; ctx.embedFn = r.embedFn
+            setNodeResult(nodeId, 'done', `${r.chunks.length} chunków po ~${cfg.chunkSize || 200} zn.`)
+            addDataNodes(nodeId, r.chunks.slice(0, 6).map((c: Chunk, i: number) => ({
+              id: `d:chunk:${i}`, label: `chunk ${i}`, detail: c.text.slice(0, 40) + '...',
+            })))
+            break
+          }
+          case 'extract': {
+            const q = cfg.questions?.split('\n').map((s: string) => s.trim()).filter((s: string) => s) || []
+            if (!q.length) throw new Error('Brak pytan — otworz config')
+            if (!ctx.chunks?.length) throw new Error('Brak chunków — dodaj Embed')
+            const stats = await blockExtract(ctx.chunks, ctx.embedFn, q, cfg.modelUrl, parseInt(cfg.topK) || 2, project, addLog)
+            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`)
+            break
+          }
+          case 'extract-api': {
+            const q = cfg.questions?.split('\n').map((s: string) => s.trim()).filter((s: string) => s) || []
+            if (!cfg.apiKey) throw new Error('Brak API Key — otworz config')
+            if (!ctx.chunks?.length) throw new Error('Brak chunków — dodaj Embed')
+            const stats = await blockExtractApi(ctx.chunks, ctx.embedFn, q, cfg.apiUrl || '', cfg.apiKey, cfg.apiModel || 'gpt-4o-mini', parseInt(cfg.topK) || 2, project, addLog)
+            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`)
+            break
+          }
+          case 'graph': {
+            ctx.graph = await blockGraph(project, addLog)
+            const values = ctx.graph.nodes.filter((n: any) => n.type !== 'document')
+            setNodeResult(nodeId, 'done', `${ctx.graph.nodes.length} encji, ${ctx.graph.edges.length} relacji`)
+            addDataNodes(nodeId, values.map((n: any) => ({
+              id: `d:${n.id}`, label: n.label, detail: n.type,
+            })))
+            break
+          }
+        }
+      } catch (e: any) {
+        addLog(`ERROR: ${e.message}`)
+        setNodeResult(nodeId, 'error', e.message)
+        break
+      }
     }
-    refreshFiles(current.name)
     addLog('--- done ---')
     setRunning(false)
   }
 
-  function updateRightPanel(type: string, ctx: RunContext) {
-    switch (type) {
-      case 'ocr': setRightPanel({ type: 'pages', data: ctx.data.pages || [] }); break
-      case 'search': setRightPanel({ type: 'search', data: ctx.data.searchResults || [] }); break
-      case 'llm': setRightPanel({ type: 'answer', data: ctx.data.answer || '' }); break
-      case 'extract': setRightPanel({ type: 'extract', data: ctx.data.extractStats }); break
-      case 'graph': setRightPanel({ type: 'graph', data: ctx.data.graph }); break
-      default: setRightPanel({ type: 'info', data: `${type} done` })
-    }
-  }
+  // --- render ---
 
   return (
-    <div className="grid h-screen font-sans text-sm" style={{ gridTemplateColumns: '220px 300px 1fr', gridTemplateRows: '1fr auto' }}>
+    <div className="flex h-screen font-sans text-xs">
 
-      {/* === LEFT === */}
-      <div className="border-r border-base-300 overflow-auto p-3 flex flex-col gap-4">
+      {/* === SIDEBAR === */}
+      <div className="w-52 shrink-0 border-r border-base-300 overflow-auto p-2 flex flex-col gap-3">
 
-        {/* Projects */}
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Projekty</h3>
-          {projects.map((p, i) => (
-            <div key={i} className={`flex gap-1 items-center px-2 py-1 rounded mb-0.5 ${currentIdx === i ? 'bg-primary/10 border border-primary/30' : 'border border-transparent'}`}>
-              <span onClick={() => selectProject(i)}
-                className={`flex-1 cursor-pointer ${currentIdx === i ? 'font-bold' : ''}`}>{p.name}</span>
-              <span className="text-[10px] text-base-content/40">{TEMPLATES.find(t => t.id === p.templateId)?.name}</span>
-              <button onClick={() => deleteProject(i)} className="btn btn-xs btn-ghost text-error">x</button>
+          <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Projekt</h3>
+          {projects.map(name => (
+            <div key={name} className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${project === name ? 'bg-primary/10 font-bold' : 'hover:bg-base-200 cursor-pointer'}`}>
+              <span onClick={() => {
+                setProject(name); setLog([])
+                const saved = loadPipeline(name)
+                if (saved) { setNodes(saved.nodes); setEdges(saved.edges) }
+                else { setNodes([]); setEdges([]) }
+                setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
+              }} className="flex-1">{name}</span>
+              <button onClick={async () => {
+                await opfs.removeProject(name).catch(() => {})
+                localStorage.removeItem(`pipeline:${name}`)
+                setProjects(p => p.filter(n => n !== name))
+                if (project === name) { setProject(null); setNodes([]); setEdges([]) }
+              }} className="opacity-20 hover:opacity-100 text-error">x</button>
             </div>
           ))}
-
-          {creating === null ? (
-            <button onClick={startCreate} className="btn btn-sm btn-primary w-full mt-1">+ Nowy projekt</button>
-          ) : (
-            <div className="mt-1 p-2 border-2 border-primary rounded-lg bg-base-200">
-              <input value={creating} onChange={e => setCreating(e.target.value)}
-                placeholder="Nazwa projektu" autoFocus
-                className="input input-bordered input-sm w-full mb-2" />
-              {TEMPLATES.map(t => (
-                <div key={t.id} onClick={() => finishCreate(t)}
-                  className="p-2 rounded cursor-pointer mb-0.5 border border-base-300 bg-base-100 hover:bg-base-200">
-                  <div className="font-semibold text-xs">{t.name}</div>
-                  <div className="text-[10px] text-base-content/50">{t.description}</div>
-                </div>
-              ))}
-              <button onClick={() => setCreating(null)} className="btn btn-xs btn-ghost mt-1">Anuluj</button>
-            </div>
-          )}
+          <div className="flex gap-1 mt-1">
+            <input value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createProject()}
+              placeholder="nowy..." className="input input-bordered input-xs flex-1" />
+            <button onClick={createProject} className="btn btn-xs btn-primary">+</button>
+          </div>
         </section>
 
-        {/* OPFS files */}
-        {current && (
+        {project && <>
           <section>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">OPFS / {current.name}</h3>
-            {opfsFiles.length === 0 && <p className="text-base-content/30 text-xs">Brak plikow — uzyj Upload</p>}
-            {opfsFiles.map(f => (
-              <div key={f} className="flex items-center gap-1 py-0.5 border-b border-base-200 text-xs">
-                <span className="flex-1">{f}</span>
-                <button onClick={async () => { await opfs.removeFile(current.name, f); refreshFiles(current.name) }}
-                  className="btn btn-xs btn-ghost text-error">x</button>
-              </div>
+            <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Szablony</h3>
+            {TEMPLATES.map(t => (
+              <div key={t.id} onClick={() => loadTemplate(t.id)}
+                className="px-1.5 py-0.5 rounded cursor-pointer hover:bg-base-200">{t.name}</div>
             ))}
           </section>
-        )}
 
-        {/* Add block */}
-        {current && (
           <section>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Dodaj blok</h3>
-            <div className="flex gap-1 flex-wrap">
-              {BLOCK_DEFS.map(def => (
-                <button key={def.type} onClick={() => addBlock(def)}
-                  className="btn btn-xs" style={{ background: def.color + '22', color: def.color, borderColor: def.color + '44' }}>
-                  + {def.label}
-                </button>
+            <h3 className="text-[10px] uppercase tracking-wider text-base-content/30 mb-1">Bloki</h3>
+            <div className="flex flex-col gap-0.5">
+              {PALETTE.map(p => (
+                <div key={p.type} draggable
+                  onDragStart={e => onDragStart(e, p.type)}
+                  className="px-2 py-1 rounded border border-base-300 cursor-grab hover:bg-base-200">
+                  {p.label}
+                </div>
               ))}
             </div>
           </section>
-        )}
-      </div>
 
-      {/* === MIDDLE: Pipeline === */}
-      <div className="border-r border-base-300 overflow-auto p-3">
-        {!current && <p className="text-base-content/30">Utworz lub wybierz projekt</p>}
-
-        {current && current.pipeline.length === 0 && <p className="text-base-content/30">Dodaj bloki z palety</p>}
-
-        {current && current.pipeline.length > 0 && (
-          <button onClick={runAll} disabled={running}
-            className={`btn btn-sm w-full mb-3 ${running ? 'btn-disabled' : 'btn-success'}`}>
-            {running ? 'Dziala...' : '▶ Uruchom pipeline'}
+          <button onClick={runPipeline} disabled={running}
+            className={`btn btn-sm w-full ${running ? 'btn-disabled' : 'btn-success'}`}>
+            {running ? 'Dziala...' : 'Analizuj'}
           </button>
-        )}
-
-        {current?.pipeline.map((block, i) => (
-          <BlockCard key={block.id} block={block} index={i} total={current.pipeline.length}
-            running={running}
-            onRemove={() => removeBlock(block.id)}
-            onMove={dir => moveBlock(block.id, dir)}
-            onConfig={(k, v) => updateConfig(block.id, k, v)}
-            onRun={() => runSingle(block)} />
-        ))}
+        </>}
       </div>
 
-      {/* === RIGHT: Results === */}
-      <div className="overflow-auto p-3">
-        {!rightPanel && <p className="text-base-content/30">Uruchom blok aby zobaczyc wyniki</p>}
-
-        {rightPanel?.type === 'pages' && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Strony OCR ({rightPanel.data.length})</h3>
-            {rightPanel.data.map((p: any, i: number) => (
-              <details key={i} className="collapse collapse-arrow bg-base-200 mb-1">
-                <summary className="collapse-title text-xs py-2 min-h-0">Strona {p.page} — {p.text.length} zn.</summary>
-                <div className="collapse-content"><pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all">{p.text}</pre></div>
-              </details>
-            ))}
-          </div>
-        )}
-
-        {rightPanel?.type === 'search' && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Wyniki ({rightPanel.data.length})</h3>
-            {rightPanel.data.map((r: any, i: number) => (
-              <div key={i} className="card card-compact bg-base-200 mb-2">
-                <div className="card-body p-2">
-                  <div className="text-[11px] text-base-content/50">str. {r.page} — score: {r.score.toFixed(4)}</div>
-                  <pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all">{r.text}</pre>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {rightPanel?.type === 'answer' && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Odpowiedz LLM</h3>
-            <div className="alert alert-success">{rightPanel.data}</div>
-          </div>
-        )}
-
-        {rightPanel?.type === 'extract' && rightPanel.data && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Ekstrakcja</h3>
-            <p>{rightPanel.data.extracted} faktow wydobytych, {rightPanel.data.failed} bledow, {rightPanel.data.total} chunkow</p>
-          </div>
-        )}
-
-        {rightPanel?.type === 'graph' && rightPanel.data && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Graf wiedzy ({rightPanel.data.nodes?.length} encji, {rightPanel.data.edges?.length} relacji)</h3>
-            {(() => {
-              const g = rightPanel.data as { nodes: any[]; edges: any[] }
-              const byType = new Map<string, any[]>()
-              g.nodes?.forEach((n: any) => { const arr = byType.get(n.type) || []; arr.push(n); byType.set(n.type, arr) })
-              return [...byType.entries()].map(([type, nodes]) => (
-                <details key={type} className="collapse collapse-arrow bg-base-200 mb-1">
-                  <summary className="collapse-title text-sm font-semibold py-2 min-h-0">{type} ({nodes.length})</summary>
-                  <div className="collapse-content">
-                    {nodes.map((n: any) => (
-                      <div key={n.id} className="text-xs pl-3 py-0.5">
-                        <strong>{n.label}</strong>{n.data?.value ? `: ${n.data.value}` : ''}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ))
-            })()}
-          </div>
-        )}
-
-        {rightPanel?.type === 'info' && (
-          <div><h3 className="text-xs uppercase tracking-wider text-base-content/40 mb-2">Status</h3><p>{rightPanel.data}</p></div>
-        )}
-      </div>
-
-      {/* === LOG === */}
-      {log.length > 0 && (
-        <div className="col-span-full border-t border-base-300 max-h-52 overflow-auto p-2">
-          <div className="flex gap-2 items-center mb-1">
-            <span className="text-xs text-base-content/40">Log ({log.length})</span>
-            <button onClick={() => setLog([])} className="btn btn-xs btn-ghost">wyczysc</button>
-          </div>
-          <pre className="text-xs bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all m-0">{log.join('\n')}</pre>
+      {/* === MAIN === */}
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes} edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={instance => { rfInstance.current = instance }}
+            onDrop={onDrop}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            nodeTypes={nodeTypes}
+            fitView
+            proOptions={{ hideAttribution: true }}
+          />
         </div>
-      )}
+
+        {log.length > 0 && (
+          <div className="border-t border-base-300 max-h-44 overflow-auto p-2">
+            <div className="flex gap-2 items-center mb-1">
+              <span className="text-[10px] text-base-content/30">Log ({log.length})</span>
+              <button onClick={() => setLog([])} className="btn btn-xs btn-ghost">wyczysc</button>
+            </div>
+            <pre className="text-[11px] bg-neutral text-neutral-content p-2 rounded whitespace-pre-wrap break-all m-0">{log.join('\n')}</pre>
+          </div>
+        )}
+      </div>
 
       {running && <div className="fixed top-0 left-0 right-0 h-1 bg-primary animate-pulse" />}
     </div>

@@ -37,10 +37,10 @@ sprawa-1/                       projekty, strony, chunki,
 sprawa-2/
   rachunek.pdf
 
-Upload → OPFS (PDF, CSV, TXT, JSON)
-Parse  ← OPFS  → ctx.pages (PDF→OCR, CSV→chunk wierszy, TXT→tekst)
-Embed  ← pages → ctx.chunks (chunki + wektory)
-Extract: pytanie → search w chunkach → LLM na trafieniach → graf
+Upload → OPFS + Dexie (PDF, CSV, TXT, JSON)
+Parse  ← OPFS  → Dexie pages (PDF→OCR, CSV→chunk wierszy, TXT→tekst)
+Embed  ← pages → Dexie chunks (chunki + wektory + embeddingi)
+Extract: pytanie → search w chunkach → LLM na trafieniach → graf (Dexie)
 Graf   ← Dexie → podglad encji + relacji
 ```
 
@@ -70,27 +70,59 @@ Kazdy klocek to pure functions + handle pattern:
 
 ## Playground = aktywny workbench
 
-3-kolumnowy layout: projekty + OPFS | pipeline nodes | wyniki
+React Flow canvas z sidebar. Drag & drop blokow, wizualne laczenie, wyniki wewnatrz nodow.
 
 ```
 examples/playground/
-├── App.tsx        — 3 kolumny, projekt=OPFS, pipeline edytowalny
-├── blocks.tsx     — Upload, Parse, Embed, Search, LLM, Extract, Graph
-├── templates.ts   — szablony: Graph RAG, Analiza WIBOR, Analiza WIBOR (API)
-└── main.tsx
+├── App.tsx        — React Flow canvas + sidebar + runner (topoSort)
+├── blocks.ts      — pure functions: Upload, Parse, Embed, Extract, Graph
+├── nodes.tsx      — custom React Flow nodes (Shell, UploadNode, DataNode)
+├── store.ts       — singletony: opfs, db (StoreDB), embedder, llm
+├── templates.ts   — szablony: Analiza WIBOR, WIBOR (API)
+├── main.tsx       — entry point
+└── index.css      — tailwind + daisyui + xyflow
 ```
 
-Flow tworzenia: Nowy projekt → wybierz szablon → pipeline gotowy → edytuj configi → uruchom.
+### ZASADA: bloki MUSZA uzywac pakietow
 
-Bloki:
-- **Upload** — multi-file (PDF, CSV, TXT, JSON) → OPFS
-- **Parse** — iteruje WSZYSTKIE pliki w OPFS projektu, routuje po rozszerzeniu (PDF→OCR, CSV→chunk wierszy, TXT→tekst)
-- **Embed** — chunki + wektory (Xenova/multilingual-e5-small, WASM)
-- **Search** — semantyczne wyszukiwanie w chunkach
-- **LLM** — pojedyncze zapytanie (klasyczny RAG)
-- **Extract** — pytanie → semantic search → LLM (WASM Bielik) na trafionych chunkach → graf. Serce GraphRAG.
-- **Extract API** — DEV TOOL: to samo co Extract ale przez OpenAI-compatible API. Do szybkiego testowania pipeline.
-- **Graph** — podglad grafu: encje pogrupowane po typie + relacje
+Playground importuje i uzywa pakietow z `packages/`. Kazdy blok czyta/pisze przez szyne:
+- `opfs` (z store.ts) — pliki w OPFS
+- `db` (z store.ts) — dane w Dexie (StoreDB)
+- `createGraphDB` — graf wiedzy w Dexie
+
+**NIGDY nie omijaj szyny.** Nowy blok = import z packages, zapis do Dexie/OPFS.
+Jesli dodajesz nowy blok, wzoruj sie na istniejacych w `blocks.ts`.
+
+### Przyklad: jak blok uzywa szyny
+
+```ts
+// blocks.ts — blockUpload zapisuje do OPFS + Dexie
+import { opfs, db } from './store'
+
+await opfs.writeFile(project, file.name, file)           // plik → OPFS
+await db.addDocument({ id, projectId, filename, ... })    // metadane → Dexie
+
+// blockParse czyta z OPFS, pisze pages do Dexie
+const file = await opfs.readFile(project, filename)       // OPFS → plik
+await db.setPages(pages)                                  // strony → Dexie
+
+// blockEmbed pisze chunki z embeddingami do Dexie
+await db.setChunks(chunks)                                // chunki + wektory → Dexie
+```
+
+### Flow
+
+Nowy projekt → wybierz szablon → pipeline na canvas → edytuj configi → uruchom.
+Pipeline state (nodes/edges) persystowany w localStorage per projekt.
+
+### Bloki
+
+- **Upload** — multi-file (PDF, CSV, TXT, JSON) → OPFS + Dexie documents
+- **Parse** — OPFS pliki → OCR/chunk → Dexie pages
+- **Embed** — pages → chunki + embeddingi → Dexie chunks
+- **Extract** — pytanie → search → LLM (WASM Bielik) → graf (Dexie)
+- **Extract API** — to samo co Extract ale przez OpenAI-compatible API
+- **Graph** — podglad grafu z Dexie: encje + relacje
 
 Extract flow:
 1. Lista pytan (sentence starters) z configu
@@ -134,9 +166,9 @@ test-mini.txt --kredytobiorca to----> Jan Kowalski
 
 ```
 examples/
-├── playground/        — AKTYWNY workbench (3 kolumny, szablony, Extract+Graph)
-├── old-playground/    — starszy playground (OPFS+Dexie, hardcoded pipeline)
-├── doc-analyzer/      — LEGACY, nie rozwijac, lamie zasade plain-text
+├── playground/        — AKTYWNY workbench (React Flow, packages, Dexie szyna)
+├── old-playground/    — starszy playground (hardcoded pipeline)
+├── doc-analyzer/      — LEGACY, nie rozwijac
 WIBOR-PRZYKLAD/        — testowe dokumenty + benchmark Bielika
 ```
 
