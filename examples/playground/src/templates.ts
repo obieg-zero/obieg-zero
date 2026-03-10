@@ -43,4 +43,21 @@ export const TEMPLATES: Template[] = [
       { type: 'graph', config: {} },
     ],
   },
+  {
+    id: 'wibor-api',
+    name: 'Analiza WIBOR (API)',
+    description: 'Jak Analiza WIBOR ale przez API — szybkie testowanie',
+    nodes: [
+      { type: 'upload', config: { project: 'default' } },
+      { type: 'ocr', config: { language: 'pol' } },
+      { type: 'embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+      { type: 'extract-api', config: {
+        questions: 'Nazwa banku to\nKwota kredytu wynosi\nMarza banku wynosi\nStawka WIBOR wynosi\nUmowe podpisano dnia\nOkres kredytu to\nMiesieczna rata wynosi\nKredytobiorca to',
+        apiUrl: 'https://api.openai.com/v1/chat/completions',
+        apiKey: '',
+        model: 'gpt-4o-mini',
+      }},
+      { type: 'graph', config: {} },
+    ],
+  },
 ]

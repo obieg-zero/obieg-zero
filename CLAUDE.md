@@ -19,11 +19,11 @@ Zero parsowania, zero regexow, zero JSON.parse. Ta zasada jest niepodwazalna.
 
 ## Stan projektu: walidacja
 
-Benchmark w `WIBOR-PRZYKLAD/bielik-benchmark.md`. Kluczowe wyniki:
-- Sentence starters: 6/8 poprawnych (75%), pytania wprost: 4/8 (50%)
-- ~53s/wywolanie w WASM (nCtx=512, nPredict=16, temp=0)
-- Bielik dobrze kopiuje liczby, halucynuje nazwy wlasne
-- Myli podobne wartosci (WIBOR vs marza)
+Benchmark w `WIBOR-PRZYKLAD/benchmark.md`. Kluczowe wyniki:
+- Bielik sentence starters: 6/8 (75%), Bielik pytania: 4/8 (50%), GPT-4o-mini: 7/8 (88%)
+- Bielik ~53s/wywolanie w WASM, GPT-4o-mini ~1s/wywolanie
+- Bielik dobrze kopiuje liczby, halucynuje nazwy wlasne, myli WIBOR z marza
+- GPT potwierdza ze pipeline RAG jest poprawny — waskie gardlo to model, nie architektura
 
 ## Architektura: szyna OPFS + Dexie
 
@@ -76,7 +76,7 @@ Kazdy klocek to pure functions + handle pattern:
 examples/playground/
 ├── App.tsx        — 3 kolumny, projekt=OPFS, pipeline edytowalny
 ├── blocks.tsx     — Upload, Parse, Embed, Search, LLM, Extract, Graph
-├── templates.ts   — szablony: Graph RAG, Analiza WIBOR
+├── templates.ts   — szablony: Graph RAG, Analiza WIBOR, Analiza WIBOR (API)
 └── main.tsx
 ```
 
@@ -88,7 +88,8 @@ Bloki:
 - **Embed** — chunki + wektory (Xenova/multilingual-e5-small, WASM)
 - **Search** — semantyczne wyszukiwanie w chunkach
 - **LLM** — pojedyncze zapytanie (klasyczny RAG)
-- **Extract** — pytanie → semantic search → LLM na trafionych chunkach → graf. Serce GraphRAG.
+- **Extract** — pytanie → semantic search → LLM (WASM Bielik) na trafionych chunkach → graf. Serce GraphRAG.
+- **Extract API** — DEV TOOL: to samo co Extract ale przez OpenAI-compatible API. Do szybkiego testowania pipeline.
 - **Graph** — podglad grafu: encje pogrupowane po typie + relacje
 
 Extract flow:

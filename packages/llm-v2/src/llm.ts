@@ -7,7 +7,6 @@ export interface AskResult {
   text: string
   tokenCount: number
   durationMs: number
-  usedTemplate: boolean
 }
 
 export interface AskOpts {
@@ -49,11 +48,9 @@ export async function createLlm(opts: LlmOpts): Promise<LlmHandle> {
       const { nPredict = 64, temperature = 0.1, topP = 0.9, topK = 20, onToken } = askOpts
 
       let formatted = prompt
-      let usedTemplate = false
       if (chatTemplate) {
         try {
           formatted = await wllama.formatChat([{ role: 'user', content: prompt }], true)
-          usedTemplate = true
         } catch (err) {
           onProgress?.(`Chat template failed, using raw prompt: ${err}`)
         }
@@ -76,7 +73,7 @@ export async function createLlm(opts: LlmOpts): Promise<LlmHandle> {
 
       if (!text) onProgress?.('Warning: LLM returned empty response')
 
-      return { text, tokenCount, durationMs, usedTemplate }
+      return { text, tokenCount, durationMs }
     },
 
     async dispose() {
