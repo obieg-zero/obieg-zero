@@ -186,7 +186,7 @@ export function App() {
           </>}
         </div>
 
-        <div className="border-t border-base-300 px-4 py-3">
+        <div className="border-t border-base-300 px-4 p-3 flex items-center h-[56px]">
           <div className="text-2xs text-base-content/20">Your data never leaves your machine.</div>
         </div>
       </div>
