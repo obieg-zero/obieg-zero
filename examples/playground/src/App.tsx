@@ -228,14 +228,14 @@ export function App() {
           </div>
           <div className="border-t border-base-300">
             {running || log.length > 0 ? (
-              <div className="flex flex-col max-h-48">
+              <div className="flex flex-col max-h-56">
                 <div className="navbar min-h-10 h-10 px-3">
                   {running && <span className="loading loading-spinner loading-xs text-warning mr-2" />}
                   <Terminal size={12} className="text-base-content/25 mr-2" />
                   <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Log</span>
                   {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
                 </div>
-                <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-3 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
+                <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-4 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
               </div>
             ) : (
               <div className="p-4"><button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running} className="btn btn-primary btn-lg w-full gap-2"><Play size={18} />Analizuj</button></div>
