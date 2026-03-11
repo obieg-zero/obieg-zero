@@ -4,20 +4,12 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,9 +19,10 @@ jobs:
       - name: Install and build
         working-directory: examples/playground
         run: npm install && npx vite build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to obieg-zero.github.io
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: examples/playground/dist
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: obieg-zero/obieg-zero.github.io
+          publish_dir: examples/playground/dist
+          publish_branch: main
