@@ -154,8 +154,8 @@ export function App() {
             <Lbl>New project</Lbl>
             <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
-                placeholder="nazwa..." className="input input-bordered input-xs flex-1" />
-              <button onClick={createProject} className="btn btn-xs btn-primary"><Plus size={12} /></button>
+                placeholder="nazwa..." className="input input-bordered input-sm flex-1" />
+              <button onClick={createProject} className="btn btn-sm btn-primary"><Plus size={14} /></button>
             </div>
           </div>
           {project && <div className="pt-4 border-t border-base-300 space-y-3">

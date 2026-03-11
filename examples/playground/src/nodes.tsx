@@ -43,11 +43,11 @@ function Shell({ id, data, children }: { id: string; data: any; children?: React
             <div className="text-2xs text-base-content/30 mb-1">{k}</div>
             {String(v).includes('\n') || String(v).length > 50
               ? <textarea value={String(v)} rows={2} onChange={e => onCfg(k, e.target.value)}
-                  className="textarea textarea-bordered textarea-xs font-mono w-full bg-transparent border-base-content/10" />
+                  className="textarea textarea-bordered textarea-sm font-mono w-full bg-transparent border-base-content/10" />
               : <input type={k === 'apiKey' ? 'password' : 'text'} value={String(v)}
                   placeholder={k === 'apiKey' ? 'sk-...' : ''}
                   onChange={e => onCfg(k, e.target.value)}
-                  className="input input-bordered input-xs w-full text-xs font-mono bg-transparent border-base-content/10" />}
+                  className="input input-bordered input-sm w-full text-xs font-mono bg-transparent border-base-content/10" />}
           </div>
         ))}</div>
       </details>}
