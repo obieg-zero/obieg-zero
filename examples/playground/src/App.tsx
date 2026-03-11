@@ -131,53 +131,51 @@ export function App() {
     <div className="h-screen bg-base-200 overflow-hidden text-sm">
       <div className={`flex flex-row h-full transition-transform duration-300 ease-in-out ${leftOpen ? '' : 'max-md:-translate-x-72'}`}>
 
-      {/* LEFT — px-4 py-3 grid, h-8 items, text-xs base */}
+      {/* LEFT — px-4, h-8 items, text-xs, border-base-300 separators */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="flex items-center h-10 px-4 shrink-0 border-b border-base-300">
-          <Folder size={14} className="text-base-content/40 mr-2" />
-          <span className="text-xs font-semibold text-base-content/40">Projects</span>
-        </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-6">
+        <div className="flex-1 overflow-y-auto">
 
-          {/* project list */}
-          {projects.length > 0 && <div className="space-y-1">
-            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Active ({projects.length})</div>
-            {projects.map(name => (
-              <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
-                <span className="truncate flex-1">{name}</span>
-                <X size={12} className="shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-100" onClick={e => { e.stopPropagation(); removeProject(name) }} />
-              </div>
-            ))}
-          </div>}
+          {/* projects */}
+          <div className="px-4 pt-4 pb-2">
+            <Lbl>Projects</Lbl>
+          </div>
+          {projects.map(name => (
+            <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
+              className={`group flex items-center h-8 mx-2 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
+              <span className="truncate flex-1">{name}</span>
+              <X size={12} className="shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-100" onClick={e => { e.stopPropagation(); removeProject(name) }} />
+            </div>
+          ))}
 
           {/* new project */}
-          <div className="space-y-2">
-            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">New project</div>
+          <div className="px-4 py-3">
             <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
-                placeholder="nazwa..." className="input input-bordered input-sm text-xs flex-1" />
+                placeholder="nowy projekt..." className="input input-bordered input-sm text-xs flex-1" />
               <button onClick={createProject} className="btn btn-sm btn-primary text-xs"><Plus size={14} /></button>
             </div>
           </div>
 
-          {/* templates / blocks */}
-          {project && <div className="space-y-3">
-            <div className="border-t border-base-content/5 pt-3" />
-            <div className="flex gap-1">
-              <button onClick={() => setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'templates' ? 'bg-base-200 font-semibold' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
-              <button onClick={() => setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'blocks' ? 'bg-base-200 font-semibold' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
+          {/* pipeline */}
+          {project && <>
+            <div className="border-t border-base-300" />
+            <div className="px-4 pt-4 pb-2">
+              <Lbl>Pipeline</Lbl>
+            </div>
+            <div className="flex gap-1 mx-2 mb-2">
+              <button onClick={() => setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'templates' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
+              <button onClick={() => setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'blocks' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
-              <div className="space-y-2">{TEMPLATES.map(t => (
+              <div className="mx-2">{TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
                   className="flex flex-col justify-center px-2 py-3 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
-                  <div className="text-xs font-semibold">{t.name}</div>
+                  <div className="text-xs">{t.name}</div>
                   <div className="text-2xs text-base-content/30 mt-1">{t.nodes.map(n => n.data.label).join(' → ')}</div>
                 </div>))}</div>
             ) : (
-              <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
+              <div className="grid grid-cols-3 gap-2 px-4">{PALETTE.map(p => {
                 const I = p.icon; return (
                   <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
                     className="flex flex-col items-center justify-center h-16 rounded-md hover:bg-base-200 cursor-grab transition-colors">
@@ -185,13 +183,11 @@ export function App() {
                   </div>)
               })}</div>
             )}
-          </div>}
+          </>}
         </div>
 
-        <div className="px-4 py-3 border-t border-base-content/5 space-y-2">
-          <a href="https://github.com/obieg-zero" target="_blank" rel="noopener"
-            className="flex items-center h-8 px-2 rounded-md text-xs text-base-content/50 hover:bg-base-200 transition-colors"><GitBranch size={12} className="mr-2" />obieg-zero</a>
-          <div className="text-2xs text-base-content/20 px-2">Your data never leaves your machine.</div>
+        <div className="border-t border-base-300 px-4 py-3">
+          <div className="text-2xs text-base-content/20">Your data never leaves your machine.</div>
         </div>
       </div>
 
