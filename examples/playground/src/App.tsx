@@ -3,6 +3,7 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
+import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, List, Upload, FileText, Layers, Cpu, Globe, GitBranch } from 'react-feather'
 import { opfs } from './store'
 import { TEMPLATES, BIELIK } from './templates'
 import { nodeTypes } from './nodes'
@@ -13,12 +14,12 @@ import {
 } from './blocks'
 
 const PALETTE = [
-  { type: 'upload', label: 'Upload', icon: '↑', config: {} },
-  { type: 'parse', label: 'Parse', icon: '¶', config: { language: 'pol' } },
-  { type: 'embed', label: 'Embed', icon: '◈', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
-  { type: 'extract', label: 'Extract', icon: '⊕', config: { questions: '', topK: '2', modelUrl: BIELIK } },
-  { type: 'extract-api', label: 'ExtractAPI', icon: '⊛', config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
-  { type: 'graph', label: 'Graph', icon: '◇', config: {} },
+  { type: 'upload', label: 'Upload', icon: Upload, config: {} },
+  { type: 'parse', label: 'Parse', icon: FileText, config: { language: 'pol' } },
+  { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+  { type: 'extract', label: 'Extract', icon: Cpu, config: { questions: '', topK: '2', modelUrl: BIELIK } },
+  { type: 'extract-api', label: 'ExtractAPI', icon: Globe, config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
+  { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
 ]
 
 export function App() {
@@ -57,8 +58,6 @@ export function App() {
   const onEdgesChange: OnEdgesChange = useCallback(changes => setEdges(e => applyEdgeChanges(changes, e)), [])
   const onConnect = useCallback((c: Connection) => setEdges(e => addEdge(c, e)), [])
 
-  // --- project ---
-
   async function createProject() {
     const name = newName.trim()
     if (!name) return
@@ -69,16 +68,27 @@ export function App() {
     setNodes([]); setEdges([]); setLog([])
   }
 
-  function loadTemplate(id: string) {
-    const tpl = TEMPLATES.find(t => t.id === id)
-    if (!tpl || !project) return
-    const n = tpl.nodes.map(n => ({ ...n, data: { ...n.data, config: { ...(n.data.config as any || {}) } } }))
-    const e = [...tpl.edges]
-    setNodes(n); setEdges(e)
+  function selectProject(name: string) {
+    setProject(name); setLog([])
+    const saved = loadPipeline(name)
+    if (saved) { setNodes(saved.nodes); setEdges(saved.edges) } else { setNodes([]); setEdges([]) }
     setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
   }
 
-  // --- DnD from palette ---
+  async function removeProject(name: string) {
+    await opfs.removeProject(name).catch(() => {})
+    localStorage.removeItem(`pipeline:${name}`)
+    setProjects(p => p.filter(n => n !== name))
+    if (project === name) { setProject(null); setNodes([]); setEdges([]) }
+  }
+
+  function loadTemplate(id: string) {
+    const tpl = TEMPLATES.find(t => t.id === id)
+    if (!tpl || !project) return
+    setNodes(tpl.nodes.map(n => ({ ...n, data: { ...n.data, config: { ...(n.data.config as any || {}) } } })))
+    setEdges([...tpl.edges])
+    setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
+  }
 
   function onDragStart(e: DragEvent, type: string) {
     e.dataTransfer.setData('application/reactflow', type)
@@ -92,13 +102,10 @@ export function App() {
     const position = rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const entry = PALETTE.find(p => p.type === type)
     if (!entry) return
-    const newNode: Node = {
-      id: `${type}-${Date.now()}`,
-      type,
-      position,
+    setNodes(n => [...n, {
+      id: `${type}-${Date.now()}`, type, position,
       data: { label: entry.label, config: { ...entry.config } },
-    }
-    setNodes(n => [...n, newNode])
+    }])
   }
 
   // --- runner ---
@@ -113,12 +120,8 @@ export function App() {
     const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([id]) => id)
     const result: string[] = []
     while (queue.length) {
-      const id = queue.shift()!
-      result.push(id)
-      for (const next of adj.get(id) || []) {
-        inDeg.set(next, inDeg.get(next)! - 1)
-        if (!inDeg.get(next)) queue.push(next)
-      }
+      const id = queue.shift()!; result.push(id)
+      for (const next of adj.get(id) || []) { inDeg.set(next, inDeg.get(next)! - 1); if (!inDeg.get(next)) queue.push(next) }
     }
     return result
   }
@@ -132,34 +135,22 @@ export function App() {
     const right = dataNodeSide.current++ % 2 === 0
     const px = parent ? parent.position.x + (right ? 200 : -180) : 500
     const py = parent ? parent.position.y - ((items.length - 1) * 14) : 0
-
-    const newNodes: Node[] = items.map((item, i) => ({
-      id: item.id,
-      type: 'data',
-      position: { x: px, y: py + i * 28 },
+    setNodes(n => [...n, ...items.map((item, i) => ({
+      id: item.id, type: 'data' as const, position: { x: px, y: py + i * 28 },
       data: { label: item.label, detail: item.detail },
-    }))
-    const newEdges: Edge[] = items.map(item => ({
-      id: `e:${parentId}→${item.id}`,
-      source: parentId,
-      sourceHandle: right ? 'data' : 'data-left',
-      target: item.id,
+    }))])
+    setEdges(e => [...e, ...items.map(item => ({
+      id: `e:${parentId}→${item.id}`, source: parentId,
+      sourceHandle: right ? 'data' : 'data-left', target: item.id,
       targetHandle: right ? 'left' : 'right',
       style: { strokeDasharray: '4 2', stroke: '#d1d5db' },
-    }))
-
-    setNodes(n => [...n, ...newNodes])
-    setEdges(e => [...e, ...newEdges])
+    }))])
   }
 
   async function runPipeline() {
     if (!project) { addLog('Wybierz projekt'); return }
-    dataNodeSide.current = 0
-    setRunning(true)
-    setLog([])
+    dataNodeSide.current = 0; setRunning(true); setLog([])
     addLog(`=== Projekt: ${project} ===`)
-
-    // clear old data nodes
     setNodes(n => n.filter(x => x.type !== 'data'))
     setEdges(e => e.filter(x => !x.id.startsWith('e:') || !x.id.includes('→')))
 
@@ -170,7 +161,6 @@ export function App() {
       const node = nodes.find(n => n.id === nodeId)
       if (!node || node.type === 'data') continue
       const cfg = (node.data.config || {}) as Record<string, string>
-
       setNodeResult(nodeId, 'running')
       addLog(`>>> ${node.data.label}`)
 
@@ -186,11 +176,8 @@ export function App() {
           }
           case 'parse': {
             ctx.pages = await blockParse(project, cfg.language || 'pol', addLog)
-            const chars = ctx.pages.reduce((s: number, p: any) => s + p.text.length, 0)
-            setNodeResult(nodeId, 'done', `${ctx.pages.length} stron, ${chars} zn.`)
-            addDataNodes(nodeId, ctx.pages.slice(0, 5).map((p: any) => ({
-              id: `d:page:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.`,
-            })))
+            setNodeResult(nodeId, 'done', `${ctx.pages.length} stron, ${ctx.pages.reduce((s: number, p: any) => s + p.text.length, 0)} zn.`)
+            addDataNodes(nodeId, ctx.pages.slice(0, 5).map((p: any) => ({ id: `d:page:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.` })))
             break
           }
           case 'embed': {
@@ -198,9 +185,7 @@ export function App() {
             if (!r) throw new Error('Brak stron do embeddingu')
             ctx.chunks = r.chunks; ctx.embedFn = r.embedFn
             setNodeResult(nodeId, 'done', `${r.chunks.length} chunków po ~${cfg.chunkSize || 200} zn.`)
-            addDataNodes(nodeId, r.chunks.slice(0, 6).map((c: Chunk, i: number) => ({
-              id: `d:chunk:${i}`, label: `chunk ${i}`, detail: c.text.slice(0, 40) + '...',
-            })))
+            addDataNodes(nodeId, r.chunks.slice(0, 6).map((c: Chunk, i: number) => ({ id: `d:chunk:${i}`, label: `chunk ${i}`, detail: c.text.slice(0, 40) + '...' })))
             break
           }
           case 'extract': {
@@ -223,9 +208,7 @@ export function App() {
             ctx.graph = await blockGraph(project, addLog)
             const values = ctx.graph.nodes.filter((n: any) => n.type !== 'document')
             setNodeResult(nodeId, 'done', `${ctx.graph.nodes.length} encji, ${ctx.graph.edges.length} relacji`)
-            addDataNodes(nodeId, values.map((n: any) => ({
-              id: `d:${n.id}`, label: n.label, detail: n.type,
-            })))
+            addDataNodes(nodeId, values.map((n: any) => ({ id: `d:${n.id}`, label: n.label, detail: n.type })))
             break
           }
         }
@@ -235,100 +218,137 @@ export function App() {
         break
       }
     }
-    addLog('--- done ---')
-    setRunning(false)
+    addLog('--- done ---'); setRunning(false)
   }
 
   // --- render ---
 
   return (
-    <div className="h-screen bg-base-200 overflow-hidden text-xs">
+    <div className="h-screen bg-base-200 overflow-hidden text-sm">
       <div className={`flex flex-row h-full transition-transform duration-300 ease-in-out ${leftOpen ? '' : 'max-md:-translate-x-72'}`}>
 
       {/* === LEFT === */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="navbar min-h-10 h-10 border-b border-base-300 text-xs font-semibold text-base-content/40">Projekty</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <ul className="menu menu-sm p-0">
+        <div className="flex items-center gap-1.5 px-4 h-12 shrink-0 border-b border-base-300">
+          <Folder size={14} className="text-base-content/40" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-base-content/40">Projekty</span>
+          <span className="text-2xs text-base-content/20">{projects.length}</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-4">
+          {/* project list */}
+          <div className="space-y-1">
             {projects.map(name => (
-              <li key={name}><a className={project === name ? 'active' : ''} onClick={() => {
-                setProject(name); setLog([])
-                const saved = loadPipeline(name)
-                if (saved) { setNodes(saved.nodes); setEdges(saved.edges) } else { setNodes([]); setEdges([]) }
-                setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
-              }}>{name}<button onClick={async (e) => {
-                e.stopPropagation(); await opfs.removeProject(name).catch(() => {})
-                localStorage.removeItem(`pipeline:${name}`); setProjects(p => p.filter(n => n !== name))
-                if (project === name) { setProject(null); setNodes([]); setEdges([]) }
-              }} className="btn btn-ghost btn-xs text-error">✕</button></a></li>
+              <button key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
+                className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-colors ${project === name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-base-200'}`}>
+                <div className="flex items-center gap-2">
+                  <Folder size={12} className={project === name ? 'text-primary' : 'text-base-content/30'} />
+                  <span className={`flex-1 truncate ${project === name ? 'font-semibold text-primary' : ''}`}>{name}</span>
+                  <button onClick={e => { e.stopPropagation(); removeProject(name) }}
+                    className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-base-content/20 hover:text-error transition-opacity">
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              </button>
             ))}
-          </ul>
+          </div>
+
+          {/* new project */}
           <div className="join w-full">
             <input value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && createProject()}
-              placeholder="nowy..." className="input input-bordered input-sm join-item flex-1" />
-            <button onClick={createProject} className="btn btn-sm btn-primary join-item">+</button>
+              placeholder="nowy projekt..." className="input input-bordered input-sm join-item flex-1 text-xs" />
+            <button onClick={createProject} className="btn btn-sm btn-primary join-item"><Plus size={14} /></button>
           </div>
+
+          {/* tabs + content */}
           {project && <>
-            <div role="tablist" className="tabs tabs-bordered">
-              <button role="tab" className={`tab ${leftTab === 'templates' ? 'tab-active' : ''}`} onClick={() => setLeftTab('templates')}>Szablony</button>
-              <button role="tab" className={`tab ${leftTab === 'blocks' ? 'tab-active' : ''}`} onClick={() => setLeftTab('blocks')}>Bloki</button>
+            <div role="tablist" className="tabs tabs-bordered tabs-sm">
+              <button role="tab" className={`tab gap-1.5 ${leftTab === 'templates' ? 'tab-active' : ''}`} onClick={() => setLeftTab('templates')}>
+                <Layout size={12} />Szablony
+              </button>
+              <button role="tab" className={`tab gap-1.5 ${leftTab === 'blocks' ? 'tab-active' : ''}`} onClick={() => setLeftTab('blocks')}>
+                <Grid size={12} />Bloki
+              </button>
             </div>
+
             {leftTab === 'templates' ? (
               <div className="space-y-2">{TEMPLATES.map(t => (
-                <div key={t.id} className="card card-compact bg-base-200 cursor-pointer hover:bg-base-300"
-                  onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}>
-                  <div className="card-body"><h3 className="card-title text-sm">{t.name}</h3>
-                    <p className="text-[10px] text-base-content/40">{t.nodes.map(n => n.data.label).join(' → ')}</p></div>
-                </div>
+                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
+                  className="w-full text-left rounded-lg bg-base-200 hover:bg-base-300 p-3 transition-colors">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Play size={12} className="text-primary" />
+                    <span className="text-xs font-semibold">{t.name}</span>
+                  </div>
+                  <p className="text-2xs text-base-content/30 leading-relaxed">{t.nodes.map(n => n.data.label).join(' → ')}</p>
+                </button>
               ))}</div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">{PALETTE.map(p => (
-                <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
-                  className="card card-compact bg-base-200 cursor-grab hover:bg-base-300 items-center py-3">
-                  <span className="text-2xl">{p.icon}</span><span className="text-xs font-medium">{p.label}</span>
-                </div>
-              ))}</div>
+              <div className="grid grid-cols-2 gap-2">{PALETTE.map(p => {
+                const Icon = p.icon
+                return (
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
+                    className="flex flex-col items-center gap-1.5 rounded-lg bg-base-200 hover:bg-base-300 cursor-grab p-3 transition-colors">
+                    <Icon size={18} className="text-base-content/50" />
+                    <span className="text-2xs font-medium">{p.label}</span>
+                  </div>
+                )
+              })}</div>
             )}
           </>}
+        </div>
+
+        {/* left footer */}
+        <div className="px-4 py-3 border-t border-base-300">
+          <span className="text-2xs text-base-content/20">obieg-zero playground</span>
         </div>
       </div>
 
       {/* === CENTER === */}
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
-        <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
-          <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm md:hidden">{leftOpen ? '✕' : '☰'}</button>
-          <span className="flex-1 text-xs font-black text-primary">OBIEG-ZERO</span>
+        <div className="flex items-center gap-2 px-4 h-12 shrink-0 border-b border-base-300">
+          <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm md:hidden -ml-2">
+            {leftOpen ? <X size={16} /> : <List size={16} />}
+          </button>
+          <span className="text-sm font-black tracking-tight text-primary">OBIEG-ZERO</span>
+          <span className="flex-1" />
+          {project && <span className="text-2xs text-base-content/30">{project}</span>}
         </div>
+
         <div className="flex-1">
           <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
             onConnect={onConnect} onInit={i => { rfInstance.current = i }} onDrop={onDrop}
             onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
             nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
         </div>
+
         {/* footer: button or logs */}
         <div className="border-t border-base-300">
           {running || log.length > 0 ? (
-            <div className="flex flex-col max-h-48">
-              <div className="navbar min-h-8 h-8 px-3">
-                <span className="flex-1 text-xs font-semibold text-base-content/40">
-                  {running && <span className="loading loading-spinner loading-xs mr-1" />}Log
-                </span>
-                {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs">wyczysc</button>}
+            <div className="flex flex-col max-h-52">
+              <div className="flex items-center gap-1.5 px-4 h-8 shrink-0">
+                {running && <span className="loading loading-spinner loading-xs text-primary" />}
+                <Terminal size={12} className="text-base-content/30" />
+                <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/30">Log</span>
+                {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs gap-1 text-base-content/30">
+                  <Trash2 size={10} />wyczysc
+                </button>}
               </div>
-              <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-2 text-[11px] font-mono whitespace-pre-wrap break-all text-base-content/60">{log.join('\n')}</pre>
+              <pre ref={logRef} className="flex-1 overflow-y-auto px-4 pb-3 text-2xs font-mono whitespace-pre-wrap break-all text-base-content/50 leading-relaxed">{log.join('\n')}</pre>
             </div>
           ) : project && (
-            <div className="p-2">
+            <div className="p-3">
               <button onClick={() => { runPipeline(); setLeftOpen(false) }}
-                className="btn btn-sm btn-success w-full">Analizuj</button>
+                className="btn btn-sm btn-primary w-full gap-2">
+                <Play size={14} />Analizuj
+              </button>
             </div>
           )}
         </div>
       </div>
 
       </div>
-      {running && <progress className="progress progress-primary w-full fixed top-0 left-0 z-50 h-1" />}
+      {running && <progress className="progress progress-primary w-full fixed top-0 left-0 z-50 h-0.5" />}
     </div>
   )
 }

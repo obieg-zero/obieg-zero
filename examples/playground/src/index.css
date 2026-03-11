@@ -1,3 +1,10 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: dracula, corporate;
+}
 @import "@xyflow/react/dist/style.css";
+
+@theme {
+  --font-size-2xs: 0.625rem;
+  --font-size-2xs--line-height: 0.875rem;
+}
