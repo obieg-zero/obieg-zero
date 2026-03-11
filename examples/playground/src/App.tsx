@@ -170,11 +170,11 @@ export function App() {
               <button onClick={() => setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'blocks' ? 'bg-base-200 font-semibold' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
-              <div className="space-y-1">{TEMPLATES.map(t => (
+              <div className="space-y-2">{TEMPLATES.map(t => (
                 <div key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
-                  className="flex flex-col justify-center h-12 px-2 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
+                  className="flex flex-col justify-center px-2 py-3 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
                   <div className="text-xs font-semibold">{t.name}</div>
-                  <div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div>
+                  <div className="text-2xs text-base-content/30 mt-1">{t.nodes.map(n => n.data.label).join(' → ')}</div>
                 </div>))}</div>
             ) : (
               <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
