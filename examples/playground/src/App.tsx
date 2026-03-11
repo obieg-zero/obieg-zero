@@ -160,12 +160,12 @@ export function App() {
           </div>
           {project && <div className="pt-4 border-t border-base-300 space-y-3">
             <div className="flex gap-2">
-              <button onClick={() => setLeftTab('templates')} className={`btn btn-ghost btn-xs gap-2 ${leftTab === 'templates' ? 'btn-active' : ''}`}><Layout size={12} />Szablony</button>
-              <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-xs gap-2 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={12} />Bloki</button>
+              <button onClick={() => setLeftTab('templates')} className={`btn btn-ghost btn-sm gap-2 ${leftTab === 'templates' ? 'btn-active' : ''}`}><Layout size={14} />Szablony</button>
+              <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-sm gap-2 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={14} />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
               <div className="space-y-2">{TEMPLATES.map(t => (
-                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-2">
+                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-sm w-full justify-start text-left h-auto py-2">
                   <div className="leading-tight"><div className="text-xs font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
                 </button>))}</div>
             ) : (
