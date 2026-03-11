@@ -145,7 +145,7 @@ export function App() {
             <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Active ({projects.length})</div>
             {projects.map(name => (
               <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-base-200 text-base-content/70'}`}>
+                className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
                 <span className="truncate flex-1">{name}</span>
                 <X size={12} className="shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-100" onClick={e => { e.stopPropagation(); removeProject(name) }} />
               </div>
@@ -157,8 +157,8 @@ export function App() {
             <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">New project</div>
             <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
-                placeholder="nazwa..." className="input input-bordered input-sm flex-1" />
-              <button onClick={createProject} className="btn btn-sm btn-primary"><Plus size={14} /></button>
+                placeholder="nazwa..." className="input input-bordered input-sm text-xs flex-1" />
+              <button onClick={createProject} className="btn btn-sm btn-primary text-xs"><Plus size={14} /></button>
             </div>
           </div>
 
