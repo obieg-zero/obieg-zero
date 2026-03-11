@@ -31,12 +31,14 @@ export function App() {
   const [running, setRunning] = useState(false)
   const [leftOpen, setLeftOpen] = useState(false)
   const [leftTab, setLeftTab] = useState<'templates' | 'blocks'>('templates')
-  const [showLog, setShowLog] = useState(false)
+  const logRef = useRef<HTMLPreElement>(null)
   const rfInstance = useRef<any>(null)
   const dataNodeSide = useRef(0)
 
-  const addLog: Log = useCallback((msg: string) =>
-    setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`]), [])
+  const addLog: Log = useCallback((msg: string) => {
+    setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`])
+    setTimeout(() => logRef.current?.scrollTo(0, logRef.current.scrollHeight), 0)
+  }, [])
 
   useEffect(() => { opfs.listProjects().then(setProjects).catch(() => {}) }, [])
   useEffect(() => { if (project) savePipeline(project, nodes, edges) }, [project, nodes, edges])
@@ -288,9 +290,6 @@ export function App() {
                 </div>
               ))}</div>
             )}
-            <button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running}
-              className={`btn btn-sm w-full ${running ? 'btn-disabled' : 'btn-success'}`}>
-              {running ? 'Dziala...' : 'Analizuj'}</button>
           </>}
         </div>
       </div>
@@ -300,8 +299,6 @@ export function App() {
         <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
           <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm md:hidden">{leftOpen ? '✕' : '☰'}</button>
           <span className="flex-1 text-xs font-black text-primary">OBIEG-ZERO</span>
-          {log.length > 0 && <button onClick={() => setShowLog(!showLog)}
-            className={`btn btn-ghost btn-xs ${showLog ? 'btn-active' : ''}`}>Log ({log.length})</button>}
         </div>
         <div className="flex-1">
           <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
@@ -309,19 +306,26 @@ export function App() {
             onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
             nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
         </div>
-      </div>
-
-      {/* === RIGHT — Log === */}
-      {showLog && (
-        <div className="w-72 shrink-0 flex flex-col bg-base-100 border-l border-base-300 min-h-0">
-          <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
-            <span className="flex-1 text-xs font-semibold text-base-content/40">Log</span>
-            <button onClick={() => setLog([])} className="btn btn-ghost btn-xs">wyczysc</button>
-            <button onClick={() => setShowLog(false)} className="btn btn-ghost btn-xs">✕</button>
-          </div>
-          <pre className="flex-1 overflow-y-auto p-3 text-[11px] font-mono whitespace-pre-wrap break-all text-base-content/60">{log.join('\n')}</pre>
+        {/* footer: button or logs */}
+        <div className="border-t border-base-300">
+          {running || log.length > 0 ? (
+            <div className="flex flex-col max-h-48">
+              <div className="navbar min-h-8 h-8 px-3">
+                <span className="flex-1 text-xs font-semibold text-base-content/40">
+                  {running && <span className="loading loading-spinner loading-xs mr-1" />}Log
+                </span>
+                {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs">wyczysc</button>}
+              </div>
+              <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-2 text-[11px] font-mono whitespace-pre-wrap break-all text-base-content/60">{log.join('\n')}</pre>
+            </div>
+          ) : project && (
+            <div className="p-2">
+              <button onClick={() => { runPipeline(); setLeftOpen(false) }}
+                className="btn btn-sm btn-success w-full">Analizuj</button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       </div>
       {running && <progress className="progress progress-primary w-full fixed top-0 left-0 z-50 h-1" />}
