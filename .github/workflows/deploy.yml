@@ -17,12 +17,12 @@ jobs:
         with:
           node-version: 20
       - name: Install and build
-        working-directory: examples/playground
+        working-directory: app
         run: npm install && npx vite build
       - name: Deploy to obieg-zero.github.io
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.DEPLOY_TOKEN }}
           external_repository: obieg-zero/obieg-zero.github.io
-          publish_dir: examples/playground/dist
+          publish_dir: app/dist
           publish_branch: main

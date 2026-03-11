@@ -3,7 +3,7 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, List, Upload, FileText, Layers, Cpu, Globe, GitBranch, Moon, Sun } from 'react-feather'
+import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, Menu, ChevronLeft, Upload, FileText, Layers, Cpu, Globe, GitBranch, Moon, Sun, Shield } from 'react-feather'
 import { opfs } from './store'
 import { TEMPLATES, BIELIK } from './templates'
 import { nodeTypes } from './nodes'
@@ -138,7 +138,7 @@ export function App() {
 
           {/* projects */}
           <div className="px-4 pt-4 pb-2">
-            <Lbl>Projects</Lbl>
+            <Lbl>Projekty</Lbl>
           </div>
           {projects.map(name => (
             <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
@@ -161,7 +161,7 @@ export function App() {
           {project && <>
             <div className="border-t border-base-300" />
             <div className="px-4 pt-4 pb-2">
-              <Lbl>Pipeline</Lbl>
+              <Lbl>Schemat</Lbl>
             </div>
             <div className="flex gap-1 mx-2 mb-2">
               <button onClick={() => setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'templates' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
@@ -187,7 +187,7 @@ export function App() {
         </div>
 
         <div className="border-t border-base-300 px-4 p-3 flex items-center h-[56px]">
-          <div className="text-2xs text-base-content/20">Your data never leaves your machine.</div>
+          <div className="text-2xs text-base-content/20">Twoje dane nie opuszczają tego urządzenia.</div>
         </div>
       </div>
 
@@ -195,7 +195,7 @@ export function App() {
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
         <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
           <div className="flex-1 flex items-center">
-            <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm -ml-3 border-r border-base-300 rounded-none md:hidden">{leftOpen ? <X size={16} /> : <List size={16} />}</button>
+            <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm -ml-2 border-r border-base-300 rounded-none md:hidden">{leftOpen ? <ChevronLeft size={16} /> : <Menu size={16} />}</button>
             <span className="text-xs font-black text-primary ml-2">OBIEG-ZERO</span>
           </div>
           <div className="flex-none flex items-center gap-1">
@@ -208,10 +208,14 @@ export function App() {
         {!project ? (
           <div className="hero flex-1">
             <div className="hero-content text-center">
-              <div className="max-w-md space-y-3">
+              <div className="max-w-md space-y-4">
                 <h1 className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</h1>
-                <p className="text-xs text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</p>
-                <p className="text-2xs text-base-content/20">Create a project from the sidebar.</p>
+                <p className="text-xs text-base-content/50">Analiza dokumentów z&nbsp;Bielikiem — lokalnie, w&nbsp;przeglądarce.</p>
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20 text-xs text-success">
+                  <Shield size={14} />
+                  <span>100% prywatnie — dane nie opuszczają Twojego urządzenia</span>
+                </div>
+                <p className="text-2xs text-base-content/20">Utwórz projekt w sidebarze i wybierz szablon.</p>
               </div>
             </div>
           </div>
@@ -228,7 +232,7 @@ export function App() {
                 <div className="navbar min-h-10 h-10 px-3">
                   {running && <span className="loading loading-spinner loading-xs text-warning mr-2" />}
                   <Terminal size={12} className="text-base-content/25 mr-2" />
-                  <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Log</span>
+                  <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Dziennik</span>
                   {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
                 </div>
                 <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-4 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>

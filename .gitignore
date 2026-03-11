@@ -5,4 +5,4 @@ dist/
 .env
 
 # prawdziwe dokumenty — nie commitowac
-WIBOR-PRZYKLAD/
+samples-docs/

@@ -17,13 +17,32 @@ Przyklad:
 
 Zero parsowania, zero regexow, zero JSON.parse. Ta zasada jest niepodwazalna.
 
-## Stan projektu: walidacja
+## Stan projektu: optymalizacja Bielika
 
-Benchmark w `WIBOR-PRZYKLAD/benchmark.md`. Kluczowe wyniki:
+Architektura RAG dziala. Waskie gardlo to jakosc i szybkosc modelu.
+
+### Znane wyniki (benchmark WIBOR)
 - Bielik sentence starters: 6/8 (75%), Bielik pytania: 4/8 (50%), GPT-4o-mini: 7/8 (88%)
 - Bielik ~53s/wywolanie w WASM, GPT-4o-mini ~1s/wywolanie
 - Bielik dobrze kopiuje liczby, halucynuje nazwy wlasne, myli WIBOR z marza
-- GPT potwierdza ze pipeline RAG jest poprawny — waskie gardlo to model, nie architektura
+- Pipeline RAG jest poprawny — waskie gardlo to model, nie architektura
+
+### Kierunki optymalizacji jakosci
+- **Prompt format**: chatTemplate=true vs raw prompt — chat template dodaje tokeny overhead, sprawdzic co daje lepsze wyniki
+- **Ciecie chunka w prompcie**: `hit.text.slice(0, 300)` tnie na 300 zn, moze ciac w pol slowa/liczby — lepiej ciac na granicy zdania
+- **topK**: topK=2 = 2 wywolania LLM na pytanie. Jesli pierwszy chunk jest dobry, drugi moze mylic. Testowac topK=1
+- **Sentence starters**: dobierac do konkretnego dokumentu — inne dla faktury gazowej, inne dla umowy kredytowej
+
+### Kierunki optymalizacji szybkosci
+- **Embedding model**: `Xenova/multilingual-e5-small` (q8) — sprawdzic mniejsze modele (e5-xsmall, gte-small) pod katem quality vs speed
+- **nCtx**: 512 — jesli prompt+odpowiedz miesci sie w 256, nCtx=256 moze przyspieszyc
+- **Quantization**: Q4_K_M to dobry balans. Q4_0 szybszy ale gorszy. Nie schodzic nizej
+- **nPredict**: 16 tokenow — dla liczb/dat wystarczy, dla nazw wlasnych moze za malo
+
+### Czego potrzebujemy
+- **Benchmark powtarzalny**: zestaw dokumentow + pytania + oczekiwane odpowiedzi, uruchamiany automatycznie
+- **Metryki**: trafnosc (% poprawnych), czas/wywolanie, rozmiar paczek (MB)
+- **Porownanie**: kazda zmiana (prompt, model, parametry) mierzona tym samym benchmarkiem
 
 ## Architektura: szyna OPFS + Dexie
 
@@ -73,14 +92,17 @@ Kazdy klocek to pure functions + handle pattern:
 React Flow canvas z sidebar. Drag & drop blokow, wizualne laczenie, wyniki wewnatrz nodow.
 
 ```
-examples/playground/
-├── App.tsx        — React Flow canvas + sidebar + runner (topoSort)
-├── blocks.ts      — pure functions: Upload, Parse, Embed, Extract, Graph
-├── nodes.tsx      — custom React Flow nodes (Shell, UploadNode, DataNode)
-├── store.ts       — singletony: opfs, db (StoreDB), embedder, llm
-├── templates.ts   — szablony: Analiza WIBOR, WIBOR (API)
-├── main.tsx       — entry point
-└── index.css      — tailwind + daisyui + xyflow
+app/
+├── src/
+│   ├── App.tsx        — React Flow canvas + sidebar + runner (topoSort)
+│   ├── blocks.ts      — pure functions: Upload, Parse, Embed, Extract, Graph
+│   ├── nodes.tsx      — custom React Flow nodes (Shell, UploadNode, DataNode)
+│   ├── store.ts       — singletony: opfs, db (StoreDB), embedder, llm
+│   ├── templates.ts   — szablony: Analiza WIBOR, Faktura za gaz, WIBOR (API)
+│   ├── main.tsx       — entry point
+│   └── index.css      — tailwind + daisyui + xyflow
+└── public/
+    └── samples/       — przykladowe dokumenty do testow (faktura gazowa etc.)
 ```
 
 ### ZASADA: bloki MUSZA uzywac pakietow
@@ -162,21 +184,19 @@ test-mini.txt --kredytobiorca to----> Jan Kowalski
 - SharedArrayBuffer (wllama multi-thread) wymaga COOP/COEP headers
 - Faza eksploracyjna — bez testow, kierunek moze sie zmienic
 
-## Projekty w repo
+## Struktura repo
 
 ```
-examples/
-├── playground/        — AKTYWNY workbench (React Flow, packages, Dexie szyna)
-├── old-playground/    — starszy playground (hardcoded pipeline)
-├── doc-analyzer/      — LEGACY, nie rozwijac
-WIBOR-PRZYKLAD/        — testowe dokumenty + benchmark Bielika
+app/                   — workbench (React Flow, packages, Dexie szyna)
+app/public/samples/    — przykladowe dokumenty do testow
+packages/              — niezalezne klocki (store, ocr, embed, llm, graph)
 ```
 
 ## Workflow
 
 ```bash
 # Dev
-cd examples/playground && npm run dev
+cd app && yarn dev
 
 # Publish zmian w pakietach
 cd packages/<name> && npm version patch --no-git-tag-version && npm publish --access public

@@ -33,6 +33,17 @@ export const TEMPLATES: Template[] = [
     ]),
   },
   {
+    id: 'faktura-gaz',
+    name: 'Faktura za gaz',
+    ...pipe([
+      { type: 'upload', label: 'Upload' },
+      { type: 'parse', label: 'Parse', config: { language: 'pol' } },
+      { type: 'embed', label: 'Embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+      { type: 'extract', label: 'Extract', config: { questions: 'Nazwa sprzedawcy to\nNumer faktury to\nOkres rozliczeniowy to\nZuzycie gazu w m3 wynosi\nZuzycie gazu w kWh wynosi\nWspolczynnik konwersji wynosi\nKwota brutto do zaplaty wynosi\nGrupa taryfowa to\nOplata abonamentowa wynosi\nOplata stala wynosi', topK: '2', modelUrl: BIELIK } },
+      { type: 'graph', label: 'Graph' },
+    ]),
+  },
+  {
     id: 'wibor-api',
     name: 'WIBOR (API)',
     ...pipe([
