@@ -131,58 +131,67 @@ export function App() {
     <div className="h-screen bg-base-200 overflow-hidden text-sm">
       <div className={`flex flex-row h-full transition-transform duration-300 ease-in-out ${leftOpen ? '' : 'max-md:-translate-x-72'}`}>
 
-      {/* LEFT */}
+      {/* LEFT — px-4 py-3 grid, h-8 items, text-xs base */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
+        <div className="flex items-center h-10 px-4 shrink-0 border-b border-base-300">
           <Folder size={14} className="text-base-content/40 mr-2" />
           <span className="text-xs font-semibold text-base-content/40">Projects</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {projects.length > 0 && <ul className="menu menu-sm p-0">
-            <li className="menu-title text-2xs px-0">Active ({projects.length})</li>
-            {projects.map(name => (
-              <li key={name}><a onClick={() => { selectProject(name); setLeftOpen(false) }} className={project === name ? 'active' : ''}>
-                <span className="truncate flex-1">{name}</span>
-                <X size={12} className="opacity-20 hover:opacity-100" onClick={e => { e.preventDefault(); e.stopPropagation(); removeProject(name) }} />
-              </a></li>
-            ))}
-          </ul>}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-6">
 
-          <div className="form-control gap-2">
-            <Lbl>New project</Lbl>
-            <div className="join w-full">
+          {/* project list */}
+          {projects.length > 0 && <div className="space-y-1">
+            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Active ({projects.length})</div>
+            {projects.map(name => (
+              <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
+                className={`flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-base-200 text-base-content/70'}`}>
+                <span className="truncate flex-1">{name}</span>
+                <X size={12} className="shrink-0 opacity-0 hover:opacity-100 group-hover:opacity-30" onClick={e => { e.stopPropagation(); removeProject(name) }} />
+              </div>
+            ))}
+          </div>}
+
+          {/* new project */}
+          <div className="space-y-2">
+            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">New project</div>
+            <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
-                placeholder="nazwa..." className="input input-bordered input-sm join-item flex-1" />
-              <button onClick={createProject} className="btn btn-sm btn-primary join-item"><Plus size={14} /></button>
+                placeholder="nazwa..." className="input input-bordered input-sm flex-1" />
+              <button onClick={createProject} className="btn btn-sm btn-primary"><Plus size={14} /></button>
             </div>
           </div>
 
-          {project && <>
-            <div className="divider my-0" />
-            <div role="tablist" className="tabs tabs-box tabs-sm">
-              <a role="tab" onClick={() => setLeftTab('templates')} className={`tab gap-2 ${leftTab === 'templates' ? 'tab-active' : ''}`}><Layout size={14} />Szablony</a>
-              <a role="tab" onClick={() => setLeftTab('blocks')} className={`tab gap-2 ${leftTab === 'blocks' ? 'tab-active' : ''}`}><Grid size={14} />Bloki</a>
+          {/* templates / blocks */}
+          {project && <div className="space-y-3">
+            <div className="border-t border-base-content/5 pt-3" />
+            <div className="flex gap-1">
+              <button onClick={() => setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'templates' ? 'bg-base-200 font-semibold' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
+              <button onClick={() => setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${leftTab === 'blocks' ? 'bg-base-200 font-semibold' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
-              <ul className="menu menu-sm p-0">{TEMPLATES.map(t => (
-                <li key={t.id}><a onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}>
-                  <div className="leading-tight"><div className="font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
-                </a></li>))}</ul>
+              <div className="space-y-1">{TEMPLATES.map(t => (
+                <div key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
+                  className="flex flex-col justify-center h-12 px-2 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
+                  <div className="text-xs font-semibold">{t.name}</div>
+                  <div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div>
+                </div>))}</div>
             ) : (
               <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
                 const I = p.icon; return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="btn btn-ghost btn-sm h-auto flex-col gap-2 py-3 cursor-grab">
-                    <I size={14} /><span className="text-2xs font-medium">{p.label}</span>
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
+                    className="flex flex-col items-center justify-center h-16 rounded-md hover:bg-base-200 cursor-grab transition-colors">
+                    <I size={14} className="text-base-content/50 mb-1" /><span className="text-2xs text-base-content/40">{p.label}</span>
                   </div>)
               })}</div>
             )}
-          </>}
+          </div>}
         </div>
 
-        <div className="border-t border-base-300 p-3 space-y-2">
-          <a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="btn btn-ghost btn-sm btn-block justify-start gap-2"><GitBranch size={14} />obieg-zero</a>
-          <div className="badge badge-ghost badge-sm w-full gap-1 text-2xs">Your data never leaves your machine</div>
+        <div className="px-4 py-3 border-t border-base-content/5 space-y-2">
+          <a href="https://github.com/obieg-zero" target="_blank" rel="noopener"
+            className="flex items-center h-8 px-2 rounded-md text-xs text-base-content/50 hover:bg-base-200 transition-colors"><GitBranch size={12} className="mr-2" />obieg-zero</a>
+          <div className="text-2xs text-base-content/20 px-2">Your data never leaves your machine.</div>
         </div>
       </div>
 
