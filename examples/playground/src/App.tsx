@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, type DragEvent } from 'react'
 import {
-  ReactFlow, Background, addEdge, applyNodeChanges, applyEdgeChanges,
+  ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
 import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, List, Upload, FileText, Layers, Cpu, Globe, GitBranch, Moon, Sun } from 'react-feather'
@@ -224,9 +224,7 @@ export function App() {
             <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
               onConnect={onConnect} onInit={i => { rfInstance.current = i }} onDrop={onDrop}
               onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-              nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }}>
-              <Background gap={16} size={1} />
-            </ReactFlow>
+              nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
           </div>
           <div className="border-t border-base-300">
             {running || log.length > 0 ? (
