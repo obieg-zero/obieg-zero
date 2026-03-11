@@ -27,7 +27,7 @@ function Shell({ id, data, children }: { id: string; data: any; children?: React
 
       {/* result row — bg-base-300 rounded, like doc rows */}
       {data.result && (
-        <div className={`flex items-center gap-2 rounded px-3 py-1.5 mb-2 ${err ? 'bg-error/10' : 'bg-base-300'}`}>
+        <div className={`flex items-center gap-2 rounded px-3 py-2 mb-2 ${err ? 'bg-error/10' : 'bg-base-300'}`}>
           <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[data.status] || 'bg-base-content/15'}`} />
           <span className={`text-xs flex-1 ${err ? 'text-error/80' : 'text-base-content/50'}`}>{data.result}</span>
         </div>
@@ -39,7 +39,7 @@ function Shell({ id, data, children }: { id: string; data: any; children?: React
       {cfg && <details>
         <summary className="text-2xs text-base-content/20 cursor-pointer hover:text-base-content/40 transition-colors select-none mt-2">config</summary>
         <div className="mt-2 space-y-1">{cfg.map(([k, v]) => (
-          <div key={k} className="bg-base-300 rounded px-3 py-1.5">
+          <div key={k} className="bg-base-300 rounded px-3 py-2">
             <div className="text-2xs text-base-content/30 mb-1">{k}</div>
             {String(v).includes('\n') || String(v).length > 50
               ? <textarea value={String(v)} rows={2} onChange={e => onCfg(k, e.target.value)}
@@ -63,7 +63,7 @@ function UploadNode({ id, data }: NodeProps) {
   const { updateNodeData } = useReactFlow()
   return (
     <Shell id={id} data={{ ...data, _blockType: 'upload' }}>
-      <label className={`flex items-center justify-center gap-2 rounded px-3 py-1.5 cursor-pointer transition-colors
+      <label className={`flex items-center justify-center gap-2 rounded px-3 py-2 cursor-pointer transition-colors
         ${data._fileNames ? 'bg-base-300' : 'bg-base-300/50 border border-dashed border-base-content/10 hover:bg-base-300'}`}>
         {data._fileNames
           ? <><FileText size={12} className="shrink-0 text-base-content/40" /><span className="text-xs text-base-content/50 truncate">{data._fileNames as string}</span></>
@@ -79,7 +79,7 @@ function UploadNode({ id, data }: NodeProps) {
 
 function DataNode({ data }: NodeProps) {
   return (
-    <div className="flex items-center gap-2 bg-base-300 rounded px-3 py-1.5 max-w-48">
+    <div className="flex items-center gap-2 bg-base-300 rounded px-3 py-2 max-w-48">
       <Handle type="target" position={Position.Left} id="left" />
       <Handle type="target" position={Position.Right} id="right" />
       <FileText size={12} className="shrink-0 text-base-content/40" />

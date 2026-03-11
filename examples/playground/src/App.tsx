@@ -18,7 +18,9 @@ const PALETTE = [
   { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
 ]
 
-const Lbl = ({ children }: { children: string }) => <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">{children}</div>
+/* scale: text-2xs(10) → text-xs(12) → text-sm(14=base) | spacing: 2(8) → 3(12) → 4(16) | gap: 2(8) | icons: 12-14 | headers: h-10 px-3 */
+
+const Lbl = ({ children }: { children: React.ReactNode }) => <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">{children}</div>
 
 export function App() {
   const [nodes, setNodes] = useState<Node[]>([])
@@ -131,8 +133,9 @@ export function App() {
 
       {/* LEFT */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="flex items-center gap-1.5 px-3 h-10 shrink-0 border-b border-base-300">
-          <Folder size={12} className="text-base-content/40" /><span className="text-xs font-semibold text-base-content/40">Projects</span>
+        <div className="flex items-center gap-2 px-3 h-10 shrink-0 border-b border-base-300">
+          <Folder size={12} className="text-base-content/40" />
+          <span className="text-xs font-semibold text-base-content/40">Projects</span>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
           {projects.length > 0 && <div className="space-y-1">
@@ -149,33 +152,33 @@ export function App() {
           </div>}
           <div className="space-y-1">
             <Lbl>New project</Lbl>
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
                 placeholder="nazwa..." className="input input-bordered input-xs flex-1" />
               <button onClick={createProject} className="btn btn-xs btn-primary"><Plus size={12} /></button>
             </div>
           </div>
-          {project && <div className="pt-3 border-t border-base-300 space-y-3">
-            <div className="flex gap-1">
-              <button onClick={() => setLeftTab('templates')} className={`btn btn-ghost btn-xs gap-1 ${leftTab === 'templates' ? 'btn-active' : ''}`}><Layout size={11} />Szablony</button>
-              <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-xs gap-1 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={11} />Bloki</button>
+          {project && <div className="pt-4 border-t border-base-300 space-y-3">
+            <div className="flex gap-2">
+              <button onClick={() => setLeftTab('templates')} className={`btn btn-ghost btn-xs gap-2 ${leftTab === 'templates' ? 'btn-active' : ''}`}><Layout size={12} />Szablony</button>
+              <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-xs gap-2 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={12} />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
               <div className="space-y-1">{TEMPLATES.map(t => (
-                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1.5">
+                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-2">
                   <div className="leading-tight"><div className="text-xs font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
                 </button>))}</div>
             ) : (
-              <div className="grid grid-cols-3 gap-1.5">{PALETTE.map(p => {
+              <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
                 const I = p.icon; return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="flex flex-col items-center gap-1 rounded bg-base-200 hover:bg-base-300 cursor-grab py-2.5 transition-colors">
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="flex flex-col items-center gap-1 rounded bg-base-200 hover:bg-base-300 cursor-grab py-3 transition-colors">
                     <I size={14} className="text-base-content/40" /><span className="text-2xs font-medium text-base-content/50">{p.label}</span>
                   </div>)
               })}</div>
             )}
           </div>}
         </div>
-        <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
+        <div className="shrink-0 border-t border-base-300 px-3 py-3 text-2xs text-base-content/20 space-y-0.5">
           <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — playground</div>
           <div className="text-base-content/80">Your data never leaves your machine.</div>
         </div>
@@ -185,19 +188,19 @@ export function App() {
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
         <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
           <span className="text-xs font-black text-primary flex items-center">
-            <button onClick={() => setLeftOpen(!leftOpen)} className="flex items-center justify-center w-10 h-10 -ml-3 border-r border-base-300 hover:bg-base-200 md:hidden">{leftOpen ? <X size={18} /> : <List size={18} />}</button>
+            <button onClick={() => setLeftOpen(!leftOpen)} className="flex items-center justify-center w-10 h-10 -ml-3 border-r border-base-300 hover:bg-base-200 md:hidden">{leftOpen ? <X size={16} /> : <List size={16} />}</button>
             <span className="ml-3">OBIEG-ZERO</span>
           </span>
-          <div className="flex items-center gap-1">
-            {project && <span className="text-2xs text-base-content/25 mr-2">{project}</span>}
+          <div className="flex items-center gap-2">
+            {project && <span className="text-2xs text-base-content/25">{project}</span>}
             {log.length > 0 && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/30"><Trash2 size={12} /></button>}
-            <button onClick={() => { const d = !dark; document.documentElement.dataset.theme = d ? 'dracula' : 'corporate'; setDark(d) }} className="btn btn-ghost btn-xs btn-square">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
+            <button onClick={() => { const d = !dark; document.documentElement.dataset.theme = d ? 'dracula' : 'corporate'; setDark(d) }} className="btn btn-ghost btn-xs btn-square">{dark ? <Sun size={14} /> : <Moon size={14} />}</button>
           </div>
         </div>
         {!project ? (
-          <div className="flex flex-col items-center justify-center flex-1 max-w-md mx-auto gap-6 text-center">
-            <div className="text-3xl font-black text-primary tracking-tight">OBIEG-ZERO</div>
-            <div className="text-sm text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</div>
+          <div className="flex flex-col items-center justify-center flex-1 max-w-md mx-auto gap-4 text-center">
+            <div className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</div>
+            <div className="text-xs text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</div>
             <div className="text-2xs text-base-content/20">Create a project from the sidebar.</div>
           </div>
         ) : (<>
@@ -212,16 +215,16 @@ export function App() {
           <div className="border-t border-base-300">
             {running || log.length > 0 ? (
               <div className="flex flex-col max-h-48">
-                <div className="flex items-center gap-1.5 px-3 h-8 shrink-0">
+                <div className="flex items-center gap-2 px-3 h-10 shrink-0">
                   {running && <span className="loading loading-spinner loading-xs text-warning" />}
-                  <Terminal size={11} className="text-base-content/25" />
+                  <Terminal size={12} className="text-base-content/25" />
                   <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Log</span>
-                  {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/20"><Trash2 size={10} /></button>}
+                  {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/20"><Trash2 size={12} /></button>}
                 </div>
-                <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-2 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
+                <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-3 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
               </div>
             ) : (
-              <div className="p-2"><button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running} className="btn btn-primary btn-sm w-full gap-1.5"><Play size={12} />Analizuj</button></div>
+              <div className="p-3"><button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running} className="btn btn-primary btn-sm w-full gap-2"><Play size={14} />Analizuj</button></div>
             )}
           </div>
         </>)}
