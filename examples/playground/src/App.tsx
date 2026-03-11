@@ -145,9 +145,9 @@ export function App() {
             <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mb-2">Active ({projects.length})</div>
             {projects.map(name => (
               <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-base-200 text-base-content/70'}`}>
+                className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer transition-colors ${project === name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-base-200 text-base-content/70'}`}>
                 <span className="truncate flex-1">{name}</span>
-                <X size={12} className="shrink-0 opacity-0 hover:opacity-100 group-hover:opacity-30" onClick={e => { e.stopPropagation(); removeProject(name) }} />
+                <X size={12} className="shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-100" onClick={e => { e.stopPropagation(); removeProject(name) }} />
               </div>
             ))}
           </div>}
