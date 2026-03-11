@@ -139,8 +139,8 @@ export function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {projects.length > 0 && <ul className="menu menu-sm bg-base-200 rounded-lg p-1">
-            <li className="menu-title text-2xs">Active ({projects.length})</li>
+          {projects.length > 0 && <ul className="menu menu-sm p-0">
+            <li className="menu-title text-2xs px-0">Active ({projects.length})</li>
             {projects.map(name => (
               <li key={name}><a onClick={() => { selectProject(name); setLeftOpen(false) }} className={project === name ? 'active' : ''}>
                 <span className="truncate flex-1">{name}</span>
@@ -165,7 +165,7 @@ export function App() {
               <a role="tab" onClick={() => setLeftTab('blocks')} className={`tab gap-2 ${leftTab === 'blocks' ? 'tab-active' : ''}`}><Grid size={14} />Bloki</a>
             </div>
             {leftTab === 'templates' ? (
-              <ul className="menu menu-sm bg-base-200 rounded-lg p-1">{TEMPLATES.map(t => (
+              <ul className="menu menu-sm p-0">{TEMPLATES.map(t => (
                 <li key={t.id}><a onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}>
                   <div className="leading-tight"><div className="font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
                 </a></li>))}</ul>
