@@ -176,9 +176,11 @@ export function App() {
             )}
           </div>}
         </div>
-        <div className="shrink-0 border-t border-base-300 px-3 py-3 text-2xs text-base-content/20 space-y-1">
-          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — playground</div>
-          <div className="text-base-content/80">Your data never leaves your machine.</div>
+        <div className="shrink-0 border-t border-base-300 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="btn btn-ghost btn-sm btn-block justify-start gap-2 text-xs font-semibold"><GitBranch size={14} />obieg-zero</a>
+          </div>
+          <div className="badge badge-ghost badge-sm w-full gap-1 text-2xs">🔒 Your data never leaves your machine</div>
         </div>
       </div>
 
