@@ -133,75 +133,82 @@ export function App() {
 
       {/* LEFT */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="flex items-center gap-2 px-3 h-10 shrink-0 border-b border-base-300">
-          <Folder size={12} className="text-base-content/40" />
+        <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
+          <Folder size={14} className="text-base-content/40 mr-2" />
           <span className="text-xs font-semibold text-base-content/40">Projects</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-4">
-          {projects.length > 0 && <div className="space-y-2">
-            <Lbl>Active ({projects.length})</Lbl>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {projects.length > 0 && <ul className="menu menu-sm bg-base-200 rounded-lg p-1">
+            <li className="menu-title text-2xs">Active ({projects.length})</li>
             {projects.map(name => (
-              <button key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`btn btn-ghost btn-sm w-full justify-between ${project === name ? 'btn-active' : ''}`}>
-                <span className="text-xs font-semibold truncate">{name}</span>
-                <span onClick={e => { e.stopPropagation(); removeProject(name) }} className="opacity-20 hover:opacity-100"><X size={12} /></span>
-              </button>
+              <li key={name}><a onClick={() => { selectProject(name); setLeftOpen(false) }} className={project === name ? 'active' : ''}>
+                <span className="truncate flex-1">{name}</span>
+                <X size={12} className="opacity-20 hover:opacity-100" onClick={e => { e.preventDefault(); e.stopPropagation(); removeProject(name) }} />
+              </a></li>
             ))}
-          </div>}
-          <div className="space-y-2">
+          </ul>}
+
+          <div className="form-control gap-2">
             <Lbl>New project</Lbl>
-            <div className="flex gap-2">
+            <div className="join w-full">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
-                placeholder="nazwa..." className="input input-bordered input-sm flex-1" />
-              <button onClick={createProject} className="btn btn-sm btn-primary"><Plus size={14} /></button>
+                placeholder="nazwa..." className="input input-bordered input-sm join-item flex-1" />
+              <button onClick={createProject} className="btn btn-sm btn-primary join-item"><Plus size={14} /></button>
             </div>
           </div>
-          {project && <div className="pt-4 border-t border-base-300 space-y-3">
-            <div className="flex gap-2">
-              <button onClick={() => setLeftTab('templates')} className={`btn btn-ghost btn-sm gap-2 ${leftTab === 'templates' ? 'btn-active' : ''}`}><Layout size={14} />Szablony</button>
-              <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-sm gap-2 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={14} />Bloki</button>
+
+          {project && <>
+            <div className="divider my-0" />
+            <div role="tablist" className="tabs tabs-box tabs-sm">
+              <a role="tab" onClick={() => setLeftTab('templates')} className={`tab gap-2 ${leftTab === 'templates' ? 'tab-active' : ''}`}><Layout size={14} />Szablony</a>
+              <a role="tab" onClick={() => setLeftTab('blocks')} className={`tab gap-2 ${leftTab === 'blocks' ? 'tab-active' : ''}`}><Grid size={14} />Bloki</a>
             </div>
             {leftTab === 'templates' ? (
-              <div className="space-y-2">{TEMPLATES.map(t => (
-                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-sm w-full justify-start text-left h-auto py-2">
-                  <div className="leading-tight"><div className="text-xs font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
-                </button>))}</div>
+              <ul className="menu menu-sm bg-base-200 rounded-lg p-1">{TEMPLATES.map(t => (
+                <li key={t.id}><a onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}>
+                  <div className="leading-tight"><div className="font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
+                </a></li>))}</ul>
             ) : (
               <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
                 const I = p.icon; return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="btn btn-ghost h-auto flex-col gap-2 py-3 cursor-grab">
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="btn btn-ghost btn-sm h-auto flex-col gap-2 py-3 cursor-grab">
                     <I size={14} /><span className="text-2xs font-medium">{p.label}</span>
                   </div>)
               })}</div>
             )}
-          </div>}
+          </>}
         </div>
-        <div className="shrink-0 border-t border-base-300 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="btn btn-ghost btn-sm btn-block justify-start gap-2 text-xs font-semibold"><GitBranch size={14} />obieg-zero</a>
-          </div>
-          <div className="badge badge-ghost badge-sm w-full gap-1 text-2xs">🔒 Your data never leaves your machine</div>
+
+        <div className="border-t border-base-300 p-3 space-y-2">
+          <a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="btn btn-ghost btn-sm btn-block justify-start gap-2"><GitBranch size={14} />obieg-zero</a>
+          <div className="badge badge-ghost badge-sm w-full gap-1 text-2xs">Your data never leaves your machine</div>
         </div>
       </div>
 
       {/* CENTER */}
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
-        <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
-          <span className="text-xs font-black text-primary flex items-center">
+        <div className="navbar min-h-10 h-10 px-3 border-b border-base-300">
+          <div className="flex-1 flex items-center">
             <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm -ml-3 border-r border-base-300 rounded-none md:hidden">{leftOpen ? <X size={16} /> : <List size={16} />}</button>
-            <span className="ml-3">OBIEG-ZERO</span>
-          </span>
-          <div className="flex items-center gap-2">
-            {project && <span className="text-2xs text-base-content/25">{project}</span>}
-            {log.length > 0 && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/30"><Trash2 size={12} /></button>}
+            <span className="text-xs font-black text-primary ml-2">OBIEG-ZERO</span>
+          </div>
+          <div className="flex-none flex items-center gap-1">
+            {project && <span className="badge badge-ghost badge-sm text-2xs">{project}</span>}
+            {log.length > 0 && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
             <button onClick={() => { const d = !dark; document.documentElement.dataset.theme = d ? 'dracula' : 'corporate'; setDark(d) }} className="btn btn-ghost btn-xs btn-square">{dark ? <Sun size={14} /> : <Moon size={14} />}</button>
           </div>
         </div>
+
         {!project ? (
-          <div className="flex flex-col items-center justify-center flex-1 max-w-md mx-auto gap-4 text-center">
-            <div className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</div>
-            <div className="text-xs text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</div>
-            <div className="text-2xs text-base-content/20">Create a project from the sidebar.</div>
+          <div className="hero flex-1">
+            <div className="hero-content text-center">
+              <div className="max-w-md space-y-3">
+                <h1 className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</h1>
+                <p className="text-xs text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</p>
+                <p className="text-2xs text-base-content/20">Create a project from the sidebar.</p>
+              </div>
+            </div>
           </div>
         ) : (<>
           <div className="flex-1">
@@ -215,11 +222,11 @@ export function App() {
           <div className="border-t border-base-300">
             {running || log.length > 0 ? (
               <div className="flex flex-col max-h-48">
-                <div className="flex items-center gap-2 px-3 h-10 shrink-0">
-                  {running && <span className="loading loading-spinner loading-xs text-warning" />}
-                  <Terminal size={12} className="text-base-content/25" />
+                <div className="navbar min-h-10 h-10 px-3">
+                  {running && <span className="loading loading-spinner loading-xs text-warning mr-2" />}
+                  <Terminal size={12} className="text-base-content/25 mr-2" />
                   <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Log</span>
-                  {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/20"><Trash2 size={12} /></button>}
+                  {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
                 </div>
                 <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-3 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
               </div>
