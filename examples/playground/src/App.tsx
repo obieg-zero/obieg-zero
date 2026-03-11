@@ -3,7 +3,7 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, List, Upload, FileText, Layers, Cpu, Globe, GitBranch } from 'react-feather'
+import { Folder, Plus, Layout, Grid, Play, Terminal, Trash2, X, List, Upload, FileText, Layers, Cpu, Globe, GitBranch, Moon, Sun } from 'react-feather'
 import { opfs } from './store'
 import { TEMPLATES, BIELIK } from './templates'
 import { nodeTypes } from './nodes'
@@ -32,6 +32,7 @@ export function App() {
   const [running, setRunning] = useState(false)
   const [leftOpen, setLeftOpen] = useState(false)
   const [leftTab, setLeftTab] = useState<'templates' | 'blocks'>('templates')
+  const [dark, setDark] = useState(true)
   const logRef = useRef<HTMLPreElement>(null)
   const rfInstance = useRef<any>(null)
   const dataNodeSide = useRef(0)
@@ -47,8 +48,7 @@ export function App() {
   function savePipeline(p: string, n: Node[], e: Edge[]) {
     const pipe = n.filter(x => x.type !== 'data')
     const pipeIds = new Set(pipe.map(x => x.id))
-    const pipeEdges = e.filter(x => pipeIds.has(x.source) && pipeIds.has(x.target))
-    localStorage.setItem(`pipeline:${p}`, JSON.stringify({ nodes: pipe, edges: pipeEdges }))
+    localStorage.setItem(`pipeline:${p}`, JSON.stringify({ nodes: pipe, edges: e.filter(x => pipeIds.has(x.source) && pipeIds.has(x.target)) }))
   }
   function loadPipeline(p: string): { nodes: Node[]; edges: Edge[] } | null {
     try { return JSON.parse(localStorage.getItem(`pipeline:${p}`) || 'null') } catch { return null }
@@ -59,12 +59,9 @@ export function App() {
   const onConnect = useCallback((c: Connection) => setEdges(e => addEdge(c, e)), [])
 
   async function createProject() {
-    const name = newName.trim()
-    if (!name) return
+    const name = newName.trim(); if (!name) return
     await opfs.createProject(name)
-    setProjects(p => [...p, name])
-    setProject(name)
-    setNewName('')
+    setProjects(p => [...p, name]); setProject(name); setNewName('')
     setNodes([]); setEdges([]); setLog([])
   }
 
@@ -91,19 +88,17 @@ export function App() {
   }
 
   function onDragStart(e: DragEvent, type: string) {
-    e.dataTransfer.setData('application/reactflow', type)
-    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/reactflow', type); e.dataTransfer.effectAllowed = 'move'
   }
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
     const type = e.dataTransfer.getData('application/reactflow')
     if (!type || !rfInstance.current) return
-    const position = rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY })
-    const entry = PALETTE.find(p => p.type === type)
-    if (!entry) return
+    const entry = PALETTE.find(p => p.type === type); if (!entry) return
     setNodes(n => [...n, {
-      id: `${type}-${Date.now()}`, type, position,
+      id: `${type}-${Date.now()}`, type,
+      position: rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY }),
       data: { label: entry.label, config: { ...entry.config } },
     }])
   }
@@ -113,8 +108,7 @@ export function App() {
   function topoSort(): string[] {
     const pipeNodes = nodes.filter(n => n.type !== 'data')
     const pipeIds = new Set(pipeNodes.map(n => n.id))
-    const inDeg = new Map<string, number>()
-    const adj = new Map<string, string[]>()
+    const inDeg = new Map<string, number>(); const adj = new Map<string, string[]>()
     for (const n of pipeNodes) { inDeg.set(n.id, 0); adj.set(n.id, []) }
     for (const e of edges.filter(e => pipeIds.has(e.source) && pipeIds.has(e.target))) { adj.get(e.source)!.push(e.target); inDeg.set(e.target, (inDeg.get(e.target) || 0) + 1) }
     const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([id]) => id)
@@ -143,7 +137,7 @@ export function App() {
       id: `e:${parentId}→${item.id}`, source: parentId,
       sourceHandle: right ? 'data' : 'data-left', target: item.id,
       targetHandle: right ? 'left' : 'right',
-      style: { strokeDasharray: '4 2', stroke: '#d1d5db' },
+      style: { strokeDasharray: '4 2', stroke: '#6b7280' },
     }))])
   }
 
@@ -153,7 +147,6 @@ export function App() {
     addLog(`=== Projekt: ${project} ===`)
     setNodes(n => n.filter(x => x.type !== 'data'))
     setEdges(e => e.filter(x => !x.id.startsWith('e:') || !x.id.includes('→')))
-
     const sorted = topoSort()
     const ctx: Record<string, any> = { project }
 
@@ -161,9 +154,7 @@ export function App() {
       const node = nodes.find(n => n.id === nodeId)
       if (!node || node.type === 'data') continue
       const cfg = (node.data.config || {}) as Record<string, string>
-      setNodeResult(nodeId, 'running')
-      addLog(`>>> ${node.data.label}`)
-
+      setNodeResult(nodeId, 'running'); addLog(`>>> ${node.data.label}`)
       try {
         switch (node.type) {
           case 'upload': {
@@ -171,52 +162,42 @@ export function App() {
             if (!files.length) throw new Error('Brak plikow — kliknij "+ pliki"')
             await blockUpload(project, files, addLog)
             setNodeResult(nodeId, 'done', `${files.length} plikow: ${files.map(f => f.name).join(', ')}`)
-            addDataNodes(nodeId, files.map(f => ({ id: `d:file:${f.name}`, label: f.name })))
-            break
+            addDataNodes(nodeId, files.map(f => ({ id: `d:file:${f.name}`, label: f.name }))); break
           }
           case 'parse': {
             ctx.pages = await blockParse(project, cfg.language || 'pol', addLog)
             setNodeResult(nodeId, 'done', `${ctx.pages.length} stron, ${ctx.pages.reduce((s: number, p: any) => s + p.text.length, 0)} zn.`)
-            addDataNodes(nodeId, ctx.pages.slice(0, 5).map((p: any) => ({ id: `d:page:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.` })))
-            break
+            addDataNodes(nodeId, ctx.pages.slice(0, 5).map((p: any) => ({ id: `d:page:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.` }))); break
           }
           case 'embed': {
             const r = await blockEmbed(project, ctx.pages || [], cfg.model, parseInt(cfg.chunkSize) || 200, addLog)
             if (!r) throw new Error('Brak stron do embeddingu')
             ctx.chunks = r.chunks; ctx.embedFn = r.embedFn
             setNodeResult(nodeId, 'done', `${r.chunks.length} chunków po ~${cfg.chunkSize || 200} zn.`)
-            addDataNodes(nodeId, r.chunks.slice(0, 6).map((c: Chunk, i: number) => ({ id: `d:chunk:${i}`, label: `chunk ${i}`, detail: c.text.slice(0, 40) + '...' })))
-            break
+            addDataNodes(nodeId, r.chunks.slice(0, 6).map((c: Chunk, i: number) => ({ id: `d:chunk:${i}`, label: `chunk ${i}`, detail: c.text.slice(0, 40) + '...' }))); break
           }
           case 'extract': {
             const q = cfg.questions?.split('\n').map((s: string) => s.trim()).filter((s: string) => s) || []
             if (!q.length) throw new Error('Brak pytan — otworz config')
             if (!ctx.chunks?.length) throw new Error('Brak chunków — dodaj Embed')
             const stats = await blockExtract(ctx.chunks, ctx.embedFn, q, cfg.modelUrl, parseInt(cfg.topK) || 2, project, addLog)
-            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`)
-            break
+            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`); break
           }
           case 'extract-api': {
             const q = cfg.questions?.split('\n').map((s: string) => s.trim()).filter((s: string) => s) || []
             if (!cfg.apiKey) throw new Error('Brak API Key — otworz config')
             if (!ctx.chunks?.length) throw new Error('Brak chunków — dodaj Embed')
             const stats = await blockExtractApi(ctx.chunks, ctx.embedFn, q, cfg.apiUrl || '', cfg.apiKey, cfg.apiModel || 'gpt-4o-mini', parseInt(cfg.topK) || 2, project, addLog)
-            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`)
-            break
+            setNodeResult(nodeId, 'done', `${stats?.extracted || 0}/${stats?.total || 0} odpowiedzi`); break
           }
           case 'graph': {
             ctx.graph = await blockGraph(project, addLog)
             const values = ctx.graph.nodes.filter((n: any) => n.type !== 'document')
             setNodeResult(nodeId, 'done', `${ctx.graph.nodes.length} encji, ${ctx.graph.edges.length} relacji`)
-            addDataNodes(nodeId, values.map((n: any) => ({ id: `d:${n.id}`, label: n.label, detail: n.type })))
-            break
+            addDataNodes(nodeId, values.map((n: any) => ({ id: `d:${n.id}`, label: n.label, detail: n.type }))); break
           }
         }
-      } catch (e: any) {
-        addLog(`ERROR: ${e.message}`)
-        setNodeResult(nodeId, 'error', e.message)
-        break
-      }
+      } catch (e: any) { addLog(`ERROR: ${e.message}`); setNodeResult(nodeId, 'error', e.message); break }
     }
     addLog('--- done ---'); setRunning(false)
   }
@@ -227,124 +208,142 @@ export function App() {
     <div className="h-screen bg-base-200 overflow-hidden text-sm">
       <div className={`flex flex-row h-full transition-transform duration-300 ease-in-out ${leftOpen ? '' : 'max-md:-translate-x-72'}`}>
 
-      {/* === LEFT === */}
+      {/* LEFT */}
       <div className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300 min-h-0">
-        <div className="flex items-center gap-1.5 px-4 h-12 shrink-0 border-b border-base-300">
-          <Folder size={14} className="text-base-content/40" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-base-content/40">Projekty</span>
-          <span className="text-2xs text-base-content/20">{projects.length}</span>
+        <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
+          <span className="text-xs font-semibold text-base-content/40 flex items-center gap-1.5"><Folder size={12} />Projects</span>
         </div>
-
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
           {/* project list */}
-          <div className="space-y-1">
-            {projects.map(name => (
-              <button key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-colors ${project === name ? 'bg-primary/10 border border-primary/20' : 'hover:bg-base-200'}`}>
-                <div className="flex items-center gap-2">
-                  <Folder size={12} className={project === name ? 'text-primary' : 'text-base-content/30'} />
-                  <span className={`flex-1 truncate ${project === name ? 'font-semibold text-primary' : ''}`}>{name}</span>
-                  <button onClick={e => { e.stopPropagation(); removeProject(name) }}
-                    className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-base-content/20 hover:text-error transition-opacity">
-                    <Trash2 size={11} />
-                  </button>
+          {projects.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">Active ({projects.length})</div>
+              {projects.map(name => (
+                <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
+                  className={`w-full text-left rounded p-2 cursor-pointer ${project === name ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold truncate">{name}</span>
+                    <button onClick={e => { e.stopPropagation(); removeProject(name) }}
+                      className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* new project */}
-          <div className="join w-full">
-            <input value={newName} onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && createProject()}
-              placeholder="nowy projekt..." className="input input-bordered input-sm join-item flex-1 text-xs" />
-            <button onClick={createProject} className="btn btn-sm btn-primary join-item"><Plus size={14} /></button>
+          <div className="space-y-1">
+            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">New project</div>
+            <div className="flex gap-1.5">
+              <input value={newName} onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && createProject()}
+                placeholder="nazwa..." className="input input-bordered input-xs flex-1" />
+              <button onClick={createProject} className="btn btn-xs btn-primary"><Plus size={12} /></button>
+            </div>
           </div>
 
-          {/* tabs + content */}
+          {/* templates / blocks */}
           {project && <>
-            <div role="tablist" className="tabs tabs-bordered tabs-sm">
-              <button role="tab" className={`tab gap-1.5 ${leftTab === 'templates' ? 'tab-active' : ''}`} onClick={() => setLeftTab('templates')}>
-                <Layout size={12} />Szablony
-              </button>
-              <button role="tab" className={`tab gap-1.5 ${leftTab === 'blocks' ? 'tab-active' : ''}`} onClick={() => setLeftTab('blocks')}>
-                <Grid size={12} />Bloki
-              </button>
-            </div>
-
-            {leftTab === 'templates' ? (
-              <div className="space-y-2">{TEMPLATES.map(t => (
-                <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
-                  className="w-full text-left rounded-lg bg-base-200 hover:bg-base-300 p-3 transition-colors">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Play size={12} className="text-primary" />
-                    <span className="text-xs font-semibold">{t.name}</span>
-                  </div>
-                  <p className="text-2xs text-base-content/30 leading-relaxed">{t.nodes.map(n => n.data.label).join(' → ')}</p>
+            <div className="pt-3 border-t border-base-300 space-y-3">
+              <div className="flex gap-1">
+                <button onClick={() => setLeftTab('templates')}
+                  className={`btn btn-ghost btn-xs gap-1 ${leftTab === 'templates' ? 'btn-active' : ''}`}>
+                  <Layout size={11} />Szablony
                 </button>
-              ))}</div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">{PALETTE.map(p => {
-                const Icon = p.icon
-                return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
-                    className="flex flex-col items-center gap-1.5 rounded-lg bg-base-200 hover:bg-base-300 cursor-grab p-3 transition-colors">
-                    <Icon size={18} className="text-base-content/50" />
-                    <span className="text-2xs font-medium">{p.label}</span>
-                  </div>
-                )
-              })}</div>
-            )}
+                <button onClick={() => setLeftTab('blocks')}
+                  className={`btn btn-ghost btn-xs gap-1 ${leftTab === 'blocks' ? 'btn-active' : ''}`}>
+                  <Grid size={11} />Bloki
+                </button>
+              </div>
+
+              {leftTab === 'templates' ? (
+                <div className="space-y-1">{TEMPLATES.map(t => (
+                  <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }}
+                    className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-1.5">
+                    <div className="leading-tight">
+                      <div className="text-xs font-semibold">{t.name}</div>
+                      <div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div>
+                    </div>
+                  </button>
+                ))}</div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5">{PALETTE.map(p => {
+                  const Icon = p.icon
+                  return (
+                    <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)}
+                      className="flex flex-col items-center gap-1 rounded bg-base-200 hover:bg-base-300 cursor-grab py-2.5 transition-colors">
+                      <Icon size={14} className="text-base-content/40" />
+                      <span className="text-2xs font-medium text-base-content/50">{p.label}</span>
+                    </div>
+                  )
+                })}</div>
+              )}
+            </div>
           </>}
         </div>
 
-        {/* left footer */}
-        <div className="px-4 py-3 border-t border-base-300">
-          <span className="text-2xs text-base-content/20">obieg-zero playground</span>
+        <div className="shrink-0 border-t border-base-300 px-3 py-2 text-2xs text-base-content/20 space-y-0.5">
+          <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — playground</div>
+          <div className="text-base-content/80">Your data never leaves your machine.</div>
         </div>
       </div>
 
-      {/* === CENTER === */}
+      {/* CENTER */}
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
-        <div className="flex items-center gap-2 px-4 h-12 shrink-0 border-b border-base-300">
-          <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm md:hidden -ml-2">
-            {leftOpen ? <X size={16} /> : <List size={16} />}
-          </button>
-          <span className="text-sm font-black tracking-tight text-primary">OBIEG-ZERO</span>
-          <span className="flex-1" />
-          {project && <span className="text-2xs text-base-content/30">{project}</span>}
+        <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
+          <span className="text-xs font-black text-primary flex items-center">
+            <button onClick={() => setLeftOpen(!leftOpen)} className="flex items-center justify-center w-10 h-10 -ml-3 border-r border-base-300 hover:bg-base-200 md:hidden">
+              {leftOpen ? <X size={18} /> : <List size={18} />}
+            </button>
+            <span className="ml-3">OBIEG-ZERO</span>
+          </span>
+          <div className="flex items-center gap-1">
+            {project && <span className="text-2xs text-base-content/25 mr-2">{project}</span>}
+            {log.length > 0 && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/30"><Trash2 size={12} /></button>}
+            <button onClick={() => { const d = !dark; document.documentElement.dataset.theme = d ? 'dracula' : 'corporate'; setDark(d) }}
+              className="btn btn-ghost btn-xs btn-square">{dark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          </div>
         </div>
 
-        <div className="flex-1">
-          <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-            onConnect={onConnect} onInit={i => { rfInstance.current = i }} onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-            nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
-        </div>
+        {!project ? (
+          <div className="flex flex-col items-center justify-center flex-1 max-w-md mx-auto gap-6 text-center">
+            <div className="text-3xl font-black text-primary tracking-tight">OBIEG-ZERO</div>
+            <div className="text-sm text-base-content/50">Upload PDFs. Build pipelines. Extract knowledge. All in your browser.</div>
+            <div className="text-2xs text-base-content/20">Create a project from the sidebar.</div>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1">
+              <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+                onConnect={onConnect} onInit={i => { rfInstance.current = i }} onDrop={onDrop}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
+            </div>
 
-        {/* footer: button or logs */}
-        <div className="border-t border-base-300">
-          {running || log.length > 0 ? (
-            <div className="flex flex-col max-h-52">
-              <div className="flex items-center gap-1.5 px-4 h-8 shrink-0">
-                {running && <span className="loading loading-spinner loading-xs text-primary" />}
-                <Terminal size={12} className="text-base-content/30" />
-                <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/30">Log</span>
-                {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs gap-1 text-base-content/30">
-                  <Trash2 size={10} />wyczysc
-                </button>}
-              </div>
-              <pre ref={logRef} className="flex-1 overflow-y-auto px-4 pb-3 text-2xs font-mono whitespace-pre-wrap break-all text-base-content/50 leading-relaxed">{log.join('\n')}</pre>
+            {/* footer */}
+            <div className="border-t border-base-300">
+              {running || log.length > 0 ? (
+                <div className="flex flex-col max-h-48">
+                  <div className="flex items-center gap-1.5 px-3 h-8 shrink-0">
+                    {running && <span className="loading loading-spinner loading-xs text-warning" />}
+                    <Terminal size={11} className="text-base-content/25" />
+                    <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Log</span>
+                    {!running && <button onClick={() => setLog([])} className="btn btn-ghost btn-xs btn-square text-base-content/20"><Trash2 size={10} /></button>}
+                  </div>
+                  <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-2 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
+                </div>
+              ) : (
+                <div className="p-2">
+                  <button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running}
+                    className="btn btn-primary btn-sm w-full gap-1.5">
+                    <Play size={12} />Analizuj
+                  </button>
+                </div>
+              )}
             </div>
-          ) : project && (
-            <div className="p-3">
-              <button onClick={() => { runPipeline(); setLeftOpen(false) }}
-                className="btn btn-sm btn-primary w-full gap-2">
-                <Play size={14} />Analizuj
-              </button>
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       </div>
