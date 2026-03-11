@@ -99,7 +99,7 @@ export function App() {
   }
   function addDataNodes(pid: string, items: { id: string; label: string; detail?: string }[]) {
     const p = nodes.find(n => n.id === pid), right = dataNodeSide.current++ % 2 === 0
-    const px = p ? p.position.x + (right ? 200 : -180) : 500, py = p ? p.position.y - ((items.length - 1) * 14) : 0
+    const px = p ? p.position.x + (right ? 320 : -280) : 500, py = p ? p.position.y - ((items.length - 1) * 14) : 0
     setNodes(n => [...n, ...items.map((it, i) => ({ id: it.id, type: 'data' as const, position: { x: px, y: py + i * 28 }, data: { label: it.label, detail: it.detail } }))])
     setEdges(e => [...e, ...items.map(it => ({ id: `e:${pid}→${it.id}`, source: pid, sourceHandle: right ? 'data' : 'data-left', target: it.id, targetHandle: right ? 'left' : 'right', style: { strokeDasharray: '4 2', stroke: '#6b7280' } }))])
   }

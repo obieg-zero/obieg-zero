@@ -79,12 +79,12 @@ function UploadNode({ id, data }: NodeProps) {
 
 function DataNode({ data }: NodeProps) {
   return (
-    <div className="flex items-center gap-2 bg-base-300 rounded px-3 py-2 max-w-48">
+    <div className="flex items-center gap-2 bg-base-300 rounded px-3 py-2 w-48 overflow-hidden">
       <Handle type="target" position={Position.Left} id="left" />
       <Handle type="target" position={Position.Right} id="right" />
       <FileText size={12} className="shrink-0 text-base-content/40" />
-      <span className="text-xs truncate flex-1">{data.label as string}</span>
-      {data.detail && <span className="text-2xs text-base-content/30 shrink-0">{data.detail as string}</span>}
+      <span className="text-xs truncate flex-1 min-w-0">{data.label as string}</span>
+      {data.detail && <span className="text-2xs text-base-content/30 truncate max-w-20">{data.detail as string}</span>}
     </div>
   )
 }
