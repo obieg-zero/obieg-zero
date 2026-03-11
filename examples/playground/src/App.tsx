@@ -238,7 +238,7 @@ export function App() {
                 <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-3 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{log.join('\n')}</pre>
               </div>
             ) : (
-              <div className="p-3"><button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running} className="btn btn-primary btn-sm w-full gap-2"><Play size={14} />Analizuj</button></div>
+              <div className="p-4"><button onClick={() => { runPipeline(); setLeftOpen(false) }} disabled={running} className="btn btn-primary btn-lg w-full gap-2"><Play size={18} />Analizuj</button></div>
             )}
           </div>
         </>)}
