@@ -138,11 +138,11 @@ export function App() {
           <span className="text-xs font-semibold text-base-content/40">Projects</span>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
-          {projects.length > 0 && <div className="space-y-1">
+          {projects.length > 0 && <div className="space-y-2">
             <Lbl>Active ({projects.length})</Lbl>
             {projects.map(name => (
               <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`w-full text-left rounded p-2 cursor-pointer ${project === name ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
+                className={`w-full text-left rounded px-3 py-2 cursor-pointer ${project === name ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold truncate">{name}</span>
                   <button onClick={e => { e.stopPropagation(); removeProject(name) }} className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
@@ -150,7 +150,7 @@ export function App() {
               </div>
             ))}
           </div>}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Lbl>New project</Lbl>
             <div className="flex gap-2">
               <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createProject()}
@@ -164,21 +164,21 @@ export function App() {
               <button onClick={() => setLeftTab('blocks')} className={`btn btn-ghost btn-xs gap-2 ${leftTab === 'blocks' ? 'btn-active' : ''}`}><Grid size={12} />Bloki</button>
             </div>
             {leftTab === 'templates' ? (
-              <div className="space-y-1">{TEMPLATES.map(t => (
+              <div className="space-y-2">{TEMPLATES.map(t => (
                 <button key={t.id} onClick={() => { loadTemplate(t.id); setLeftOpen(false) }} className="btn btn-ghost btn-xs w-full justify-start text-left h-auto py-2">
                   <div className="leading-tight"><div className="text-xs font-semibold">{t.name}</div><div className="text-2xs text-base-content/30">{t.nodes.map(n => n.data.label).join(' → ')}</div></div>
                 </button>))}</div>
             ) : (
               <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
                 const I = p.icon; return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="flex flex-col items-center gap-1 rounded bg-base-200 hover:bg-base-300 cursor-grab py-3 transition-colors">
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="flex flex-col items-center gap-2 rounded bg-base-200 hover:bg-base-300 cursor-grab py-3 transition-colors">
                     <I size={14} className="text-base-content/40" /><span className="text-2xs font-medium text-base-content/50">{p.label}</span>
                   </div>)
               })}</div>
             )}
           </div>}
         </div>
-        <div className="shrink-0 border-t border-base-300 px-3 py-3 text-2xs text-base-content/20 space-y-0.5">
+        <div className="shrink-0 border-t border-base-300 px-3 py-3 text-2xs text-base-content/20 space-y-1">
           <div><a href="https://github.com/obieg-zero" target="_blank" rel="noopener" className="link link-hover text-base-content/40">obieg-zero</a> — playground</div>
           <div className="text-base-content/80">Your data never leaves your machine.</div>
         </div>
