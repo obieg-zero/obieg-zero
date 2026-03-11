@@ -141,13 +141,11 @@ export function App() {
           {projects.length > 0 && <div className="space-y-2">
             <Lbl>Active ({projects.length})</Lbl>
             {projects.map(name => (
-              <div key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
-                className={`w-full text-left rounded px-3 py-2 cursor-pointer ${project === name ? 'bg-primary/10 border border-primary/30' : 'bg-base-200 hover:bg-base-300'}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold truncate">{name}</span>
-                  <button onClick={e => { e.stopPropagation(); removeProject(name) }} className="btn btn-ghost btn-xs btn-square opacity-20 hover:opacity-100"><X size={10} /></button>
-                </div>
-              </div>
+              <button key={name} onClick={() => { selectProject(name); setLeftOpen(false) }}
+                className={`btn btn-ghost btn-sm w-full justify-between ${project === name ? 'btn-active' : ''}`}>
+                <span className="text-xs font-semibold truncate">{name}</span>
+                <span onClick={e => { e.stopPropagation(); removeProject(name) }} className="opacity-20 hover:opacity-100"><X size={12} /></span>
+              </button>
             ))}
           </div>}
           <div className="space-y-2">
@@ -171,8 +169,8 @@ export function App() {
             ) : (
               <div className="grid grid-cols-3 gap-2">{PALETTE.map(p => {
                 const I = p.icon; return (
-                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="flex flex-col items-center gap-2 rounded bg-base-200 hover:bg-base-300 cursor-grab py-3 transition-colors">
-                    <I size={14} className="text-base-content/40" /><span className="text-2xs font-medium text-base-content/50">{p.label}</span>
+                  <div key={p.type} draggable onDragStart={e => onDragStart(e, p.type)} className="btn btn-ghost h-auto flex-col gap-2 py-3 cursor-grab">
+                    <I size={14} /><span className="text-2xs font-medium">{p.label}</span>
                   </div>)
               })}</div>
             )}
@@ -188,7 +186,7 @@ export function App() {
       <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
         <div className="flex items-center justify-between px-3 h-10 shrink-0 border-b border-base-300">
           <span className="text-xs font-black text-primary flex items-center">
-            <button onClick={() => setLeftOpen(!leftOpen)} className="flex items-center justify-center w-10 h-10 -ml-3 border-r border-base-300 hover:bg-base-200 md:hidden">{leftOpen ? <X size={16} /> : <List size={16} />}</button>
+            <button onClick={() => setLeftOpen(!leftOpen)} className="btn btn-ghost btn-square btn-sm -ml-3 border-r border-base-300 rounded-none md:hidden">{leftOpen ? <X size={16} /> : <List size={16} />}</button>
             <span className="ml-3">OBIEG-ZERO</span>
           </span>
           <div className="flex items-center gap-2">
