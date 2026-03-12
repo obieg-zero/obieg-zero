@@ -6,7 +6,7 @@ import { Box, Cell } from '../components/Box'
 
 type Ctx = { projects: string[]; project: string | null; files: string[]; select: (n: string) => void; create: (n: string) => void; remove: (n: string) => void; upload: (f: File[]) => void }
 const DemoCtx = createContext<Ctx | null>(null)
-const use = () => { const c = useContext(DemoCtx); if (!c) throw new Error('DemoProvider missing'); return c }
+const useDemoCtx = () => { const c = useContext(DemoCtx); if (!c) throw new Error('DemoProvider missing'); return c }
 
 const demoPlugin: PluginFactory = (sdk, deps) => {
   const host = deps.host
@@ -23,7 +23,7 @@ const demoPlugin: PluginFactory = (sdk, deps) => {
       await host.opfs.createProject(name); setProjects(p => [...p, name]); setProject(name)
     }
     async function remove(name: string) {
-      await host.opfs.removeProject(name).catch(() => {}); setProjects(p => p.filter(n => n !== name))
+      await host.opfs.removeProject(name).catch(() => {}); await host.db.clearProject(name).catch(() => {}); setProjects(p => p.filter(n => n !== name))
       if (project === name) { setProject(null); setFiles([]) }
     }
     async function upload(fileList: File[]) {
@@ -36,7 +36,7 @@ const demoPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function LeftPanel() {
-    const { projects, project, select, create, remove } = use()
+    const { projects, project, select, create, remove } = useDemoCtx()
     const [name, setName] = useState('')
     return <Box header={<Cell label>projekty</Cell>} body={<div>
       {projects.map(p => (
@@ -54,7 +54,7 @@ const demoPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function CenterPanel() {
-    const { project, files, upload } = use()
+    const { project, files, upload } = useDemoCtx()
     return <>
       {project ? (
         <div className="flex-1 min-h-0 p-3 overflow-y-auto">
@@ -81,7 +81,7 @@ const demoPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function FooterPanel() {
-    const { project, files } = use()
+    const { project, files } = useDemoCtx()
     if (!project) return null
     return (
       <div className="h-10 min-h-10 shrink-0 flex items-center border-t border-base-300 divide-x divide-base-300">

@@ -21,8 +21,8 @@ export function Cell({ children, onClick, label, className = '' }: {
   return <div className={base}>{onClick ? <button className="btn btn-ghost btn-sm btn-square" onClick={onClick}>{children}</button> : children}</div>
 }
 
-export class PluginErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state: { error: Error | null } = { error: null }
+export class PluginErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; retries: number }> {
+  state: { error: Error | null; retries: number } = { error: null, retries: 0 }
   static getDerivedStateFromError(error: Error) { return { error } }
   render() {
     if (this.state.error) return (
@@ -30,7 +30,9 @@ export class PluginErrorBoundary extends Component<{ children: ReactNode }, { er
         <div className="text-center max-w-sm">
           <p className="text-xs font-semibold text-base-content/70 mb-1">Plugin crash</p>
           <p className="text-2xs text-base-content/40 mb-3">{this.state.error.message}</p>
-          <button className="text-2xs text-primary hover:underline" onClick={() => this.setState({ error: null })}>Spróbuj ponownie</button>
+          {this.state.retries < 3
+            ? <button className="text-2xs text-primary hover:underline" onClick={() => this.setState(s => ({ error: null, retries: s.retries + 1 }))}>Spróbuj ponownie ({3 - this.state.retries})</button>
+            : <p className="text-2xs text-base-content/30">Przeładuj stronę.</p>}
         </div>
       </div>
     )

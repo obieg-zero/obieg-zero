@@ -10,7 +10,7 @@ const PROJ_ID = '__notes__'
 type Note = { id: string; title: string; text: string; ts: number }
 type Ctx = { notes: Note[]; active: Note | null; select: (n: Note) => void; create: () => void; remove: (id: string) => void; update: (n: Note) => void }
 const NotesCtx = createContext<Ctx | null>(null)
-const use = () => { const c = useContext(NotesCtx); if (!c) throw new Error('NotesProvider missing'); return c }
+const useNotesCtx = () => { const c = useContext(NotesCtx); if (!c) throw new Error('NotesProvider missing'); return c }
 
 function toNote(r: { id: string; page: number; text: string }): Note {
   return { id: r.id, title: r.text?.split('\n')[0] || 'bez tytułu', text: r.text || '', ts: r.page }
@@ -56,7 +56,7 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function LeftPanel() {
-    const { notes, active, select, create, remove } = use()
+    const { notes, active, select, create, remove } = useNotesCtx()
     return <Box header={<>
       <Cell label>notatki ({notes.length})</Cell>
       <Cell onClick={create}><Plus size={16} /></Cell>
@@ -71,7 +71,7 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function CenterPanel() {
-    const { active, update } = use()
+    const { active, update } = useNotesCtx()
     return <>
       {active ? (
         <textarea className="flex-1 min-h-0 p-3 bg-transparent text-xs text-base-content/70 resize-none outline-none"
@@ -89,7 +89,7 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
   }
 
   function FooterPanel() {
-    const { active } = use()
+    const { active } = useNotesCtx()
     if (!active) return null
     return (
       <div className="h-10 min-h-10 shrink-0 flex items-center border-t border-base-300 divide-x divide-base-300">
