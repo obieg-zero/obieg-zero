@@ -1,4 +1,4 @@
-import type { ReactNode, MouseEventHandler } from 'react'
+import { Component, type ReactNode, type MouseEventHandler } from 'react'
 
 const bar = 'h-10 min-h-10 shrink-0 flex items-center border-base-300 divide-x divide-base-300'
 
@@ -19,4 +19,21 @@ export function Cell({ children, onClick, label, className = '' }: {
 }) {
   const base = `self-stretch flex items-center ${label ? 'flex-1 px-3 text-2xs uppercase tracking-wider text-base-content/25 font-medium' : 'px-1'} ${className}`
   return <div className={base}>{onClick ? <button className="btn btn-ghost btn-xs btn-square" onClick={onClick}>{children}</button> : children}</div>
+}
+
+export class PluginErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  render() {
+    if (this.state.error) return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <p className="text-xs font-semibold text-base-content/70 mb-1">Plugin crash</p>
+          <p className="text-2xs text-base-content/40 mb-3">{this.state.error.message}</p>
+          <button className="text-2xs text-primary hover:underline" onClick={() => this.setState({ error: null })}>Spróbuj ponownie</button>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
 }

@@ -8,6 +8,11 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@obieg-zero/plugin-sdk": "file:../packages/plugin-sdk",
+    "@obieg-zero/store-v2": "file:../packages/store-v2",
+    "@obieg-zero/graph-v2": "file:../packages/graph-v2",
+    "@obieg-zero/embed-v2": "file:../packages/embed-v2",
+    "dexie": "^4.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-feather": "^2.0.10"
