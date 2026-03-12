@@ -91,7 +91,7 @@ const demoPlugin: PluginFactory = (sdk, deps) => {
   }
 
   sdk.registerManifest({ id: 'demo', label: 'Demo', description: 'OPFS + Dexie demo — projekty i pliki' })
-  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, { pluginId: 'demo', node: <Cell onClick={() => doAction('shell:activate', 'demo')}><Folder size={14} /></Cell> }], 10, 'demo')
+  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, { pluginId: 'demo', node: <Cell onClick={() => doAction('shell:activate', 'demo')}><Folder size={16} /></Cell> }], 10, 'demo')
   sdk.addFilter('routes', (routes: any[]) => [...routes, {
     path: '/*', pluginId: 'demo',
     layout: { wrapper: DemoProvider, left: LeftPanel, center: CenterPanel, footer: FooterPanel }

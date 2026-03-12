@@ -59,7 +59,7 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
     const { notes, active, select, create, remove } = use()
     return <Box header={<>
       <Cell label>notatki ({notes.length})</Cell>
-      <Cell onClick={create}><Plus size={14} /></Cell>
+      <Cell onClick={create}><Plus size={16} /></Cell>
     </>} body={<div>
       {notes.map(n => (
         <div key={n.id} onClick={() => select(n)} className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer ${active?.id === n.id ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
@@ -99,7 +99,7 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
   }
 
   sdk.registerManifest({ id: 'notes', label: 'Notatki', description: 'Lokalne notatki w Dexie' })
-  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, { pluginId: 'notes', node: <Cell onClick={() => doAction('shell:activate', 'notes')}><FileText size={14} /></Cell> }], 10, 'notes')
+  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, { pluginId: 'notes', node: <Cell onClick={() => doAction('shell:activate', 'notes')}><FileText size={16} /></Cell> }], 10, 'notes')
   sdk.addFilter('routes', (routes: any[]) => [...routes, {
     path: '/notes', pluginId: 'notes',
     layout: { wrapper: NotesProvider, left: LeftPanel, center: CenterPanel, footer: FooterPanel }

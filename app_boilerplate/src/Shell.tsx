@@ -46,11 +46,11 @@ export function Shell() {
         <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
           <div className="h-10 min-h-10 shrink-0 flex items-center border-b border-base-300 divide-x divide-base-300">
             <Cell className="md:hidden" onClick={() => { setLeftOpen(!leftOpen); if (!leftOpen) setRightOpen(false) }}>
-              {leftOpen ? <ChevronLeft size={14} /> : <Menu size={14} />}
+              {leftOpen ? <ChevronLeft size={16} /> : <Menu size={16} />}
             </Cell>
             <Cell label>{active?.layout ? plugins.find(p => p.id === active.pluginId)?.label ?? '' : 'obieg-zero'}</Cell>
             {actions.map(a => <div key={a.pluginId} className={`self-stretch flex items-center ${active?.pluginId === a.pluginId ? 'text-primary' : ''}`}>{a.node}</div>)}
-            <Cell onClick={() => setRightOpen(!rightOpen)}><Sidebar size={14} /></Cell>
+            <Cell onClick={() => setRightOpen(!rightOpen)}><Sidebar size={16} /></Cell>
           </div>
           <div className="flex-1 min-h-0 flex flex-col">
             {Center ? <PluginErrorBoundary><Center /></PluginErrorBoundary> : (
@@ -64,7 +64,7 @@ export function Shell() {
       </div>
       {rightOpen && (
         <Box className="w-72 shrink-0 border-l border-base-300 absolute right-0 top-0 bottom-0 z-40 shadow-lg"
-          header={<><Cell label>pluginy</Cell><Cell onClick={() => setRightOpen(false)}><X size={14} /></Cell></>}
+          header={<><Cell label>pluginy</Cell><Cell onClick={() => setRightOpen(false)}><X size={16} /></Cell></>}
           body={<div className="space-y-1">
             {plugins.map(p => {
               const enabled = isPluginEnabled(p.id)

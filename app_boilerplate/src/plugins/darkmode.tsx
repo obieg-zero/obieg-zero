@@ -17,7 +17,7 @@ const darkmodePlugin: PluginFactory = (sdk) => {
       localStorage.setItem(STORAGE_KEY, theme)
     }, [dark])
 
-    return <Cell onClick={() => setDark(d => !d)}>{dark ? <Sun size={14} /> : <Moon size={14} />}</Cell>
+    return <Cell onClick={() => setDark(d => !d)}>{dark ? <Sun size={16} /> : <Moon size={16} />}</Cell>
   }
 
   sdk.registerManifest({ id: 'darkmode', label: 'Dark mode', description: 'Przełącznik dark/light' })

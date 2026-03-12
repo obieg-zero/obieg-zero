@@ -18,7 +18,7 @@ export function Cell({ children, onClick, label, className = '' }: {
   children?: ReactNode; onClick?: MouseEventHandler; label?: boolean; className?: string
 }) {
   const base = `self-stretch flex items-center ${label ? 'flex-1 px-3 text-2xs uppercase tracking-wider text-base-content/25 font-medium' : 'px-1'} ${className}`
-  return <div className={base}>{onClick ? <button className="btn btn-ghost btn-xs btn-square" onClick={onClick}>{children}</button> : children}</div>
+  return <div className={base}>{onClick ? <button className="btn btn-ghost btn-sm btn-square" onClick={onClick}>{children}</button> : children}</div>
 }
 
 export class PluginErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
