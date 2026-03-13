@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/plugin-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Universal plugin SDK — hooks, registry, profile, contracts, loader",
   "type": "module",
   "main": "src/index.ts",
@@ -13,7 +13,11 @@
     "fflate": ">=0.8.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "fflate": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "fflate": {
+      "optional": true
+    }
   }
 }
