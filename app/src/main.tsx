@@ -10,26 +10,41 @@ import { loadInstalledPlugins } from '@obieg-zero/plugin-sdk'
 import { Shell } from './Shell'
 import projectsPlugin from './plugins/projects'
 import darkmodePlugin from './plugins/darkmode'
+import playgroundPlugin from './plugins/playground'
 import notesPlugin from './plugins/notes'
 import pluginManagerPlugin from './plugins/plugin-manager'
-import playgroundPlugin from './plugins/playground'
+import configExportPlugin from './plugins/config-export'
 
-configureProfileStore({ storageKey: 'bp-profile' })
+async function boot() {
+  // Load deploy config (config.json next to index.html)
+  let deployConfig: { plugins?: Record<string, boolean>; defaultPlugin?: string } = {}
+  try {
+    const res = await fetch('./config.json')
+    if (res.ok) deployConfig = await res.json()
+  } catch {}
 
-const host: PluginDeps['host'] = {
-  opfs: createOpfs(), db: createStoreDB(), embedder: null, llm: null, createGraphDB, search,
+  configureProfileStore({ storageKey: 'bp-profile', defaults: deployConfig.plugins })
+  if (deployConfig.defaultPlugin && !localStorage.getItem('bp-active')) {
+    localStorage.setItem('bp-active', deployConfig.defaultPlugin)
+  }
+
+  const host: PluginDeps['host'] = {
+    opfs: createOpfs(), db: createStoreDB(), embedder: null, llm: null, createGraphDB, search,
+  }
+
+  const deps = { host }
+  const local: [string, (sdk: typeof SDK, deps: PluginDeps) => void][] = [
+    ['projects', projectsPlugin],
+    ['darkmode', darkmodePlugin],
+    ['playground', playgroundPlugin],
+    ['notes', notesPlugin],
+    ['plugin-manager', pluginManagerPlugin],
+    ['config-export', configExportPlugin],
+  ]
+  for (const [id, factory] of local) { factory(SDK, deps); markReady(id) }
+
+  await loadInstalledPlugins(SDK, deps)
+  createRoot(document.getElementById('root')!).render(<Shell />)
 }
 
-const deps = { host }
-const local: [string, (sdk: typeof SDK, deps: PluginDeps) => void][] = [
-  ['projects', projectsPlugin],
-  ['darkmode', darkmodePlugin],
-  ['notes', notesPlugin],
-  ['plugin-manager', pluginManagerPlugin],
-  ['playground', playgroundPlugin],
-]
-for (const [id, factory] of local) { factory(SDK, deps); markReady(id) }
-
-loadInstalledPlugins(SDK, deps).then(() => {
-  createRoot(document.getElementById('root')!).render(<Shell />)
-})
+boot()

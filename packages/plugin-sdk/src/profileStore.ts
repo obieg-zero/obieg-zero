@@ -5,10 +5,12 @@ export interface UserProfile { [pluginId: string]: boolean }
 
 let storageKey = 'oz-profile'
 let storage: Storage = typeof localStorage !== 'undefined' ? localStorage : (undefined as any)
+let deployDefaults: UserProfile = {}
 
-export function configureProfileStore(opts: { storageKey?: string; storage?: Storage }): void {
+export function configureProfileStore(opts: { storageKey?: string; storage?: Storage; defaults?: UserProfile }): void {
   if (opts.storageKey) storageKey = opts.storageKey
   if (opts.storage) storage = opts.storage
+  if (opts.defaults) deployDefaults = opts.defaults
 }
 
 function buildDefaults(): UserProfile {
@@ -18,7 +20,7 @@ function buildDefaults(): UserProfile {
 }
 
 export function getProfile(): UserProfile {
-  const defaults = buildDefaults()
+  const defaults = { ...buildDefaults(), ...deployDefaults }
   try {
     const raw = storage?.getItem(storageKey)
     if (!raw) return defaults
