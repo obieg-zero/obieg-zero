@@ -1,23 +1,16 @@
 type ActionFn = (...args: any[]) => void | Promise<void>
-type Entry = { fn: ActionFn; priority: number }
 
-const actions = new Map<string, Entry[]>()
+const actions = new Map<string, ActionFn[]>()
 
-export function addAction(hook: string, fn: ActionFn, priority = 10): () => void {
+export function addAction(hook: string, fn: ActionFn): () => void {
   if (!actions.has(hook)) actions.set(hook, [])
-  const entry: Entry = { fn, priority }
   const list = actions.get(hook)!
-  list.push(entry)
-  list.sort((a, b) => a.priority - b.priority)
-  return () => { const i = list.indexOf(entry); if (i >= 0) list.splice(i, 1) }
+  list.push(fn)
+  return () => { const i = list.indexOf(fn); if (i >= 0) list.splice(i, 1) }
 }
 
 export function doAction(hook: string, ...args: unknown[]): void {
   const list = actions.get(hook)
   if (!list) return
-  for (const { fn } of list) fn(...args)
-}
-
-export function resetHooks(): void {
-  actions.clear()
+  for (const fn of list) fn(...args)
 }

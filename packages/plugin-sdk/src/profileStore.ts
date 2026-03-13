@@ -6,26 +6,30 @@ export interface UserProfile { [pluginId: string]: boolean }
 let storageKey = 'oz-profile'
 let storage: Storage = typeof localStorage !== 'undefined' ? localStorage : (undefined as any)
 let deployDefaults: UserProfile = {}
+let profileCache: { raw: string | null; result: UserProfile } | null = null
 
 export function configureProfileStore(opts: { storageKey?: string; storage?: Storage; defaults?: UserProfile }): void {
   if (opts.storageKey) storageKey = opts.storageKey
   if (opts.storage) storage = opts.storage
   if (opts.defaults) deployDefaults = opts.defaults
-}
-
-function buildDefaults(): UserProfile {
-  const profile: UserProfile = {}
-  for (const p of getAllPlugins()) profile[p.id] = p.defaultEnabled !== false
-  return profile
+  profileCache = null
 }
 
 export function getProfile(): UserProfile {
-  const defaults = { ...buildDefaults(), ...deployDefaults }
+  const raw = storage?.getItem(storageKey) ?? null
+  if (profileCache && profileCache.raw === raw) return profileCache.result
+
+  const defaults: UserProfile = {}
+  for (const p of getAllPlugins()) defaults[p.id] = p.defaultEnabled !== false
+  const merged = { ...defaults, ...deployDefaults }
   try {
-    const raw = storage?.getItem(storageKey)
-    if (!raw) return defaults
-    return { ...defaults, ...JSON.parse(raw) }
-  } catch { return defaults }
+    const result = raw ? { ...merged, ...JSON.parse(raw) } : merged
+    profileCache = { raw, result }
+    return result
+  } catch {
+    profileCache = { raw, result: merged }
+    return merged
+  }
 }
 
 export function isPluginEnabled(pluginId: string): boolean {
@@ -37,6 +41,7 @@ export function isPluginEnabled(pluginId: string): boolean {
 export function setPluginEnabled(pluginId: string, enabled: boolean): void {
   const profile = { ...getProfile(), [pluginId]: enabled }
   storage?.setItem(storageKey, JSON.stringify(profile))
+  profileCache = null
 }
 
 export function useProfile(): [UserProfile, (patch: UserProfile) => void] {
@@ -45,12 +50,9 @@ export function useProfile(): [UserProfile, (patch: UserProfile) => void] {
     setProfile(prev => {
       const next = { ...prev, ...patch }
       storage?.setItem(storageKey, JSON.stringify(next))
+      profileCache = null
       return next
     })
   }, [])
   return [profile, update]
-}
-
-export function resetProfileStore(): void {
-  storageKey = 'oz-profile'
 }

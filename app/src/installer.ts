@@ -1,6 +1,5 @@
-import type { PluginDef, PluginFactory, PluginDeps } from './types.js'
-import { registerPlugin, markReady } from './registry.js'
-import { isPluginEnabled } from './profileStore.js'
+import type { PluginDef, PluginFactory, PluginDeps } from '@obieg-zero/plugin-sdk'
+import { registerPlugin, isPluginEnabled } from '@obieg-zero/plugin-sdk'
 
 const PLUGINS_DIR = '__plugins__'
 
@@ -144,7 +143,6 @@ export async function loadInstalledPlugins(deps: PluginDeps): Promise<void> {
         const def = factory(deps)
         if (def) registerPlugin(def)
         if (def?.setup) def.setup()
-        markReady(manifest.id)
       } catch (err) {
         console.error(`[plugin-sdk] installed/${manifest.id}:`, err)
       }

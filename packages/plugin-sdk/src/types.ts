@@ -1,7 +1,5 @@
 import type { ComponentType, FC, ReactNode } from 'react'
 
-// --- Plugin definition — the single contract between plugin and shell ---
-
 export interface PluginDef {
   id: string
   label: string
@@ -24,10 +22,6 @@ export interface PluginDef {
   action?: ReactNode
 
   setup?: () => void | (() => void)
-}
-
-export interface PluginManifest extends PluginDef {
-  ready: boolean
 }
 
 export interface HostAPI {

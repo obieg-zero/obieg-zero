@@ -1,7 +1,6 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { Menu, ChevronLeft } from 'react-feather'
 import { getAllPlugins, isPluginEnabled, addAction } from '@obieg-zero/plugin-sdk'
-import type { PluginManifest } from '@obieg-zero/plugin-sdk'
 import { PluginErrorBoundary } from './components/Box'
 
 export function Shell() {
@@ -14,8 +13,6 @@ export function Shell() {
   const active = withLayout.find(p => p.id === activeId) ?? withLayout[0]
   const { left: Left, center: Center, footer: Footer, wrapper: Wrapper } = active?.layout ?? {}
   const hasLeft = !!Left
-
-  // Collect action nodes from plugins that have them
   const actionPlugins = plugins.filter(p => p.action)
 
   useEffect(() => { if (activeId) localStorage.setItem('bp-active', activeId) }, [activeId])
@@ -45,13 +42,11 @@ export function Shell() {
               </div>
             )}
             <div className="self-stretch flex items-center flex-1 px-3 text-2xs uppercase tracking-wider text-base-content/25 font-medium">
-              {active ? plugins.find(p => p.id === active.id)?.label ?? '' : 'obieg-zero'}
+              {active ? active.label : 'obieg-zero'}
             </div>
-            {/* Plugin actions in navbar */}
             {actionPlugins.map(p => (
               <div key={p.id} className={`self-stretch flex items-center ${active?.id === p.id ? 'text-primary' : ''}`}>{p.action}</div>
             ))}
-            {/* Activity bar: icons for plugins with layout */}
             {withLayout.map(p => {
               const Icon = p.icon
               if (!Icon) return null

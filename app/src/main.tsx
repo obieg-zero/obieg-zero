@@ -1,6 +1,7 @@
 import './index.css'
 import { createRoot } from 'react-dom/client'
-import { configureProfileStore, registerPlugin, markReady, loadInstalledPlugins } from '@obieg-zero/plugin-sdk'
+import { configureProfileStore, registerPlugin } from '@obieg-zero/plugin-sdk'
+import { loadInstalledPlugins } from './installer'
 import { createOpfs, createStoreDB } from '@obieg-zero/store-v2'
 import { createGraphDB } from '@obieg-zero/graph-v2'
 import { search } from '@obieg-zero/embed-v2'
@@ -29,12 +30,10 @@ async function boot() {
     host: { opfs: createOpfs(), db: createStoreDB(), embedder: null, llm: null, createGraphDB, search }
   }
 
-  const factories = [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin, configExportPlugin]
-  for (const factory of factories) {
+  for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin, configExportPlugin]) {
     const def = factory(deps)
     registerPlugin(def)
     if (def.setup) def.setup()
-    markReady(def.id)
   }
 
   await loadInstalledPlugins(deps)

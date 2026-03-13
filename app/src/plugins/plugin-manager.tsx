@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Download, Trash2, RefreshCw, Package, ExternalLink } from 'react-feather'
 import type { PluginFactory, PluginDef } from '@obieg-zero/plugin-sdk'
-import { doAction, getAllPlugins, isPluginEnabled, setPluginEnabled, installFromGitHub, installFromZip, installFromUrl, listInstalled, uninstallPlugin } from '@obieg-zero/plugin-sdk'
+import { doAction, getAllPlugins, isPluginEnabled, setPluginEnabled } from '@obieg-zero/plugin-sdk'
+import { installFromGitHub, installFromZip, installFromUrl, listInstalled, uninstallPlugin } from '../installer'
 
 const pluginManagerPlugin: PluginFactory = () => {
   function ManagerCenter() {
