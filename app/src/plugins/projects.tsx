@@ -13,7 +13,7 @@ export type ProjectsAPI = {
   ProjectList: React.FC
 }
 
-const projectsPlugin: PluginFactory = (sdk, deps) => {
+const projectsPlugin: PluginFactory = (deps) => {
   const host = deps.host
   let state = { projects: [] as string[], current: null as string | null }
   const subs = new Set<() => void>()
@@ -62,8 +62,13 @@ const projectsPlugin: PluginFactory = (sdk, deps) => {
     </>
   }
 
-  sdk.registerManifest({ id: 'projects', label: 'Projekty', description: 'Lista projektów OPFS' })
   registerProvider('projects', { useProjects, ProjectList } as ProjectsAPI)
+
+  return {
+    id: 'projects',
+    label: 'Projekty',
+    description: 'Lista projektów OPFS',
+  }
 }
 
 export default projectsPlugin

@@ -19,7 +19,7 @@ function toPage(n: Note) {
   return { id: n.id, projectId: PROJ_ID, documentId: DOC_ID, page: n.ts, text: n.text }
 }
 
-const notesPlugin: PluginFactory = (sdk, deps) => {
+const notesPlugin: PluginFactory = (deps) => {
   const host = deps.host
 
   function NotesProvider({ children }: { children: React.ReactNode }) {
@@ -98,12 +98,13 @@ const notesPlugin: PluginFactory = (sdk, deps) => {
     )
   }
 
-  sdk.registerManifest({ id: 'notes', label: 'Notatki', description: 'Lokalne notatki w Dexie' })
-  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, { pluginId: 'notes', node: <Cell onClick={() => doAction('shell:activate', 'notes')}><FileText size={16} /></Cell> }], 10, 'notes')
-  sdk.addFilter('routes', (routes: any[]) => [...routes, {
-    path: '/notes', pluginId: 'notes',
-    layout: { wrapper: NotesProvider, left: LeftPanel, center: CenterPanel, footer: FooterPanel }
-  }])
+  return {
+    id: 'notes',
+    label: 'Notatki',
+    description: 'Lokalne notatki w Dexie',
+    icon: FileText,
+    layout: { wrapper: NotesProvider, left: LeftPanel, center: CenterPanel, footer: FooterPanel },
+  }
 }
 
 export default notesPlugin

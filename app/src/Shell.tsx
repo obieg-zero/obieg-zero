@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Menu, ChevronLeft } from 'react-feather'
-import { applyFilters, getAllPlugins, isPluginEnabled, addAction } from '@obieg-zero/plugin-sdk'
-import type { RouteEntry } from '@obieg-zero/plugin-sdk'
+import { getAllPlugins, isPluginEnabled, addAction } from '@obieg-zero/plugin-sdk'
+import type { PluginManifest } from '@obieg-zero/plugin-sdk'
 import { PluginErrorBoundary } from './components/Box'
 
 export function Shell() {
@@ -9,13 +9,14 @@ export function Shell() {
   const [activeId, setActiveId] = useState<string | null>(() => localStorage.getItem('bp-active'))
   const [, rerender] = useState(0)
 
-  const allRoutes = applyFilters<RouteEntry[]>('routes', [])
-  const routes = allRoutes.filter(r => isPluginEnabled(r.pluginId))
-  const plugins = getAllPlugins()
-  const active = routes.find(r => r.pluginId === activeId) ?? routes[0]
-  const actions = applyFilters<{ pluginId: string; node: ReactNode }[]>('shell:actions', [])
+  const plugins = getAllPlugins().filter(p => isPluginEnabled(p.id))
+  const withLayout = plugins.filter(p => p.layout?.center)
+  const active = withLayout.find(p => p.id === activeId) ?? withLayout[0]
   const { left: Left, center: Center, footer: Footer, wrapper: Wrapper } = active?.layout ?? {}
   const hasLeft = !!Left
+
+  // Collect action nodes from plugins that have them
+  const actionPlugins = plugins.filter(p => p.action)
 
   useEffect(() => { if (activeId) localStorage.setItem('bp-active', activeId) }, [activeId])
 
@@ -44,9 +45,24 @@ export function Shell() {
               </div>
             )}
             <div className="self-stretch flex items-center flex-1 px-3 text-2xs uppercase tracking-wider text-base-content/25 font-medium">
-              {active?.layout ? plugins.find(p => p.id === active.pluginId)?.label ?? '' : 'obieg-zero'}
+              {active ? plugins.find(p => p.id === active.id)?.label ?? '' : 'obieg-zero'}
             </div>
-            {actions.map(a => <div key={a.pluginId} className={`self-stretch flex items-center ${active?.pluginId === a.pluginId ? 'text-primary' : ''}`}>{a.node}</div>)}
+            {/* Plugin actions in navbar */}
+            {actionPlugins.map(p => (
+              <div key={p.id} className={`self-stretch flex items-center ${active?.id === p.id ? 'text-primary' : ''}`}>{p.action}</div>
+            ))}
+            {/* Activity bar: icons for plugins with layout */}
+            {withLayout.map(p => {
+              const Icon = p.icon
+              if (!Icon) return null
+              return (
+                <div key={p.id} className={`self-stretch flex items-center ${active?.id === p.id ? 'text-primary' : ''}`}>
+                  <button className="btn btn-ghost btn-sm btn-square mx-1" onClick={() => setActiveId(p.id)}>
+                    <Icon size={16} />
+                  </button>
+                </div>
+              )
+            })}
           </div>
           <div className="flex-1 min-h-0 flex flex-col">
             {Center ? <PluginErrorBoundary><Center /></PluginErrorBoundary> : (

@@ -10,7 +10,6 @@ import type { HostAPI } from '@obieg-zero/plugin-sdk'
 import { TEMPLATES, BIELIK } from './templates'
 import { nodeTypes } from './nodes'
 import { blockUpload, blockParse, blockEmbed, blockExtract, blockExtractApi, blockGraph, type Chunk, type Log } from './blocks'
-import { Cell } from '../../components/Box'
 import type { ProjectsAPI } from '../projects'
 
 const PALETTE = [
@@ -256,17 +255,16 @@ function CenterCanvas() {
 
 // --- Plugin factory ---
 
-const playgroundPlugin: PluginFactory = (sdk, deps) => {
+const playgroundPlugin: PluginFactory = (deps) => {
   _host = deps.host
-  sdk.registerManifest({ id: 'playground', label: 'Playground', description: 'Wizualny potok analizy dokumentów (React Flow)', requires: ['projects'] })
-  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, {
-    pluginId: 'playground',
-    node: <Cell onClick={() => doAction('shell:activate', 'playground')}><GitBranch size={16} /></Cell>
-  }], 10, 'playground')
-  sdk.addFilter('routes', (routes: any[]) => [...routes, {
-    path: '/*', pluginId: 'playground',
-    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, center: CenterCanvas, footer: FooterPanel }
-  }])
+  return {
+    id: 'playground',
+    label: 'Playground',
+    description: 'Wizualny potok analizy dokumentów (React Flow)',
+    icon: GitBranch,
+    requires: ['projects'],
+    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, center: CenterCanvas, footer: FooterPanel },
+  }
 }
 
 export default playgroundPlugin

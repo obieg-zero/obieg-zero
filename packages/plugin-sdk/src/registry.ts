@@ -1,40 +1,30 @@
-import type { PluginManifestData, PluginManifest } from './types.js'
+import type { PluginDef, PluginManifest } from './types.js'
 
-const manifests: PluginManifestData[] = []
+const plugins: PluginDef[] = []
 const readyIds = new Set<string>()
 
-/** Phase 1: register manifest (light — visible even when plugin disabled) */
-export function registerManifest(data: PluginManifestData): void {
-  if (manifests.some(m => m.id === data.id)) return
-  manifests.push(data)
+export function registerPlugin(def: PluginDef): void {
+  if (plugins.some(p => p.id === def.id)) return
+  plugins.push(def)
 }
 
-/** Phase 2: mark plugin as loaded and ready */
 export function markReady(pluginId: string): void {
   readyIds.add(pluginId)
 }
 
-/** All known manifests (even disabled plugins) */
-export function getAllManifests(): PluginManifestData[] {
-  return [...manifests]
-}
-
-/** Single manifest by id */
-export function getManifest(id: string): PluginManifestData | undefined {
-  return manifests.find(m => m.id === id)
-}
-
-/** All plugins with ready flag */
 export function getAllPlugins(): PluginManifest[] {
-  return manifests.map(m => ({ ...m, ready: readyIds.has(m.id) }))
+  return plugins.map(p => ({ ...p, ready: readyIds.has(p.id) }))
 }
 
-/** Check if specific plugin is loaded */
+export function getPlugin(pluginId: string): PluginDef | undefined {
+  return plugins.find(p => p.id === pluginId)
+}
+
 export function isReady(pluginId: string): boolean {
   return readyIds.has(pluginId)
 }
 
 export function resetRegistry(): void {
-  manifests.length = 0
+  plugins.length = 0
   readyIds.clear()
 }

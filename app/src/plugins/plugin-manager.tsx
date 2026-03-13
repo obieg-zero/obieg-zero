@@ -1,24 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Download, Trash2, RefreshCw, Package, ExternalLink } from 'react-feather'
-import type { PluginFactory, PluginManifestData } from '@obieg-zero/plugin-sdk'
-import { doAction, applyFilters, getAllPlugins, isPluginEnabled, setPluginEnabled, installFromGitHub, installFromZip, installFromUrl, listInstalled, uninstallPlugin } from '@obieg-zero/plugin-sdk'
-import { Cell } from '../components/Box'
+import type { PluginFactory, PluginDef } from '@obieg-zero/plugin-sdk'
+import { doAction, getAllPlugins, isPluginEnabled, setPluginEnabled, installFromGitHub, installFromZip, installFromUrl, listInstalled, uninstallPlugin } from '@obieg-zero/plugin-sdk'
 
-const pluginManagerPlugin: PluginFactory = (sdk) => {
+const pluginManagerPlugin: PluginFactory = () => {
   function ManagerCenter() {
-    const [installed, setInstalled] = useState<PluginManifestData[]>([])
+    const [installed, setInstalled] = useState<PluginDef[]>([])
     const [input, setInput] = useState('')
     const [busy, setBusy] = useState(false)
     const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
     const [, rerender] = useState(0)
 
     const plugins = getAllPlugins()
-    const routeIds = new Set(applyFilters<{ pluginId: string }[]>('routes', []).map(r => r.pluginId))
 
     const refresh = useCallback(() => { listInstalled().then(setInstalled) }, [])
     useEffect(refresh, [])
 
-    async function run(fn: () => Promise<PluginManifestData>) {
+    async function run(fn: () => Promise<PluginDef>) {
       setBusy(true); setMsg(null)
       try {
         const m = await fn()
@@ -33,16 +31,13 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
       const enabling = !isPluginEnabled(id)
       setPluginEnabled(id, enabling)
       if (enabling) {
-        // auto-enable dependencies
         const m = plugins.find(p => p.id === id)
         for (const req of m?.requires ?? []) { if (!isPluginEnabled(req)) setPluginEnabled(req, true) }
       } else {
-        // auto-disable plugins that require this one
         for (const p of plugins) { if (p.requires?.includes(id) && isPluginEnabled(p.id)) setPluginEnabled(p.id, false) }
       }
       rerender(n => n + 1)
     }
-
 
     function handleInstallUrl() {
       if (input.trim()) run(async () => { const m = await installFromUrl(input.trim()); setInput(''); return m })
@@ -60,7 +55,7 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
       if (file) run(() => installFromZip(file))
     }
 
-    async function handleReinstall(m: PluginManifestData) {
+    async function handleReinstall(m: PluginDef) {
       if (!m.repo) return
       run(async () => { await uninstallPlugin(m.id); return installFromGitHub(m.repo!) })
     }
@@ -74,7 +69,7 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
             <tbody>
               {plugins.map(p => {
                 const enabled = isPluginEnabled(p.id)
-                const hasRoute = routeIds.has(p.id)
+                const hasRoute = !!p.layout?.center
                 return (
                   <tr key={p.id} className={enabled ? '' : 'opacity-50'}>
                     <td>
@@ -117,7 +112,7 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
                   </button>
                 )}
                 <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-40"
-                  title="Odinstaluj" onClick={async () => { await uninstallPlugin(p.id); refresh() }}>
+                  title="Odinstaluj" onClick={() => run(async () => { await uninstallPlugin(p.id); refresh(); return p })}>
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -148,15 +143,14 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
     )
   }
 
-  sdk.registerManifest({ id: 'plugin-manager', label: 'Pluginy', description: 'Instaluj pluginy z GitHub / ZIP', alwaysOn: true })
-  sdk.addFilter('shell:actions', (actions: any[]) => [...actions, {
-    pluginId: 'plugin-manager',
-    node: <Cell onClick={() => doAction('shell:activate', 'plugin-manager')}><Package size={16} /></Cell>
-  }], 20, 'plugin-manager')
-  sdk.addFilter('routes', (routes: any[]) => [...routes, {
-    path: '/plugins', pluginId: 'plugin-manager',
-    layout: { center: ManagerCenter }
-  }])
+  return {
+    id: 'plugin-manager',
+    label: 'Pluginy',
+    description: 'Instaluj pluginy z GitHub / ZIP',
+    icon: Package,
+    alwaysOn: true,
+    layout: { center: ManagerCenter },
+  }
 }
 
 export default pluginManagerPlugin

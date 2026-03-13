@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { getAllManifests } from './registry.js'
+import { getAllPlugins } from './registry.js'
 
 export interface UserProfile { [pluginId: string]: boolean }
 
@@ -15,7 +15,7 @@ export function configureProfileStore(opts: { storageKey?: string; storage?: Sto
 
 function buildDefaults(): UserProfile {
   const profile: UserProfile = {}
-  for (const m of getAllManifests()) profile[m.id] = m.defaultEnabled !== false
+  for (const p of getAllPlugins()) profile[p.id] = p.defaultEnabled !== false
   return profile
 }
 
@@ -29,8 +29,8 @@ export function getProfile(): UserProfile {
 }
 
 export function isPluginEnabled(pluginId: string): boolean {
-  const m = getAllManifests().find(x => x.id === pluginId)
-  if (m?.alwaysOn) return true
+  const p = getAllPlugins().find(x => x.id === pluginId)
+  if (p?.alwaysOn) return true
   return getProfile()[pluginId] !== false
 }
 
