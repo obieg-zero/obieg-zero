@@ -299,7 +299,7 @@
   integrity sha512-oIUN5zpWnhxQ5HUp1sOn3JMlDRAF+uB5Ic5vvBAlwfBzclvmdUbO42xy1BAaHOn5E1rpU/FykQaXKiO0MuCF9A==
 
 "@obieg-zero/plugin-sdk@file:/home/dadmor/code/obieg-zero/packages/plugin-sdk":
-  version "0.3.0"
+  version "0.4.0"
   resolved "file:packages/plugin-sdk"
 
 "@obieg-zero/store-v2@*", "@obieg-zero/store-v2@^1.0.0", "@obieg-zero/store-v2@file:/home/dadmor/code/obieg-zero/packages/store-v2":

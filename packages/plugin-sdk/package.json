@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/plugin-sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Declarative plugin SDK — PluginDef, registry, profile, contracts, hooks",
   "type": "module",
   "main": "src/index.ts",
@@ -12,6 +12,8 @@
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true }
+    "react": {
+      "optional": true
+    }
   }
 }
