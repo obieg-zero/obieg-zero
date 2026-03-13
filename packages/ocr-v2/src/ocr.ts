@@ -1,6 +1,6 @@
-export interface Page { page: number; text: string }
+interface Page { page: number; text: string }
 
-export interface OcrOpts {
+interface OcrOpts {
   language?: string
   ocrThreshold?: number
   scale?: number
@@ -95,7 +95,7 @@ async function ocrPage(pdf: any, pageNum: number, scale: number, language?: stri
   const canvas = new OffscreenCanvas(viewport.width, viewport.height)
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error(`ocr: canvas context failed for page ${pageNum}`)
-  await page.render({ canvasContext: ctx as any, viewport }).promise
+  await page.render({ canvasContext: ctx as any, viewport, canvas: canvas as any }).promise
 
   const blob = await canvas.convertToBlob({ type: 'image/png' })
   const Tesseract = await import('tesseract.js')

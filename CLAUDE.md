@@ -17,53 +17,142 @@ Przyklad:
 
 Zero parsowania, zero regexow, zero JSON.parse. Ta zasada jest niepodwazalna.
 
-## Stan projektu: optymalizacja Bielika
+## Architektura
 
-Architektura RAG dziala. Waskie gardlo to jakosc i szybkosc modelu.
+```
+@obieg-zero/plugin-sdk (287 LOC)     — micro-framework pluginowy
+app/src/Shell.tsx (87 LOC)           — layout + error boundary + router
+app/src/main.tsx (22 LOC)            — bootstrap: host API + load plugins + render
+app/src/plugins/playground/ (651 LOC) — pierwszy plugin (React Flow workbench)
+packages/ (store, ocr, embed, llm, graph) — niezalezne klocki
+```
 
-### Znane wyniki (benchmark WIBOR)
-- Bielik sentence starters: 6/8 (75%), Bielik pytania: 4/8 (50%), GPT-4o-mini: 7/8 (88%)
-- Bielik ~53s/wywolanie w WASM, GPT-4o-mini ~1s/wywolanie
-- Bielik dobrze kopiuje liczby, halucynuje nazwy wlasne, myli WIBOR z marza
-- Pipeline RAG jest poprawny — waskie gardlo to model, nie architektura
-
-### Kierunki optymalizacji jakosci
-- **Prompt format**: chatTemplate=true vs raw prompt — chat template dodaje tokeny overhead, sprawdzic co daje lepsze wyniki
-- **Ciecie chunka w prompcie**: `hit.text.slice(0, 300)` tnie na 300 zn, moze ciac w pol slowa/liczby — lepiej ciac na granicy zdania
-- **topK**: topK=2 = 2 wywolania LLM na pytanie. Jesli pierwszy chunk jest dobry, drugi moze mylic. Testowac topK=1
-- **Sentence starters**: dobierac do konkretnego dokumentu — inne dla faktury gazowej, inne dla umowy kredytowej
-
-### Kierunki optymalizacji szybkosci
-- **Embedding model**: `Xenova/multilingual-e5-small` (q8) — sprawdzic mniejsze modele (e5-xsmall, gte-small) pod katem quality vs speed
-- **nCtx**: 512 — jesli prompt+odpowiedz miesci sie w 256, nCtx=256 moze przyspieszyc
-- **Quantization**: Q4_K_M to dobry balans. Q4_0 szybszy ale gorszy. Nie schodzic nizej
-- **nPredict**: 16 tokenow — dla liczb/dat wystarczy, dla nazw wlasnych moze za malo
-
-### Czego potrzebujemy
-- **Benchmark powtarzalny**: zestaw dokumentow + pytania + oczekiwane odpowiedzi, uruchamiany automatycznie
-- **Metryki**: trafnosc (% poprawnych), czas/wywolanie, rozmiar paczek (MB)
-- **Porownanie**: kazda zmiana (prompt, model, parametry) mierzona tym samym benchmarkiem
-
-## Architektura: szyna OPFS + Dexie
+### Szyna danych: OPFS + Dexie
 
 ```
 OPFS (pliki)                    Dexie (dane)
 ─────────────                   ────────────────────
 sprawa-1/                       projekty, strony, chunki,
-  umowa.pdf                     embeddingi, encje, graf,
-  aneks.pdf                     trace, konfiguracje
-  dane.csv
+  umowa.pdf                     embeddingi, encje, graf
+  aneks.pdf
 sprawa-2/
   rachunek.pdf
 
-Upload → OPFS + Dexie (PDF, CSV, TXT, JSON)
-Parse  ← OPFS  → Dexie pages (PDF→OCR, CSV→chunk wierszy, TXT→tekst)
-Embed  ← pages → Dexie chunks (chunki + wektory + embeddingi)
-Extract: pytanie → search w chunkach → LLM na trafieniach → graf (Dexie)
+Upload → OPFS + Dexie
+Parse  ← OPFS → Dexie pages
+Embed  ← pages → Dexie chunks
+Extract: pytanie → search → LLM → graf (Dexie)
 Graf   ← Dexie → podglad encji + relacji
 ```
 
 **OPFS = pliki. Dexie = dane. To jest szyna pracy.**
+
+## Plugin SDK (`@obieg-zero/plugin-sdk`)
+
+Micro-framework pluginowy. 287 LOC, 7 plikow. Wzorowany na BrainQuest (brain-edu-play).
+
+### Moduly SDK
+
+| Modul | Co robi |
+|-------|---------|
+| `hooks.ts` | `addFilter/applyFilters` (pipeline), `addAction/doAction` (events). Oba zwracaja cleanup fn. Priority-based sort. |
+| `registry.ts` | 2-fazowy: `registerManifest()` (deklaracja, widoczny w UI) + `markReady()` (po zaladowaniu factory). `getAllPlugins()` zwraca manifest + ready flag. |
+| `profileStore.ts` | `isPluginEnabled()`, `setPluginEnabled()`, `useProfile()` hook. `configureProfileStore({ storageKey })` — persist w localStorage. |
+| `contracts.ts` | `registerProvider<T>(name, provider)` + `getProvider<T>(name)` — komunikacja miedzy pluginami. |
+| `loader.ts` | `loadPlugins({ indexUrl, sdk, deps })` — fetch index.json z GitHub, dynamic import .mjs przez blob URL, factory(sdk, deps). |
+| `types.ts` | `PluginManifestData`, `PluginManifest`, `ExternalPluginEntry`, `PluginFactory`, `LayoutSlots`, `RouteEntry`, `NavItem`, `HostAPI`, `PluginDeps` |
+
+### Lifecycle pluginu
+
+```
+1. DISCOVERY   loader fetches index.json → registerManifest() (widoczny w UI)
+2. FILTER      isPluginEnabled() — filtruje wg profilu (toggle w prawym panelu)
+3. LOAD        importFromUrl(url) → factory(sdk, deps) → markReady(id)
+4. INTEGRATE   Shell: applyFilters('routes', []) → layout slots → Error Boundary
+5. RUNTIME     Plugin: doAction('shell:toggle-left'), Shell: addAction(...)
+```
+
+### Layout — sloty
+
+Shell definiuje layout z 5 slotami. Plugin wypelnia ktore potrzebuje.
+
+```
+┌────────┬───────────────────────┐
+│  left  │       center          │
+│  w-72  │       flex-1          │
+│        │                       │
+│        ├───────────────────────┤
+│        │       footer          │
+└────────┴───────────────────────┘
++ wrapper (React Context provider owijajacy wszystkie sloty)
++ right (zadeklarowany w typach, prawy panel shella to lista pluginow)
+```
+
+Plugin deklaruje co idzie w ktory slot:
+
+```ts
+sdk.registerManifest({ id: 'playground', label: 'Playground', description: '...' })
+sdk.addFilter('routes', routes => [...routes, {
+  path: '/*',
+  pluginId: 'playground',
+  layout: {
+    wrapper: PlaygroundProvider,  // React Context — wspolny stan miedzy slotami
+    left: LeftSidebar,
+    center: CenterCanvas,
+    footer: FooterPanel,
+  }
+}])
+```
+
+### Shell (app/src/Shell.tsx)
+
+- Renderuje layout ze slotami
+- `applyFilters('routes', [])` + `isPluginEnabled()` filtruje routes
+- `getAllPlugins()` → prawy panel z lista pluginow + toggle on/off
+- `PluginErrorBoundary` — crash pluginu nie zabija shella
+- Mobile: `max-md:-translate-x-72` sliding pattern
+- Shell NIGDY nie importuje kodu pluginu
+
+### Plugin nie wie nic o shellu
+
+- Plugin dostaje SDK (hooki) + deps.host
+- Plugin rejestruje route z layout slots
+- Plugin uzywa `doAction('shell:toggle-left')` do komunikacji
+- Plugin NIGDY nie importuje z app/src/
+
+### Host API — co plugin dostaje
+
+```ts
+deps.host = {
+  opfs,           // OpfsHandle — pliki w OPFS
+  db,             // StoreDB — dane w Dexie (+ clearDocument per-plik)
+  embedder,       // EmbedHandle | null (lazy)
+  llm,            // LlmHandle | null (lazy)
+  createGraphDB,  // (name) → GraphDB
+  search,         // semantic search w chunkach
+}
+```
+
+### Ladowanie pluginow
+
+```ts
+// main.tsx
+configureProfileStore({ storageKey: 'oz-profile' })
+
+// Lokalne (dev)
+playgroundPlugin(SDK, { host })
+markReady('playground')
+
+// Zdalne (prod) — jeszcze nie aktywne, SDK gotowe
+// await loadPlugins({ indexUrl: '...plugin-index/index.json', sdk: SDK, deps: { host } })
+```
+
+### ZASADA: bloki MUSZA uzywac pakietow przez deps.host
+
+Plugin importuje i uzywa pakietow z `packages/` przez deps.host.
+Kazdy blok czyta/pisze przez szyne OPFS + Dexie.
+
+**NIGDY nie omijaj szyny.** Nowy blok = deps.host, zapis do Dexie/OPFS.
 
 ## Pakiety (klocki)
 
@@ -71,87 +160,52 @@ Kazdy pakiet to niezalezny klocek. Czyta z szyny, pisze do szyny.
 
 ```
 packages/
-├── store-v2/   # @obieg-zero/store-v2  — OPFS pliki + Dexie dane (szyna)
-├── ocr-v2/     # @obieg-zero/ocr-v2    — PDF → strony tekstu
-├── embed-v2/   # @obieg-zero/embed-v2  — tekst → chunki + wektory + search
-├── llm-v2/     # @obieg-zero/llm-v2    — prompt → odpowiedz (lokalny GGUF)
-└── graph-v2/   # @obieg-zero/graph-v2  — encje + relacje (graf na Dexie)
+├── plugin-sdk/ # @obieg-zero/plugin-sdk — micro-framework pluginowy (287 LOC)
+├── store-v2/   # @obieg-zero/store-v2   — OPFS pliki + Dexie dane (szyna)
+├── ocr-v2/     # @obieg-zero/ocr-v2     — PDF → strony tekstu
+├── embed-v2/   # @obieg-zero/embed-v2   — tekst → chunki + wektory + search
+├── llm-v2/     # @obieg-zero/llm-v2     — prompt → odpowiedz (lokalny GGUF)
+└── graph-v2/   # @obieg-zero/graph-v2   — encje + relacje (graf na Dexie)
 ```
 
 Kazdy klocek to pure functions + handle pattern:
 - `createOpfs() → OpfsHandle` → `listProjects()`, `writeFile()`, `readFile()`
-- `createStoreDB() → StoreDB` → projekty, dokumenty, strony, chunki (Dexie)
+- `createStoreDB() → StoreDB` → projekty, dokumenty, strony, chunki, clearDocument (Dexie)
 - `ocrFile(file, opts) → Page[]`
 - `createEmbedder(opts) → EmbedHandle` → `handle.createIndex(pages) → EmbedIndex`
 - `search(chunks, query, embedFn, opts) → SearchResult[]`
 - `createLlm(opts) → LlmHandle` → `handle.ask(prompt) → AskResult { text, tokenCount, durationMs }`
 - `createGraphDB(name) → GraphDB` → `addNodes()`, `getContext(id, hops)`, `queryNodes()`
 
-## Playground = aktywny workbench
+## Playground = pierwszy plugin
 
 React Flow canvas z sidebar. Drag & drop blokow, wizualne laczenie, wyniki wewnatrz nodow.
 
+### Architektura wewnetrzna
+
 ```
-app/
-├── src/
-│   ├── App.tsx        — React Flow canvas + sidebar + runner (topoSort)
-│   ├── blocks.ts      — pure functions: Upload, Parse, Embed, Extract, Graph
-│   ├── nodes.tsx      — custom React Flow nodes (Shell, UploadNode, DataNode)
-│   ├── store.ts       — singletony: opfs, db (StoreDB), embedder, llm
-│   ├── templates.ts   — szablony: Analiza WIBOR, Faktura za gaz, WIBOR (API)
-│   ├── main.tsx       — entry point
-│   └── index.css      — tailwind + daisyui + xyflow
-└── public/
-    └── samples/       — przykladowe dokumenty do testow (faktura gazowa etc.)
+PlaygroundProvider (wrapper slot — React Context, wspolny stan)
+├── LeftSidebar (left slot — projekty, szablony, bloki drag&drop)
+├── CenterCanvas (center slot — navbar + ReactFlow canvas + hero)
+└── FooterPanel (footer slot — log + przycisk Analizuj)
 ```
 
-### ZASADA: bloki MUSZA uzywac pakietow
+Stan wspoldzielony przez Context (`Ctx`), nie module-level variables.
+`store.ts` (6 LOC) — bridge do host API: `initHost(host)` / `getHost()`.
 
-Playground importuje i uzywa pakietow z `packages/`. Kazdy blok czyta/pisze przez szyne:
-- `opfs` (z store.ts) — pliki w OPFS
-- `db` (z store.ts) — dane w Dexie (StoreDB)
-- `createGraphDB` — graf wiedzy w Dexie
+### Bloki (blocks.ts)
 
-**NIGDY nie omijaj szyny.** Nowy blok = import z packages, zapis do Dexie/OPFS.
-Jesli dodajesz nowy blok, wzoruj sie na istniejacych w `blocks.ts`.
-
-### Przyklad: jak blok uzywa szyny
-
-```ts
-// blocks.ts — blockUpload zapisuje do OPFS + Dexie
-import { opfs, db } from './store'
-
-await opfs.writeFile(project, file.name, file)           // plik → OPFS
-await db.addDocument({ id, projectId, filename, ... })    // metadane → Dexie
-
-// blockParse czyta z OPFS, pisze pages do Dexie
-const file = await opfs.readFile(project, filename)       // OPFS → plik
-await db.setPages(pages)                                  // strony → Dexie
-
-// blockEmbed pisze chunki z embeddingami do Dexie
-await db.setChunks(chunks)                                // chunki + wektory → Dexie
-```
-
-### Flow
-
-Nowy projekt → wybierz szablon → pipeline na canvas → edytuj configi → uruchom.
-Pipeline state (nodes/edges) persystowany w localStorage per projekt.
-
-### Bloki
-
-- **Upload** — multi-file (PDF, CSV, TXT, JSON) → OPFS + Dexie documents
-- **Parse** — OPFS pliki → OCR/chunk → Dexie pages
-- **Embed** — pages → chunki + embeddingi → Dexie chunks
+- **Upload** — multi-file (PDF, CSV, TXT, JSON) → OPFS + Dexie documents. `clearDocument` per-plik (nie clearProject).
+- **Parse** — OPFS pliki → OCR/chunk → Dexie pages. Cache z Dexie.
+- **Embed** — pages → chunki + embeddingi → Dexie chunks. Cache z Dexie.
 - **Extract** — pytanie → search → LLM (WASM Bielik) → graf (Dexie)
 - **Extract API** — to samo co Extract ale przez OpenAI-compatible API
 - **Graph** — podglad grafu z Dexie: encje + relacje
 
-Extract flow:
-1. Lista pytan (sentence starters) z configu
-2. Dla kazdego pytania → semantic search w chunkach → top K trafien
-3. LLM dostaje: "Dokoncz zdanie...\n\nTekst: chunk\n\nNazwa banku to"
-4. Cala odpowiedz = wartosc, pytanie = typ
-5. Graf: document --typ--> wartosc (kierunkowy edge)
+### Pipeline execution
+
+`runPipeline()` robi snapshot konfiguracji node'ow (`snap`) przed async loop — unika stale closures.
+`topoSort()` sortuje topologicznie. Wyniki dodawane jako data/entity/doc nodes na canvas.
 
 ## Graf wiedzy — dokument-centryczny
 
@@ -175,6 +229,104 @@ test-mini.txt --kredytobiorca to----> Jan Kowalski
 - Multi-thread: COOP/COEP headers wlaczone
 - Sentence starters zamiast pytan (75% vs 50% poprawnosci)
 
+### Kierunki optymalizacji
+- **Prompt format**: chatTemplate=true vs raw prompt
+- **Ciecie chunka**: ciac na granicy zdania, nie na 300 zn
+- **topK**: testowac topK=1 vs topK=2
+- **Embedding model**: sprawdzic mniejsze modele (e5-xsmall, gte-small)
+- **nCtx**: jesli prompt miesci sie w 256, nCtx=256 moze przyspieszyc
+- **Benchmark powtarzalny**: zestaw dokumentow + pytania + oczekiwane odpowiedzi
+
+## Design system
+
+Tailwind + DaisyUI (dracula/corporate). Nie wymyslaj nowych klas — uzywaj ponizszych.
+
+### Tekst
+
+| Rola | Klasa | Kiedy |
+|------|-------|-------|
+| base | `text-sm` (14px) | root div, domyslny rozmiar |
+| tresc | `text-xs` (12px) | etykiety, wartosci, nazwy, buttony |
+| meta | `text-2xs` (10px) | podpisy, detale, sekcje, logi |
+| tytul | `text-2xl font-black` | tylko hero |
+
+### Kolor tekstu
+
+| Rola | Klasa |
+|------|-------|
+| ghost | `text-base-content/20` lub `/25` |
+| muted | `text-base-content/30` lub `/40` |
+| secondary | `text-base-content/50` |
+| normal | `text-base-content/70` |
+| full | brak modyfikatora |
+| brand | `text-primary` |
+| status | `text-success`, `text-error`, `text-warning` |
+
+### Tla i obramowania
+
+| Rola | Klasa |
+|------|-------|
+| powierzchnia | `bg-base-100` |
+| zaglebianie | `bg-base-200` |
+| element | `bg-base-300` |
+| obramowanie | `border-base-300` — zawsze to samo |
+| separator | `border-t border-base-300` lub `border-r`/`border-b`/`border-l` |
+
+### Spacing
+
+| Gdzie | Klasa |
+|-------|-------|
+| padding wewn. | `px-3 py-2` (ciasno), `px-4 py-3` (luznie), `p-3`, `p-4` |
+| gap | `gap-1` (toolbar), `gap-2` (form/grid) |
+| margin sekcji | `mt-1` (inline), `mt-2` (blok), `mb-2`/`mb-3` |
+
+### Wysokosci
+
+| Element | Klasa |
+|---------|-------|
+| wiersz listy | `h-8` |
+| navbar/toolbar | `h-10` z `min-h-10` |
+| kafelek | `h-16` |
+| footer | `h-[56px]` |
+
+### Ikony (react-feather)
+
+| Kontekst | Rozmiar |
+|----------|---------|
+| inline/detail | `size={12}` |
+| button/label | `size={14}` |
+| navbar | `size={16}` |
+
+### Komponenty DaisyUI
+
+| Element | Klasy |
+|---------|-------|
+| button toolbar | `btn btn-ghost btn-xs btn-square` |
+| button action | `btn btn-primary btn-sm` |
+| input | `input input-bordered input-sm text-xs` |
+| badge | `badge badge-ghost badge-sm text-2xs` |
+| toggle | `toggle toggle-xs toggle-primary` |
+| karta | `rounded-lg bg-base-200 p-3` lub `p-4` |
+| element listy | `rounded-md` + hover `hover:bg-base-200` |
+| label sekcji | `text-2xs uppercase tracking-wider text-base-content/25 font-medium` |
+| card header | `h-10 border-b border-base-300` z label sekcji |
+
+### Panele
+
+| Panel | Szerokosc | Klasy |
+|-------|-----------|-------|
+| lewy sidebar | `w-72` | `shrink-0 bg-base-100 border-r border-base-300` |
+| prawy panel | `w-72` | `shrink-0 bg-base-100 border-l border-base-300 absolute right-0 z-40 shadow-lg` |
+| center | `flex-1` | `bg-base-100 min-h-0 max-md:min-w-[100vw]` |
+
+### Zasady
+
+1. **Nie wymyslaj klas** — uzywaj TYLKO powyzszych tokenow
+2. **Kazdy nowy komponent** — sprawdz tabele wyzej i zastosuj odpowiedni wzorzec
+3. **Zero px/rem w kodzie** — tylko klasy Tailwind z tabeli
+4. **Opacity tekstu** — uzywaj `/20`, `/25`, `/30`, `/40`, `/50`, `/70` — nie wymyslaj nowych
+5. **Jeden border-color** — `border-base-300`, nigdy inny
+
 ## Konwencje
 
 - TypeScript, ESM, published as `.ts` source (no build step)
@@ -187,9 +339,23 @@ test-mini.txt --kredytobiorca to----> Jan Kowalski
 ## Struktura repo
 
 ```
-app/                   — workbench (React Flow, packages, Dexie szyna)
-app/public/samples/    — przykladowe dokumenty do testow
-packages/              — niezalezne klocki (store, ocr, embed, llm, graph)
+app/                           — shell + plugins
+  src/Shell.tsx                — layout + error boundary + router (87 LOC)
+  src/main.tsx                 — bootstrap (22 LOC)
+  src/plugins/playground/      — pierwszy plugin (651 LOC)
+    index.tsx                  — UI: provider + 3 sloty + factory
+    blocks.ts                  — logika blokow pipeline
+    nodes.tsx                  — React Flow node types
+    store.ts                   — bridge do host API
+    templates.ts               — predefiniowane pipeline'y
+  public/samples/              — przykladowe dokumenty
+packages/
+  plugin-sdk/                  — micro-framework pluginowy (287 LOC)
+  store-v2/                    — OPFS + Dexie
+  ocr-v2/                      — PDF → tekst
+  embed-v2/                    — embeddingi + search
+  llm-v2/                      — lokalny LLM (WASM)
+  graph-v2/                    — graf wiedzy
 ```
 
 ## Workflow

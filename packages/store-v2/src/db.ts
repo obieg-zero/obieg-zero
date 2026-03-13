@@ -1,9 +1,9 @@
 import Dexie from 'dexie'
 
-export interface ProjectRecord { id: string; name: string; createdAt: number }
-export interface DocumentRecord { id: string; projectId: string; filename: string; pageCount?: number; addedAt: number }
-export interface PageRecord { id: string; projectId: string; documentId: string; page: number; text: string }
-export interface ChunkRecord { id: string; projectId: string; documentId: string; page: number; text: string; embedding: number[] }
+interface ProjectRecord { id: string; name: string; createdAt: number }
+interface DocumentRecord { id: string; projectId: string; filename: string; addedAt: number }
+interface PageRecord { id: string; projectId: string; documentId: string; page: number; text: string }
+interface ChunkRecord { id: string; projectId: string; documentId: string; page: number; text: string; embedding: number[] }
 
 class StoreDexie extends Dexie {
   projects!: Dexie.Table<ProjectRecord, string>
@@ -29,7 +29,6 @@ export interface StoreDB {
   listDocuments(projectId: string): Promise<DocumentRecord[]>
   getDocument(id: string): Promise<DocumentRecord | undefined>
   addDocument(doc: DocumentRecord): Promise<void>
-  removeDocument(id: string): Promise<void>
   getPages(documentId: string): Promise<PageRecord[]>
   setPages(pages: PageRecord[]): Promise<void>
   hasPages(documentId: string): Promise<boolean>
@@ -37,6 +36,7 @@ export interface StoreDB {
   getChunksByProject(projectId: string): Promise<ChunkRecord[]>
   setChunks(chunks: ChunkRecord[]): Promise<void>
   hasChunks(documentId: string): Promise<boolean>
+  clearDocument(documentId: string): Promise<void>
   clearProject(projectId: string): Promise<void>
   dispose(): void
 }
@@ -66,7 +66,6 @@ export function createStoreDB(): StoreDB {
     async listDocuments(projectId) { return db.documents.where('projectId').equals(projectId).toArray() },
     async getDocument(id) { return db.documents.get(id) },
     async addDocument(doc) { await db.documents.put(doc) },
-    async removeDocument(id) { await deleteData({ documentId: id }) },
 
     async getPages(documentId) { return db.pages.where('documentId').equals(documentId).sortBy('page') },
     async setPages(pages) { await db.pages.bulkPut(pages) },
@@ -77,6 +76,7 @@ export function createStoreDB(): StoreDB {
     async setChunks(chunks) { await db.chunks.bulkPut(chunks) },
     async hasChunks(documentId) { return (await db.chunks.where('documentId').equals(documentId).count()) > 0 },
 
+    async clearDocument(documentId) { await deleteData({ documentId }) },
     async clearProject(projectId) { await deleteData({ projectId }) },
     dispose() { db.close() },
   }

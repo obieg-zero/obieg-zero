@@ -1,5 +1,5 @@
 {
-  "name": "mini-playground",
+  "name": "app-boilerplate",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -8,20 +8,22 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.4.0",
-    "@obieg-zero/embed-v2": "*",
-    "@obieg-zero/graph-v2": "*",
-    "@obieg-zero/llm-v2": "*",
-    "@obieg-zero/ocr-v2": "*",
-    "@obieg-zero/store-v2": "*",
-    "@wllama/wllama": "^2.2.0",
+    "@huggingface/transformers": "^3.8.1",
+    "@obieg-zero/embed-v2": "^1.0.1",
+    "@obieg-zero/graph-v2": "^1.1.0",
+    "@obieg-zero/llm-v2": "^1.0.1",
+    "@obieg-zero/ocr-v2": "^1.0.2",
+    "@obieg-zero/plugin-sdk": "^0.2.0",
+    "@obieg-zero/store-v2": "^1.0.0",
+    "@wllama/wllama": "^2.3.7",
     "@xyflow/react": "^12.10.1",
     "dexie": "^4.0.0",
-    "pdfjs-dist": "^4.10.38",
+    "fflate": "^0.8.2",
+    "pdfjs-dist": "^5.5.207",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-feather": "^2.0.10",
-    "tesseract.js": "^6.0.0"
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

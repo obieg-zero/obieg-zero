@@ -1,31 +1,15 @@
 export interface LlmHandle {
-  ask(prompt: string, opts?: AskOpts): Promise<AskResult>
+  ask(prompt: string, opts?: { nPredict?: number; temperature?: number; topP?: number; topK?: number; onToken?: (text: string) => void }): Promise<{ text: string; tokenCount: number; durationMs: number }>
   dispose(): Promise<void>
 }
 
-export interface AskResult {
-  text: string
-  tokenCount: number
-  durationMs: number
-}
-
-export interface AskOpts {
-  nPredict?: number
-  temperature?: number
-  topP?: number
-  topK?: number
-  onToken?: (text: string) => void
-}
-
-export interface LlmOpts {
+export async function createLlm(opts: {
   modelUrl: string
   wasmPaths: Record<string, string>
   nCtx?: number
   chatTemplate?: boolean
   onProgress?: (msg: string) => void
-}
-
-export async function createLlm(opts: LlmOpts): Promise<LlmHandle> {
+}): Promise<LlmHandle> {
   const { modelUrl, wasmPaths, nCtx = 2048, chatTemplate = true, onProgress } = opts
 
   if (!modelUrl) throw new Error('llm: modelUrl is required')

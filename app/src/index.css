@@ -1,44 +1,15 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
 @plugin "daisyui" {
   themes: dracula, corporate;
 }
-@import "@xyflow/react/dist/style.css";
 
 @theme {
   --font-size-2xs: 0.625rem;
   --font-size-2xs--line-height: 0.875rem;
 }
 
-/* ReactFlow — reset node chrome, match DaisyUI theme */
-.react-flow {
-  --xy-node-background-color: transparent;
-  --xy-node-border: none;
-  --xy-node-border-radius: 0.5rem;
-  --xy-node-boxshadow-hover: none;
-  --xy-node-boxshadow-selected: 0 0 0 2px oklch(var(--p));
-
-  --xy-handle-background-color: oklch(var(--bc) / 0.3);
-  --xy-handle-border-color: oklch(var(--b2));
-
-  --xy-edge-stroke: oklch(var(--bc) / 0.15);
-  --xy-edge-stroke-selected: oklch(var(--p));
-
-  --xy-background-color: oklch(var(--b1));
-  --xy-background-pattern-dots-color: transparent;
-}
-
-.react-flow__node {
-  font-size: inherit;
-}
-
-/* subtle noise mat */
-.react-flow::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.15;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+.react-flow__edge-path,
+.react-flow__connection-path {
+  stroke-width: 1;
 }

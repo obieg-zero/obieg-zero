@@ -23,35 +23,10 @@ export interface Graph {
 }
 
 export interface GraphDB {
-  // single ops
-  addNode(node: GraphNode): Promise<void>
-  getNode(id: string): Promise<GraphNode | undefined>
-  updateNode(id: string, patch: Omit<Partial<GraphNode>, 'id'>): Promise<void>
-  removeNode(id: string): Promise<void>
-
-  // batch ops
   addNodes(nodes: GraphNode[]): Promise<void>
   addEdges(edges: GraphEdge[]): Promise<void>
-
-  // queries
-  getNodesByType(type: string): Promise<GraphNode[]>
-  queryNodes(predicate: (n: GraphNode) => boolean): Promise<GraphNode[]>
-  getAllNodes(): Promise<GraphNode[]>
-
-  // edges
-  addEdge(edge: GraphEdge): Promise<void>
-  getEdge(id: string): Promise<GraphEdge | undefined>
-  removeEdge(id: string): Promise<void>
-  getEdgesFrom(nodeId: string): Promise<GraphEdge[]>
-  getEdgesTo(nodeId: string): Promise<GraphEdge[]>
-  getAllEdges(): Promise<GraphEdge[]>
-
-  // traversal
-  getNeighbors(nodeId: string): Promise<GraphNode[]>
-  getContext(nodeId: string, maxHops?: number): Promise<Graph>
-
-  // bulk
   getGraph(): Promise<Graph>
+  getContext(nodeId: string, maxHops?: number): Promise<Graph>
   clear(): Promise<void>
   dispose(): void
 }
@@ -73,73 +48,20 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
   const db = new GraphDexie(name)
 
   return {
-    async addNode(node) {
-      await db.nodes.put(node)
-    },
-
     async addNodes(nodes) {
       await db.nodes.bulkPut(nodes)
-    },
-
-    async getNode(id) {
-      return db.nodes.get(id)
-    },
-
-    async updateNode(id, patch) {
-      const count = await db.nodes.update(id, patch)
-      if (count === 0) throw new Error(`Node ${id} not found`)
-    },
-
-    async removeNode(id) {
-      await db.transaction('rw', db.nodes, db.edges, async () => {
-        await db.edges.where('from').equals(id).delete()
-        await db.edges.where('to').equals(id).delete()
-        await db.nodes.delete(id)
-      })
-    },
-
-    async getNodesByType(type) {
-      return db.nodes.where('type').equals(type).toArray()
-    },
-
-    async queryNodes(predicate) {
-      return db.nodes.filter(predicate).toArray()
-    },
-
-    async getAllNodes() {
-      return db.nodes.toArray()
-    },
-
-    async addEdge(edge) {
-      await db.edges.put(edge)
     },
 
     async addEdges(edges) {
       await db.edges.bulkPut(edges)
     },
 
-    async getEdge(id) {
-      return db.edges.get(id)
-    },
-
-    async removeEdge(id) {
-      await db.edges.delete(id)
-    },
-
-    async getEdgesFrom(nodeId) {
-      return db.edges.where('from').equals(nodeId).toArray()
-    },
-
-    async getEdgesTo(nodeId) {
-      return db.edges.where('to').equals(nodeId).toArray()
-    },
-
-    async getNeighbors(nodeId) {
-      const from = await db.edges.where('from').equals(nodeId).toArray()
-      const to = await db.edges.where('to').equals(nodeId).toArray()
-      const ids = [...new Set([...from, ...to].flatMap(e => [e.from, e.to]).filter(id => id !== nodeId))]
-      const nodes = await db.nodes.bulkGet(ids)
-      return nodes.filter((n): n is GraphNode => n !== undefined)
+    async getGraph() {
+      const [nodes, edges] = await Promise.all([
+        db.nodes.toArray(),
+        db.edges.toArray(),
+      ])
+      return { nodes, edges }
     },
 
     async getContext(nodeId, maxHops = 2) {
@@ -169,18 +91,6 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
 
       const nodes = (await db.nodes.bulkGet([...visitedNodes])).filter((n): n is GraphNode => n !== undefined)
       const edges = (await db.edges.bulkGet([...visitedEdges])).filter((e): e is GraphEdge => e !== undefined)
-      return { nodes, edges }
-    },
-
-    async getAllEdges() {
-      return db.edges.toArray()
-    },
-
-    async getGraph() {
-      const [nodes, edges] = await Promise.all([
-        db.nodes.toArray(),
-        db.edges.toArray(),
-      ])
       return { nodes, edges }
     },
 

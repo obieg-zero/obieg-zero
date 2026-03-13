@@ -5,7 +5,6 @@ export interface OpfsHandle {
   listFiles(project: string): Promise<string[]>
   writeFile(project: string, filename: string, data: File | Blob | ArrayBuffer): Promise<void>
   readFile(project: string, filename: string): Promise<File>
-  removeFile(project: string, filename: string): Promise<void>
 }
 
 async function entries(dir: FileSystemDirectoryHandle): Promise<string[]> {
@@ -48,12 +47,6 @@ export function createOpfs(): OpfsHandle {
       const root = await navigator.storage.getDirectory()
       const dir = await root.getDirectoryHandle(project)
       return (await dir.getFileHandle(filename)).getFile()
-    },
-
-    async removeFile(project, filename) {
-      const root = await navigator.storage.getDirectory()
-      const dir = await root.getDirectoryHandle(project)
-      await (dir as any).removeEntry(filename)
     },
   }
 }

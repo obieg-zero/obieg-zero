@@ -1,30 +1,23 @@
 export interface Chunk { text: string; page: number; embedding: number[] }
 
-export interface EmbedIndex {
-  chunks: Chunk[]
-  embed: (text: string) => Promise<number[]>
-}
-
-export interface EmbedOpts {
-  model: string
-  dtype: string
-  onProgress?: (msg: string) => void
-}
-
-export interface IndexOpts {
+interface IndexOpts {
   chunkSize: number
   chunkOverlap?: number
   minChunkLength?: number
   onProgress?: (msg: string) => void
 }
 
-export interface SearchResult extends Chunk { score: number }
-
-export interface SearchOpts {
+interface SearchOpts {
   topK?: number
   keywordBoost?: number
   maxContextChars?: number
   minWordLength?: number
+}
+
+export interface EmbedHandle {
+  embed(text: string): Promise<number[]>
+  createIndex(pages: { page: number; text: string }[], opts: IndexOpts): Promise<{ chunks: Chunk[]; embed: (text: string) => Promise<number[]> }>
+  dispose(): void
 }
 
 // --- search (pure function) ---
@@ -40,7 +33,7 @@ export async function search(
   query: string,
   embedFn: (text: string) => Promise<number[]>,
   opts: SearchOpts = {},
-): Promise<SearchResult[]> {
+): Promise<(Chunk & { score: number })[]> {
   const { topK = 3, keywordBoost = 0.05, maxContextChars, minWordLength = 2 } = opts
   const queryEmb = await embedFn(query)
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= minWordLength)
@@ -78,7 +71,9 @@ function chunkText(text: string, chunkSize: number, overlap: number, minLen: num
 
 // --- embedder handle ---
 
-export async function createEmbedder(opts: EmbedOpts): Promise<EmbedHandle> {
+type Dtype = 'auto' | 'fp32' | 'fp16' | 'q8' | 'int8' | 'uint8' | 'q4' | 'bnb4' | 'q4f16'
+
+export async function createEmbedder(opts: { model: string; dtype: Dtype; onProgress?: (msg: string) => void }): Promise<EmbedHandle> {
   const { model, dtype, onProgress } = opts
 
   onProgress?.('Loading embedding model…')
@@ -116,10 +111,4 @@ export async function createEmbedder(opts: EmbedOpts): Promise<EmbedHandle> {
 
     dispose() {},
   }
-}
-
-export interface EmbedHandle {
-  embed(text: string): Promise<number[]>
-  createIndex(pages: { page: number; text: string }[], opts: IndexOpts): Promise<EmbedIndex>
-  dispose(): void
 }
