@@ -7,7 +7,7 @@ const configExportPlugin: PluginFactory = (sdk) => {
   function exportConfig() {
     const profile = getProfile()
     const plugins: Record<string, boolean> = {}
-    for (const p of getAllPlugins()) plugins[p.id] = profile[p.id] !== false
+    for (const p of getAllPlugins()) { if (!p.alwaysOn) plugins[p.id] = profile[p.id] !== false }
     const activeId = localStorage.getItem('bp-active') || undefined
     const config = { plugins, defaultPlugin: activeId }
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })

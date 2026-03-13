@@ -72,7 +72,7 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
         <div className="flex-1 min-h-0 p-3 overflow-y-auto space-y-1">
           <table className="table table-sm">
             <tbody>
-              {plugins.filter(p => !p.alwaysOn).map(p => {
+              {plugins.map(p => {
                 const enabled = isPluginEnabled(p.id)
                 const hasRoute = routeIds.has(p.id)
                 return (
@@ -90,8 +90,11 @@ const pluginManagerPlugin: PluginFactory = (sdk) => {
                       <div className="text-2xs text-base-content/40">{p.description}</div>
                     </td>
                     <td className="w-10 align-top">
-                      <input type="checkbox" className="toggle toggle-xs toggle-primary"
-                        checked={enabled} onChange={() => togglePlugin(p.id)} />
+                      {p.alwaysOn
+                        ? <span className="text-2xs text-base-content/30">Always on</span>
+                        : <input type="checkbox" className="toggle toggle-xs toggle-primary"
+                            checked={enabled} onChange={() => togglePlugin(p.id)} />
+                      }
                     </td>
                   </tr>
                 )
