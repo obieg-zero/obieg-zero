@@ -8,18 +8,28 @@ function pipe(types: { type: string; label: string; config?: Record<string, stri
   return { nodes, edges }
 }
 
-function dag(branches: { docGroup: string; chunkSize: string; questions: string; topK?: string }[]) {
+function dag(branches: { docGroup: string; chunkSize: string; questions: string; topK?: string; filter?: { contains?: string; pages?: string } }[]) {
   const nodes: any[] = [], edges: any[] = [], colW = 420, graphId = 'graph-1'
+  const hasFilter = branches.some(b => b.filter)
+  const graphY = hasFilter ? 580 : 440
   branches.forEach((b, col) => {
-    const x = col * colW, u = `upload-${col}`, e = `embed-${col}`, ex = `extract-${col}`
+    const x = col * colW, u = `upload-${col}`, e = `embed-${col}`, f = `filter-${col}`, ex = `extract-${col}`
     nodes.push(
       { id: u, type: 'upload', position: { x, y: 0 }, data: { label: b.docGroup, config: { docGroup: b.docGroup } } },
       { id: e, type: 'embed', position: { x, y: 140 }, data: { label: 'Embed', config: { model: 'Xenova/multilingual-e5-small', chunkSize: b.chunkSize, language: 'pol' } } },
-      { id: ex, type: 'extract', position: { x, y: 280 }, data: { label: 'Extract', config: { questions: b.questions, topK: b.topK || '2', modelUrl: BIELIK } } },
     )
-    edges.push({ id: `e:${u}-${e}`, source: u, sourceHandle: 'next', target: e }, { id: `e:${e}-${ex}`, source: e, sourceHandle: 'next', target: ex }, { id: `e:${ex}-${graphId}`, source: ex, sourceHandle: 'next', target: graphId })
+    edges.push({ id: `p:${u}-${e}`, source: u, sourceHandle: 'next', target: e })
+    if (b.filter) {
+      nodes.push({ id: f, type: 'filter', position: { x, y: 280 }, data: { label: 'Filter', config: { contains: b.filter.contains || '', pages: b.filter.pages || '' } } })
+      nodes.push({ id: ex, type: 'extract', position: { x, y: 420 }, data: { label: 'Extract', config: { questions: b.questions, topK: b.topK || '2', modelUrl: BIELIK } } })
+      edges.push({ id: `p:${e}-${f}`, source: e, sourceHandle: 'next', target: f }, { id: `p:${f}-${ex}`, source: f, sourceHandle: 'next', target: ex })
+    } else {
+      nodes.push({ id: ex, type: 'extract', position: { x, y: 280 }, data: { label: 'Extract', config: { questions: b.questions, topK: b.topK || '2', modelUrl: BIELIK } } })
+      edges.push({ id: `p:${e}-${ex}`, source: e, sourceHandle: 'next', target: ex })
+    }
+    edges.push({ id: `p:${ex}-${graphId}`, source: ex, sourceHandle: 'next', target: graphId })
   })
-  nodes.push({ id: graphId, type: 'graph', position: { x: ((branches.length - 1) * colW) / 2, y: 440 }, data: { label: 'Graph', config: {} } })
+  nodes.push({ id: graphId, type: 'graph', position: { x: ((branches.length - 1) * colW) / 2, y: graphY }, data: { label: 'Graph', config: {} } })
   return { nodes, edges }
 }
 
@@ -37,6 +47,10 @@ export const SEED_TEMPLATES: Omit<PipelineRecord, 'projectId'>[] = [
     { docGroup: 'Formularz ESIS', chunkSize: '200', questions: 'RRSO wynosi\nCalkowity koszt kredytu wynosi\nCalkowita kwota do zaplaty wynosi' },
     { docGroup: 'Wezwanie do zaplaty', chunkSize: '200', questions: 'Kwota roszczenia wynosi\nTermin zaplaty to\nPodstawa prawna roszczenia to' },
     { docGroup: 'Potwierdzenie nadania', chunkSize: '150', questions: 'Data nadania to\nAdresat to\nNumer przesylki to', topK: '1' },
+  ]) },
+  { id: 'tpl:wibor-filter', name: 'WIBOR (z filtrem)', ...dag([
+    { docGroup: 'Umowa kredytu', chunkSize: '200', questions: 'Nazwa banku to\nKwota kredytu wynosi\nStawka WIBOR wynosi\nKredytobiorca to', filter: { contains: 'kredyt' } },
+    { docGroup: 'Aneksy', chunkSize: '150', questions: 'Nowa stawka WIBOR wynosi\nData wejscia w zycie aneksu to', filter: { contains: 'WIBOR' } },
   ]) },
   { id: 'tpl:faktura-gaz', name: 'Faktura za gaz', ...pipe([
     { type: 'upload', label: 'Upload', config: { docGroup: 'Faktura' } },

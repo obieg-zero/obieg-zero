@@ -104,6 +104,28 @@ export async function blockEmbed(host: HostAPI, project: string, docIds: string[
   return { chunks: index.chunks, embedFn: index.embed }
 }
 
+/** Filter chunks by text content and/or page range. */
+export function blockFilter(chunks: Chunk[], contains: string, pages: string, log: Log): Chunk[] {
+  let result = chunks
+  if (contains.trim()) {
+    const term = contains.trim().toLowerCase()
+    result = result.filter(c => c.text.toLowerCase().includes(term))
+    log(`Filter: "${contains}" → ${result.length}/${chunks.length} chunków`)
+  }
+  if (pages.trim()) {
+    const allowed = new Set<number>()
+    for (const part of pages.split(',')) {
+      const range = part.trim().split('-').map(Number)
+      if (range.length === 2) { for (let i = range[0]; i <= range[1]; i++) allowed.add(i) }
+      else if (range.length === 1 && !isNaN(range[0])) allowed.add(range[0])
+    }
+    result = result.filter(c => allowed.has(c.page))
+    log(`Filter: strony [${pages}] → ${result.length} chunków`)
+  }
+  if (!contains.trim() && !pages.trim()) log(`Filter: brak kryteriów, ${chunks.length} chunków`)
+  return result
+}
+
 async function initLlm(host: HostAPI, modelUrl: string, log: Log) {
   if (!host.llm) {
     host.llm = await createLlm({

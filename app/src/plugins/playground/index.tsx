@@ -3,18 +3,19 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, X, Download } from 'react-feather'
+import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, Filter, X, Download } from 'react-feather'
 import { doAction, getProvider, type PluginFactory, type HostAPI } from '@obieg-zero/plugin-sdk'
 import { Box, Cell, Bar, ListItem, Field, Tabs } from '../../themes'
 import { BIELIK } from './templates'
 import type { PipelineRecord } from '@obieg-zero/store-v2'
 import { nodeTypes } from './nodes'
-import { blockUpload, blockEmbed, blockExtract, blockExtractApi, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
+import { blockUpload, blockEmbed, blockFilter, blockExtract, blockExtractApi, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
 import type { ProjectsAPI } from '../projects'
 
 const PALETTE = [
   { type: 'upload', label: 'Upload', icon: Upload, config: { docGroup: '' } },
   { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200', language: 'pol' } },
+  { type: 'filter', label: 'Filter', icon: Filter, config: { contains: '', pages: '' } },
   { type: 'extract', label: 'Extract', icon: Cpu, config: { questions: '', topK: '2', modelUrl: BIELIK } },
   { type: 'extract-api', label: 'ExtractAPI', icon: Globe, config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
   { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
@@ -209,7 +210,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     const right = dataNodeSide.current++ % 2 === 0
     const px = posRef ? posRef.x + (right ? 280 : -240) : 500, py = posRef ? posRef.y - ((items.length - 1) * 14) : 0
     setNodes(n => [...n, ...items.map((it, i) => ({ id: it.id, type: 'data' as const, position: { x: px, y: py + i * 28 }, data: { label: it.label, detail: it.detail } }))])
-    setEdges(e => [...e, ...items.map(it => ({ id: `e:${pid}→${it.id}`, source: pid, sourceHandle: right ? 'data' : 'data-left', target: it.id, targetHandle: right ? 'left' : 'right', style: { strokeDasharray: '4 2', strokeWidth: 1, stroke: 'currentColor', opacity: 0.2 } }))])
+    setEdges(e => [...e, ...items.map(it => ({ id: `viz:${pid}→${it.id}`, source: pid, sourceHandle: right ? 'data' : 'data-left', target: it.id, targetHandle: right ? 'left' : 'right', style: { strokeDasharray: '4 2', strokeWidth: 1, stroke: 'currentColor', opacity: 0.2 } }))])
   }
   function addGraphNodes(_pid: string, graph: { nodes: any[]; edges: any[] }, posRef?: { x: number; y: number }) {
     const baseX = posRef ? posRef.x : 500, baseY = posRef ? posRef.y : 0
@@ -221,11 +222,11 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
       if (sources.size > 1) sharedIds.add(v.id)
     }
     setNodes(n => [...n,
-      ...docs.map((d: any, i: number) => ({ id: `g:${d.id}`, type: 'doc' as const, position: { x: baseX - 200, y: baseY + 80 + i * 40 }, data: { label: d.label } })),
-      ...values.map((v: any, i: number) => ({ id: `g:${v.id}`, type: 'entity' as const, position: { x: baseX + 280, y: baseY + 80 + i * 36 }, data: { label: v.label, detail: v.type, shared: sharedIds.has(v.id) } })),
+      ...docs.map((d: any, i: number) => ({ id: `viz:${d.id}`, type: 'doc' as const, position: { x: baseX - 200, y: baseY + 80 + i * 40 }, data: { label: d.label } })),
+      ...values.map((v: any, i: number) => ({ id: `viz:${v.id}`, type: 'entity' as const, position: { x: baseX + 280, y: baseY + 80 + i * 36 }, data: { label: v.label, detail: v.type, shared: sharedIds.has(v.id) } })),
     ])
     setEdges(e => [...e, ...graph.edges.map((ge: any) => ({
-      id: `g:${ge.id}`, source: `g:${ge.from}`, sourceHandle: 'right', target: `g:${ge.to}`, targetHandle: 'left',
+      id: `viz:${ge.id}`, source: `viz:${ge.from}`, sourceHandle: 'right', target: `viz:${ge.to}`, targetHandle: 'left',
       label: ge.label, style: { strokeWidth: 1, stroke: sharedIds.has(ge.to) ? 'var(--color-primary)' : 'rgba(255,255,255,0.2)' },
       labelStyle: { fontSize: 9, fill: 'color-mix(in oklch, var(--color-base-content) 30%, transparent)' },
     }))])
@@ -252,7 +253,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     const pipeIds = new Set(sorted)
     const snap = new Map(nodes.filter(n => n.type !== 'data').map(n => [n.id, { type: n.type!, label: n.data.label as string, config: { ...(n.data.config || {}) } as Record<string, string>, _files: (n.data._files || []) as File[], position: n.position }]))
     dataNodeSide.current = 0; setRunning(true); doAction('shell:progress', true); setLog([]); setSelectedId(null); addLog(`=== ${project} ===`)
-    setNodes(n => n.filter(x => x.type !== 'data' && x.type !== 'entity' && x.type !== 'doc')); setEdges(e => e.filter(x => !x.id.startsWith('e:') && !x.id.startsWith('g:')))
+    setNodes(n => n.filter(x => x.type !== 'data' && x.type !== 'entity' && x.type !== 'doc')); setEdges(e => e.filter(x => !x.id.startsWith('viz:')))
 
     await clearGraph(host, project)
     const outputs = new Map<string, NodeOutput>()
@@ -270,7 +271,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
             const docIds = await blockUpload(host, project, f, docGroup, addLog)
             outputs.set(nid, { docIds, docGroup })
             setNodeResult(nid, 'done', `${f.length} plikow`)
-            addDataNodes(nid, f.map(f => ({ id: `d:${nid}:${f.name}`, label: f.name })), nd.position)
+            addDataNodes(nid, f.map(f => ({ id: `viz:${nid}:${f.name}`, label: f.name })), nd.position)
             break
           }
           case 'embed': {
@@ -280,7 +281,14 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
             if (!r) throw new Error('Brak stron')
             outputs.set(nid, { ...input, chunks: r.chunks, embedFn: r.embedFn })
             setNodeResult(nid, 'done', `${r.chunks.length} chunków`)
-            addDataNodes(nid, r.chunks.slice(0, 6).map((ch: Chunk, i: number) => ({ id: `d:${nid}:c${i}`, label: `chunk ${i}`, detail: ch.text.slice(0, 40) + '...' })), nd.position)
+            addDataNodes(nid, r.chunks.slice(0, 6).map((ch: Chunk, i: number) => ({ id: `viz:${nid}:c${i}`, label: `chunk ${i}`, detail: ch.text.slice(0, 40) + '...' })), nd.position)
+            break
+          }
+          case 'filter': {
+            const chunks = input.chunks || []; if (!chunks.length) throw new Error('Brak chunków — połącz z Embed')
+            const filtered = blockFilter(chunks, c.contains || '', c.pages || '', addLog)
+            outputs.set(nid, { ...input, chunks: filtered })
+            setNodeResult(nid, 'done', `${filtered.length}/${chunks.length} chunków`)
             break
           }
           case 'extract': {
