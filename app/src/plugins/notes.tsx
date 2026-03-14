@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react'
-import { Plus, Edit2, Trash2, FileText } from 'react-feather'
-import type { PluginFactory } from '@obieg-zero/plugin-sdk'
-import { doAction } from '@obieg-zero/plugin-sdk'
-import { Box, Cell } from '../components/Box'
+import { Plus, Trash2, FileText } from 'react-feather'
+import { doAction, type PluginFactory } from '@obieg-zero/plugin-sdk'
+import { Box, Cell, Bar, ListItem } from '../themes'
 
 const DOC_ID = '__notes__'
 const PROJ_ID = '__notes__'
@@ -62,10 +61,7 @@ const notesPlugin: PluginFactory = (deps) => {
       <Cell onClick={create}><Plus size={16} /></Cell>
     </>} body={<div>
       {notes.map(n => (
-        <div key={n.id} onClick={() => select(n)} className={`group flex items-center h-8 px-2 rounded-md text-xs cursor-pointer ${active?.id === n.id ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
-          <Edit2 size={12} className="mr-2 shrink-0" /><span className="truncate flex-1">{n.title}</span>
-          <Trash2 size={12} className="shrink-0 opacity-0 group-hover:opacity-40" onClick={e => { e.stopPropagation(); remove(n.id) }} />
-        </div>
+        <ListItem key={n.id} label={n.title} active={active?.id === n.id} onClick={() => select(n)} action={{ icon: Trash2, onClick: () => remove(n.id) }} />
       ))}
     </div>} />
   }
@@ -91,11 +87,7 @@ const notesPlugin: PluginFactory = (deps) => {
   function FooterPanel() {
     const { active } = useNotesCtx()
     if (!active) return null
-    return (
-      <div className="h-10 min-h-10 shrink-0 flex items-center border-t border-base-300 divide-x divide-base-300">
-        <Cell label><pre className="text-2xs text-base-content/30" data-prefix=">">{active.text.length} zn.</pre></Cell>
-      </div>
-    )
+    return <Bar><Cell label>{active.text.length} zn.</Cell></Bar>
   }
 
   return {

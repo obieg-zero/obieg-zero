@@ -1,7 +1,6 @@
 import { Settings } from 'react-feather'
-import type { PluginFactory } from '@obieg-zero/plugin-sdk'
-import { getProfile, getAllPlugins } from '@obieg-zero/plugin-sdk'
-import { Cell } from '../components/Box'
+import { getProfile, getAllPlugins, type PluginFactory } from '@obieg-zero/plugin-sdk'
+import { Cell } from '../themes'
 
 function exportConfig() {
   const profile = getProfile()

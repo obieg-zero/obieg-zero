@@ -1,5 +1,4 @@
-import type { PluginDef, PluginFactory, PluginDeps } from '@obieg-zero/plugin-sdk'
-import { registerPlugin, isPluginEnabled } from '@obieg-zero/plugin-sdk'
+import { registerPlugin, isPluginEnabled, type PluginDef, type PluginFactory, type PluginDeps } from '@obieg-zero/plugin-sdk'
 
 const PLUGINS_DIR = '__plugins__'
 

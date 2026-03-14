@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { Plus, X } from 'react-feather'
-import type { PluginFactory } from '@obieg-zero/plugin-sdk'
-import { doAction, registerProvider } from '@obieg-zero/plugin-sdk'
+import { doAction, registerProvider, type PluginFactory } from '@obieg-zero/plugin-sdk'
+import { ListItem, Field } from '../themes'
 
 export type ProjectsAPI = {
   useProjects: () => {
@@ -46,19 +46,17 @@ const projectsPlugin: PluginFactory = (deps) => {
     const [name, setName] = useState('')
     return <>
       {projects.map(p => (
-        <div key={p} onClick={() => select(p)}
-          className={`group flex items-center h-8 mx-2 px-2 rounded-md text-xs cursor-pointer transition-colors ${current === p ? 'bg-primary/10 text-primary' : 'hover:bg-base-200 text-base-content/70'}`}>
-          <span className="truncate flex-1">{p}</span>
-          <X size={12} className="shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-100" onClick={e => { e.stopPropagation(); remove(p) }} />
-        </div>
+        <ListItem key={p} label={p} active={current === p} onClick={() => select(p)} action={{ icon: X, onClick: () => remove(p) }} />
       ))}
-      <div className="px-4 py-3 flex gap-2">
-        <input value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { create(name.trim()); setName('') } }}
-          placeholder="nowy projekt..." className="input input-bordered input-sm text-xs flex-1" />
-        <button onClick={() => { if (name.trim()) { create(name.trim()); setName('') } }}
-          className="btn btn-sm btn-primary text-xs"><Plus size={14} /></button>
-      </div>
+      <Field label="">
+        <div className="flex gap-2">
+          <input value={name} onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { create(name.trim()); setName('') } }}
+            placeholder="nowy projekt..." className="input input-bordered input-sm text-xs flex-1" />
+          <button onClick={() => { if (name.trim()) { create(name.trim()); setName('') } }}
+            className="btn btn-sm btn-primary text-xs"><Plus size={14} /></button>
+        </div>
+      </Field>
     </>
   }
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Download, Trash2, RefreshCw, Package, ExternalLink } from 'react-feather'
-import type { PluginFactory, PluginDef } from '@obieg-zero/plugin-sdk'
-import { doAction, getAllPlugins, isPluginEnabled, setPluginEnabled } from '@obieg-zero/plugin-sdk'
+import { Download, Trash2, Package, ExternalLink } from 'react-feather'
+import { doAction, getAllPlugins, isPluginEnabled, setPluginEnabled, type PluginFactory, type PluginDef } from '@obieg-zero/plugin-sdk'
 import { installFromGitHub, installFromZip, installFromUrl, listInstalled, uninstallPlugin } from '../installer'
+import { ListItem, Bar, Cell, Field } from '../themes'
 
 const pluginManagerPlugin: PluginFactory = () => {
   function ManagerCenter() {
@@ -65,63 +65,32 @@ const pluginManagerPlugin: PluginFactory = () => {
       <div className="flex-1 min-h-0 flex flex-col"
         onDragOver={e => e.preventDefault()} onDrop={handleDrop}>
 
-        <div className="flex-1 min-h-0 p-3 overflow-y-auto space-y-1">
-          <table className="table table-sm">
-            <tbody>
-              {plugins.map(p => {
-                const enabled = isPluginEnabled(p.id)
-                const hasRoute = !!p.layout?.center
-                return (
-                  <tr key={p.id} className={enabled ? '' : 'opacity-50'}>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium">{p.label}</span>
-                        {hasRoute && enabled && (
-                          <button className="btn btn-ghost btn-xs btn-square"
-                            title={`Otwórz ${p.label}`} onClick={() => doAction('shell:activate', p.id)}>
-                            <ExternalLink size={12} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-2xs text-base-content/40">{p.description}</div>
-                    </td>
-                    <td className="w-10 align-top">
-                      {p.alwaysOn
-                        ? <span className="text-2xs text-base-content/30">Always on</span>
-                        : <input type="checkbox" className="toggle toggle-xs toggle-primary"
-                            checked={enabled} onChange={() => togglePlugin(p.id)} />
-                      }
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {plugins.map(p => {
+            const enabled = isPluginEnabled(p.id)
+            const hasRoute = !!p.layout?.center
+            return (
+              <ListItem key={p.id} label={p.label} detail={p.description} separator
+                aside={<>
+                  {hasRoute && enabled && <button className="btn btn-ghost btn-xs btn-square" onClick={() => doAction('shell:activate', p.id)}><ExternalLink size={12} /></button>}
+                  {p.alwaysOn
+                    ? <span className="text-2xs text-base-content/30">always on</span>
+                    : <input type="checkbox" className="toggle toggle-xs toggle-primary"
+                        checked={enabled} onChange={() => togglePlugin(p.id)} />}
+                </>} />
+            )
+          })}
 
           {installed.length > 0 && <>
-            <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium mt-2 pt-2 border-t border-base-300">zainstalowane</div>
+            <Bar><Cell label>zainstalowane</Cell></Bar>
             {installed.map(p => (
-              <div key={p.id} className="flex items-center h-8 px-2 rounded-md hover:bg-base-200 group">
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs text-base-content/70 truncate">{p.label}</span>
-                  <span className="text-2xs text-base-content/30 ml-2">{p.id}</span>
-                </div>
-                {p.repo && (
-                  <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-40"
-                    title="Aktualizuj z GitHub" onClick={() => handleReinstall(p)}>
-                    <RefreshCw size={12} />
-                  </button>
-                )}
-                <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-40"
-                  title="Odinstaluj" onClick={() => run(async () => { await uninstallPlugin(p.id); refresh(); return p })}>
-                  <Trash2 size={12} />
-                </button>
-              </div>
+              <ListItem key={p.id} label={p.label} detail={p.id}
+                action={{ icon: Trash2, onClick: () => run(async () => { await uninstallPlugin(p.id); refresh(); return p }) }} />
             ))}
           </>}
         </div>
 
-        <div className="p-3 border-t border-base-300 space-y-2">
+        <Field label="Instaluj">
           <div className="flex gap-2">
             <input value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleInstallUrl() }}
@@ -131,15 +100,14 @@ const pluginManagerPlugin: PluginFactory = () => {
               <Download size={14} />
             </button>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-2">
             <label className="btn btn-sm btn-ghost gap-2 text-xs">
               <Package size={14} /> ZIP
               <input type="file" accept=".zip" className="hidden" onChange={handleFileInput} />
             </label>
-            <span className="text-2xs text-base-content/30 self-center">lub upuść .zip na stronę</span>
           </div>
           {msg && <p className={`text-2xs ${msg.ok ? 'text-success' : 'text-error'}`}>{msg.text}</p>}
-        </div>
+        </Field>
       </div>
     )
   }

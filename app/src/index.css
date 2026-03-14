@@ -3,13 +3,3 @@
 @plugin "daisyui" {
   themes: dracula, corporate;
 }
-
-@theme {
-  --font-size-2xs: 0.625rem;
-  --font-size-2xs--line-height: 0.875rem;
-}
-
-.react-flow__edge-path,
-.react-flow__connection-path {
-  stroke-width: 1;
-}

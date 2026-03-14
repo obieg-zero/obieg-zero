@@ -13,6 +13,7 @@ import playgroundPlugin from './plugins/playground'
 import notesPlugin from './plugins/notes'
 import pluginManagerPlugin from './plugins/plugin-manager'
 import configExportPlugin from './plugins/config-export'
+import { SEED_TEMPLATES } from './plugins/playground/templates'
 
 async function boot() {
   let deployConfig: { plugins?: Record<string, boolean>; defaultPlugin?: string } = {}
@@ -26,8 +27,14 @@ async function boot() {
     localStorage.setItem('bp-active', deployConfig.defaultPlugin)
   }
 
+  const db = createStoreDB()
   const deps: PluginDeps = {
-    host: { opfs: createOpfs(), db: createStoreDB(), embedder: null, llm: null, createGraphDB, search }
+    host: { opfs: createOpfs(), db, embedder: null, llm: null, createGraphDB, search }
+  }
+
+  // Seed templates on first run
+  for (const t of SEED_TEMPLATES) {
+    if (!await db.getPipeline(t.id)) await db.savePipeline({ ...t, projectId: null })
   }
 
   for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin, configExportPlugin]) {

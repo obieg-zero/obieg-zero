@@ -4,12 +4,14 @@ interface ProjectRecord { id: string; name: string; createdAt: number }
 export interface DocumentRecord { id: string; projectId: string; filename: string; addedAt: number; docGroup?: string }
 interface PageRecord { id: string; projectId: string; documentId: string; page: number; text: string }
 interface ChunkRecord { id: string; projectId: string; documentId: string; page: number; text: string; embedding: number[] }
+export interface PipelineRecord { id: string; projectId: string | null; name: string; nodes: any[]; edges: any[] }
 
 class StoreDexie extends Dexie {
   projects!: Dexie.Table<ProjectRecord, string>
   documents!: Dexie.Table<DocumentRecord, string>
   pages!: Dexie.Table<PageRecord, string>
   chunks!: Dexie.Table<ChunkRecord, string>
+  pipelines!: Dexie.Table<PipelineRecord, string>
   constructor() {
     super('obieg-store')
     this.version(1).stores({
@@ -23,6 +25,13 @@ class StoreDexie extends Dexie {
       documents: 'id, projectId, docGroup',
       pages: 'id, projectId, documentId',
       chunks: 'id, projectId, documentId, page',
+    })
+    this.version(3).stores({
+      projects: 'id',
+      documents: 'id, projectId, docGroup',
+      pages: 'id, projectId, documentId',
+      chunks: 'id, projectId, documentId, page',
+      pipelines: 'id, projectId',
     })
   }
 }
@@ -47,6 +56,11 @@ export interface StoreDB {
   getPagesByDocIds(docIds: string[]): Promise<PageRecord[]>
   clearDocument(documentId: string): Promise<void>
   clearProject(projectId: string): Promise<void>
+  getPipeline(id: string): Promise<PipelineRecord | undefined>
+  getPipelineByProject(projectId: string): Promise<PipelineRecord | undefined>
+  savePipeline(pipeline: PipelineRecord): Promise<void>
+  listTemplates(): Promise<PipelineRecord[]>
+  deletePipeline(id: string): Promise<void>
   dispose(): void
 }
 
@@ -69,6 +83,7 @@ export function createStoreDB(): StoreDB {
     async addProject(project) { await db.projects.put(project) },
     async removeProject(id) {
       await deleteData({ projectId: id })
+      await db.pipelines.where('projectId').equals(id).delete()
       await db.projects.delete(id)
     },
 
@@ -88,6 +103,12 @@ export function createStoreDB(): StoreDB {
     async listDocumentsByGroup(projectId, docGroup) { return db.documents.where('docGroup').equals(docGroup).filter(d => d.projectId === projectId).toArray() },
     async getChunksByDocIds(docIds) { return docIds.length ? db.chunks.where('documentId').anyOf(docIds).toArray() : [] },
     async getPagesByDocIds(docIds) { return docIds.length ? db.pages.where('documentId').anyOf(docIds).sortBy('page') : [] },
+
+    async getPipeline(id) { return db.pipelines.get(id) },
+    async getPipelineByProject(projectId) { return db.pipelines.where('projectId').equals(projectId).first() },
+    async savePipeline(pipeline) { await db.pipelines.put(pipeline) },
+    async listTemplates() { return db.pipelines.filter(p => p.projectId === null).toArray() },
+    async deletePipeline(id) { await db.pipelines.delete(id) },
 
     async clearDocument(documentId) { await deleteData({ documentId }) },
     async clearProject(projectId) { await deleteData({ projectId }) },

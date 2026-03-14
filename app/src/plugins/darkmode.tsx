@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Sun, Moon } from 'react-feather'
 import type { PluginFactory } from '@obieg-zero/plugin-sdk'
-import { Cell } from '../components/Box'
+import { Cell } from '../themes'
 
 const STORAGE_KEY = 'bp-theme'
 const DARK = 'dracula'

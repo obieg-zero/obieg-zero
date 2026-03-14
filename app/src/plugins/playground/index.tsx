@@ -3,11 +3,11 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Layout, Grid, Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, X } from 'react-feather'
-import type { PluginFactory } from '@obieg-zero/plugin-sdk'
-import { doAction, getProvider } from '@obieg-zero/plugin-sdk'
-import type { HostAPI } from '@obieg-zero/plugin-sdk'
-import { TEMPLATES, BIELIK } from './templates'
+import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, X, Download } from 'react-feather'
+import { doAction, getProvider, type PluginFactory, type HostAPI } from '@obieg-zero/plugin-sdk'
+import { Box, Cell, Bar, ListItem, Field, Tabs } from '../../themes'
+import { BIELIK } from './templates'
+import type { PipelineRecord } from '@obieg-zero/store-v2'
 import { nodeTypes } from './nodes'
 import { blockUpload, blockEmbed, blockExtract, blockExtractApi, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
 import type { ProjectsAPI } from '../projects'
@@ -20,19 +20,18 @@ const PALETTE = [
   { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
 ]
 
-const Lbl = ({ children }: { children: React.ReactNode }) => <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">{children}</div>
-
 type State = {
   nodes: Node[]; edges: Edge[]; project: string | null; log: string[]
   running: boolean; leftTab: 'templates' | 'blocks'; selectedId: string | null
+  templates: PipelineRecord[]
 }
 type Actions = {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>; setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   setLog: React.Dispatch<React.SetStateAction<string[]>>; setLeftTab: (t: 'templates' | 'blocks') => void
   setSelectedId: (id: string | null) => void
-  addLog: Log; loadTemplate: (id: string) => void; runPipeline: () => void
+  addLog: Log; loadTemplate: (id: string) => void; runPipeline: () => void; exportPipeline: () => void
   onNodesChange: OnNodesChange; onEdgesChange: OnEdgesChange; onConnect: (c: Connection) => void
-  onDrop: (e: DragEvent) => void; rfInstance: React.MutableRefObject<any>
+  onDrop: (e: DragEvent) => void; rfInstance: React.RefObject<any>
 }
 
 const Ctx = createContext<{ s: State; a: Actions }>(null!)
@@ -48,37 +47,31 @@ function LeftSidebar() {
   const { current: project } = pApi.useProjects()
 
   return <>
-    <div className="flex-1 overflow-y-auto">
-      <div className="flex items-center h-10 px-3 border-b border-base-300"><Lbl>Projekty</Lbl></div>
-      <pApi.ProjectList />
-      {project && <>
-        <div className="flex items-center h-10 px-3 border-t border-b border-base-300"><Lbl>Schemat</Lbl></div>
-        <div className="flex gap-1 mx-2 my-2">
-          <button onClick={() => a.setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'templates' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
-          <button onClick={() => a.setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'blocks' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
-        </div>
-        {s.leftTab === 'templates' ? (
-          <div className="mx-2">{TEMPLATES.map(t => (
-            <div key={t.id} onClick={() => { a.loadTemplate(t.id); doAction('shell:close-left') }}
-              className="flex flex-col justify-center px-2 py-3 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
-              <div className="text-xs">{t.name}</div>
-              <div className="text-2xs text-base-content/30 mt-1">{t.nodes.filter(n => n.type === 'upload').map(n => (n.data.config as any)?.docGroup || n.data.label).join(' + ')}</div>
-            </div>))}</div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2 px-4">{PALETTE.map(p => {
-            const I = p.icon; return (
-              <div key={p.type} draggable onDragStart={e => { e.dataTransfer.setData('application/reactflow', p.type); e.dataTransfer.effectAllowed = 'move' }}
-                className="flex flex-col items-center justify-center h-16 rounded-md hover:bg-base-200 cursor-grab transition-colors">
-                <I size={14} className="text-base-content/50 mb-1" /><span className="text-2xs text-base-content/40">{p.label}</span>
-              </div>)
-          })}</div>
-        )}
-      </>}
-    </div>
-    <div className="border-t border-base-300 px-4 p-3 flex items-center h-[56px]">
-      <div className="text-2xs text-base-content/20">Twoje dane nie opuszczają tego urządzenia.</div>
-    </div>
+    <Box header={<Cell label>Projekty</Cell>} body={<pApi.ProjectList />} />
+    {project && <Box header={<Cell label>Schemat</Cell>} body={<>
+      <Tabs active={s.leftTab} onSelect={id => a.setLeftTab(id as 'templates' | 'blocks')}
+        items={[{ id: 'templates', label: 'Szablony' }, { id: 'blocks', label: 'Bloki' }]} />
+      {s.leftTab === 'templates' ? (
+        <>{s.templates.map(t => (
+          <ListItem key={t.id} label={t.name} separator
+            detail={t.nodes.filter((n: any) => n.type === 'upload').map((n: any) => n.data?.config?.docGroup || n.data?.label).join(' + ')}
+            onClick={() => { a.loadTemplate(t.id); doAction('shell:close-left') }} />
+        ))}</>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 px-4">{PALETTE.map(p => {
+          const I = p.icon; return (
+            <div key={p.type} draggable onDragStart={e => { e.dataTransfer.setData('application/reactflow', p.type); e.dataTransfer.effectAllowed = 'move' }}
+              className="flex flex-col items-center justify-center h-16 rounded-md hover:bg-base-200 cursor-grab transition-colors">
+              <I size={14} className="text-base-content/50 mb-1" /><span className="text-2xs text-base-content/40">{p.label}</span>
+            </div>)
+        })}</div>
+      )}
+    </>} />}
   </>
+}
+
+function LeftFooter() {
+  return <div className="px-3 py-2 text-2xs text-base-content/20">Twoje dane nie opuszczają tego urządzenia.</div>
 }
 
 // --- Right panel (node config) ---
@@ -94,27 +87,22 @@ function RightPanel() {
   }
 
   return (
-    <div className="w-72 shrink-0 bg-base-100 border-l border-base-300 flex flex-col min-h-0">
-      <div className="flex items-center h-10 min-h-10 px-3 border-b border-base-300">
-        <Lbl>{node.data.label as string}</Lbl>
-        <div className="flex-1" />
-        <button onClick={() => a.setSelectedId(null)} className="btn btn-ghost btn-xs btn-square"><X size={12} /></button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {cfg.map(([k, v]) => (
-          <div key={k}>
-            <div className="text-2xs text-base-content/30 mb-1">{k}</div>
-            {String(v).includes('\n') || k === 'questions'
-              ? <textarea value={String(v)} rows={k === 'questions' ? 8 : 3} onChange={e => onCfg(k, e.target.value)}
-                  className="textarea textarea-bordered textarea-sm font-mono w-full bg-transparent border-base-300 text-xs" />
-              : <input type={k === 'apiKey' ? 'password' : 'text'} value={String(v)}
-                  placeholder={k === 'apiKey' ? 'sk-...' : ''}
-                  onChange={e => onCfg(k, e.target.value)}
-                  className="input input-bordered input-sm w-full text-xs font-mono bg-transparent border-base-300" />}
-          </div>
-        ))}
-      </div>
-    </div>
+    <Box header={<>
+      <Cell label>{node.data.label as string}</Cell>
+      <Cell onClick={() => a.setSelectedId(null)}><X size={12} /></Cell>
+    </>} body={<>
+      {cfg.map(([k, v]) => (
+        <Field key={k} label={k}>
+          {String(v).includes('\n') || k === 'questions'
+            ? <textarea value={String(v)} rows={k === 'questions' ? 8 : 3} onChange={e => onCfg(k, e.target.value)}
+                className="textarea textarea-bordered textarea-sm font-mono w-full" />
+            : <input type={k === 'apiKey' ? 'password' : 'text'} value={String(v)}
+                placeholder={k === 'apiKey' ? 'sk-...' : ''}
+                onChange={e => onCfg(k, e.target.value)}
+                className="input input-bordered input-sm w-full text-xs font-mono" />}
+        </Field>
+      ))}
+    </>} />
   )
 }
 
@@ -127,19 +115,21 @@ function FooterPanel() {
 
   if (!s.project) return null
   return (
-    <div className="border-t border-base-300">
+    <div>
       {s.running || s.log?.length > 0 ? (
         <div className="flex flex-col max-h-56">
-          <div className="navbar min-h-10 h-10 px-3">
+          <Bar>
             {s.running && <span className="loading loading-spinner loading-xs text-warning mr-2" />}
-            <Terminal size={12} className="text-base-content/25 mr-2" />
-            <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Dziennik</span>
-            {!s.running && <button onClick={() => a.setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
-          </div>
+            <Cell label><Terminal size={12} className="mr-2" />Dziennik</Cell>
+            {!s.running && <Cell onClick={() => a.setLog([])}><Trash2 size={12} /></Cell>}
+          </Bar>
           <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-4 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{(s.log || []).join('\n')}</pre>
         </div>
       ) : (
-        <div className="p-3"><button onClick={() => { a.runPipeline(); doAction('shell:close-left') }} disabled={s.running} className="btn btn-primary btn-sm w-full gap-2"><Play size={14} />Analizuj</button></div>
+        <div className="p-3 flex gap-2">
+          <button onClick={() => { a.runPipeline(); doAction('shell:close-left') }} disabled={s.running} className="btn btn-primary btn-sm flex-1 gap-2"><Play size={14} />Analizuj</button>
+          <button onClick={a.exportPipeline} className="btn btn-ghost btn-sm btn-square" title="Eksportuj pipeline JSON"><Download size={14} /></button>
+        </div>
       )}
     </div>
   )
@@ -154,6 +144,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   const [running, setRunning] = useState(false)
   const [leftTab, setLeftTab] = useState<'templates' | 'blocks'>('templates')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<PipelineRecord[]>([])
   const rfInstance = useRef<any>(null)
   const dataNodeSide = useRef(0)
   const host = _host
@@ -163,17 +154,25 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`])
   }, [])
 
+  // Load templates from Dexie
+  useEffect(() => { host.db.listTemplates().then(setTemplates) }, [])
+
+  // Load pipeline from Dexie when project changes
   useEffect(() => {
     if (!project) { setNodes([]); setEdges([]); return }
-    try { const s = JSON.parse(localStorage.getItem(`pipeline:${project}`) || 'null'); s ? (setNodes(s.nodes), setEdges(s.edges)) : (setNodes([]), setEdges([])) } catch { setNodes([]); setEdges([]) }
+    host.db.getPipelineByProject(project).then((p: PipelineRecord | undefined) => {
+      p ? (setNodes(p.nodes), setEdges(p.edges)) : (setNodes([]), setEdges([]))
+      setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
+    })
     setLog([]); setSelectedId(null)
-    setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
   }, [project])
 
+  // Save pipeline to Dexie
   useEffect(() => {
     if (!project) return
-    const pipe = nodes.filter(x => x.type !== 'data'), ids = new Set(pipe.map(x => x.id))
-    localStorage.setItem(`pipeline:${project}`, JSON.stringify({ nodes: pipe, edges: edges.filter(x => ids.has(x.source) && ids.has(x.target)) }))
+    const pipe = nodes.filter(x => x.type !== 'data' && x.type !== 'entity' && x.type !== 'doc')
+    const ids = new Set(pipe.map(x => x.id))
+    host.db.savePipeline({ id: `pipeline:${project}`, projectId: project, name: project, nodes: pipe, edges: edges.filter(x => ids.has(x.source) && ids.has(x.target)) })
   }, [project, nodes, edges])
 
   const onNodesChange: OnNodesChange = useCallback(ch => setNodes(n => applyNodeChanges(ch, n)), [])
@@ -181,8 +180,8 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   const onConnect = useCallback((c: Connection) => setEdges(e => addEdge(c, e)), [])
 
   function loadTemplate(id: string) {
-    const t = TEMPLATES.find(t => t.id === id); if (!t || !project) return
-    setNodes(t.nodes.map(n => ({ ...n, data: { ...n.data, config: { ...(n.data.config as any || {}) } } }))); setEdges([...t.edges])
+    const t = templates.find(t => t.id === id); if (!t || !project) return
+    setNodes(t.nodes.map((n: any) => ({ ...n, data: { ...n.data, config: { ...(n.data.config || {}) } } }))); setEdges([...t.edges])
     setSelectedId(null)
     setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
   }
@@ -212,7 +211,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     setNodes(n => [...n, ...items.map((it, i) => ({ id: it.id, type: 'data' as const, position: { x: px, y: py + i * 28 }, data: { label: it.label, detail: it.detail } }))])
     setEdges(e => [...e, ...items.map(it => ({ id: `e:${pid}→${it.id}`, source: pid, sourceHandle: right ? 'data' : 'data-left', target: it.id, targetHandle: right ? 'left' : 'right', style: { strokeDasharray: '4 2', strokeWidth: 1, stroke: 'currentColor', opacity: 0.2 } }))])
   }
-  function addGraphNodes(pid: string, graph: { nodes: any[]; edges: any[] }, posRef?: { x: number; y: number }) {
+  function addGraphNodes(_pid: string, graph: { nodes: any[]; edges: any[] }, posRef?: { x: number; y: number }) {
     const baseX = posRef ? posRef.x : 500, baseY = posRef ? posRef.y : 0
     const docs = graph.nodes.filter((n: any) => n.type === 'document')
     const values = graph.nodes.filter((n: any) => n.type !== 'document')
@@ -314,8 +313,17 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     addLog('--- done ---'); setRunning(false); doAction('shell:progress', false)
   }
 
-  const s = { nodes, edges, project, log, running, leftTab, selectedId }
-  const a = { setNodes, setEdges, setLog, setLeftTab, setSelectedId, addLog, loadTemplate, runPipeline,
+  function exportPipeline() {
+    if (!project) return
+    const pipe = nodes.filter(x => x.type !== 'data' && x.type !== 'entity' && x.type !== 'doc')
+    const ids = new Set(pipe.map(x => x.id))
+    const data = { name: project, nodes: pipe, edges: edges.filter(x => ids.has(x.source) && ids.has(x.target)) }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${project}.pipeline.json`; a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  const s = { nodes, edges, project, log, running, leftTab, selectedId, templates }
+  const a = { setNodes, setEdges, setLog, setLeftTab, setSelectedId, addLog, loadTemplate, runPipeline, exportPipeline,
     onNodesChange, onEdgesChange, onConnect, onDrop, rfInstance }
 
   return <Ctx.Provider value={{ s, a }}>{children}</Ctx.Provider>
@@ -360,7 +368,7 @@ const playgroundPlugin: PluginFactory = (deps) => {
     description: 'Blokowy RAG builder (React Flow)',
     icon: GitBranch,
     requires: ['projects'],
-    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, center: CenterCanvas, right: RightPanel, footer: FooterPanel },
+    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, leftFooter: LeftFooter, center: CenterCanvas, right: RightPanel, footer: FooterPanel },
   }
 }
 

@@ -1,6 +1,5 @@
 import { ocrFile } from '@obieg-zero/ocr-v2'
-import { createEmbedder } from '@obieg-zero/embed-v2'
-import type { Chunk } from '@obieg-zero/embed-v2'
+import { createEmbedder, type Chunk } from '@obieg-zero/embed-v2'
 import { createLlm } from '@obieg-zero/llm-v2'
 import type { HostAPI } from '@obieg-zero/plugin-sdk'
 
