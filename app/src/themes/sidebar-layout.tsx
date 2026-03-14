@@ -117,8 +117,8 @@ export function SidebarLayout({ left: Left, leftFooter: LeftFooter, center: Cent
             <PluginErrorBoundary><Left /></PluginErrorBoundary>
           </Column>
         )}
-        <div className="flex-1 max-md:min-w-[100vw] flex flex-col bg-base-100 min-h-0">
-          <div className="h-10 min-h-10 shrink-0 flex items-center border-b border-base-300 divide-x divide-base-300">
+        <Column className="flex-1 max-md:min-w-[100vw]" footer={Footer && <PluginErrorBoundary><Footer /></PluginErrorBoundary>}>
+          <div className={`${bar} border-b`}>
             {hasLeft && <div className="md:hidden self-stretch flex items-center px-1">
               <button className="btn btn-ghost btn-sm btn-square" onClick={toggleLeft}>{leftOpen ? <ChevronLeft size={16} /> : <Menu size={16} />}</button>
             </div>}
@@ -139,8 +139,7 @@ export function SidebarLayout({ left: Left, leftFooter: LeftFooter, center: Cent
               <PluginErrorBoundary><Right /></PluginErrorBoundary>
             </div>}
           </div>
-          {Footer && <PluginErrorBoundary><Footer /></PluginErrorBoundary>}
-        </div>
+        </Column>
       </div>
     </div>
   )
