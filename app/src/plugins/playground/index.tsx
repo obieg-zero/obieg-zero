@@ -3,19 +3,18 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Layout, Grid, Play, Terminal, Trash2, Upload, FileText, Layers, Cpu, Globe, GitBranch } from 'react-feather'
+import { Layout, Grid, Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, X } from 'react-feather'
 import type { PluginFactory } from '@obieg-zero/plugin-sdk'
 import { doAction, getProvider } from '@obieg-zero/plugin-sdk'
 import type { HostAPI } from '@obieg-zero/plugin-sdk'
 import { TEMPLATES, BIELIK } from './templates'
 import { nodeTypes } from './nodes'
-import { blockUpload, blockParse, blockEmbed, blockExtract, blockExtractApi, blockGraph, type Chunk, type Log } from './blocks'
+import { blockUpload, blockEmbed, blockExtract, blockExtractApi, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
 import type { ProjectsAPI } from '../projects'
 
 const PALETTE = [
-  { type: 'upload', label: 'Upload', icon: Upload, config: {} },
-  { type: 'parse', label: 'Parse', icon: FileText, config: { language: 'pol' } },
-  { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200' } },
+  { type: 'upload', label: 'Upload', icon: Upload, config: { docGroup: '' } },
+  { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200', language: 'pol' } },
   { type: 'extract', label: 'Extract', icon: Cpu, config: { questions: '', topK: '2', modelUrl: BIELIK } },
   { type: 'extract-api', label: 'ExtractAPI', icon: Globe, config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
   { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
@@ -23,12 +22,14 @@ const PALETTE = [
 
 const Lbl = ({ children }: { children: React.ReactNode }) => <div className="text-2xs uppercase tracking-wider text-base-content/25 font-medium">{children}</div>
 
-// --- Shared state via React Context ---
-
-type State = { nodes: Node[]; edges: Edge[]; project: string | null; log: string[]; running: boolean; leftTab: 'templates' | 'blocks' }
+type State = {
+  nodes: Node[]; edges: Edge[]; project: string | null; log: string[]
+  running: boolean; leftTab: 'templates' | 'blocks'; selectedId: string | null
+}
 type Actions = {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>; setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   setLog: React.Dispatch<React.SetStateAction<string[]>>; setLeftTab: (t: 'templates' | 'blocks') => void
+  setSelectedId: (id: string | null) => void
   addLog: Log; loadTemplate: (id: string) => void; runPipeline: () => void
   onNodesChange: OnNodesChange; onEdgesChange: OnEdgesChange; onConnect: (c: Connection) => void
   onDrop: (e: DragEvent) => void; rfInstance: React.MutableRefObject<any>
@@ -39,7 +40,7 @@ const use = () => useContext(Ctx)
 
 let _host: HostAPI
 
-// --- Left sidebar (slot) ---
+// --- Left sidebar ---
 
 function LeftSidebar() {
   const { s, a } = use()
@@ -50,19 +51,18 @@ function LeftSidebar() {
     <div className="flex-1 overflow-y-auto">
       <div className="flex items-center h-10 px-3 border-b border-base-300"><Lbl>Projekty</Lbl></div>
       <pApi.ProjectList />
-
       {project && <>
         <div className="flex items-center h-10 px-3 border-t border-b border-base-300"><Lbl>Schemat</Lbl></div>
         <div className="flex gap-1 mx-2 my-2">
-          <button onClick={() => a.setLeftTab?.('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'templates' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
-          <button onClick={() => a.setLeftTab?.('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'blocks' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
+          <button onClick={() => a.setLeftTab('templates')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'templates' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Layout size={12} className="mr-2" />Szablony</button>
+          <button onClick={() => a.setLeftTab('blocks')} className={`flex items-center h-8 px-3 rounded-md text-xs transition-colors ${s.leftTab === 'blocks' ? 'bg-base-200' : 'hover:bg-base-200 text-base-content/50'}`}><Grid size={12} className="mr-2" />Bloki</button>
         </div>
         {s.leftTab === 'templates' ? (
           <div className="mx-2">{TEMPLATES.map(t => (
-            <div key={t.id} onClick={() => { a.loadTemplate?.(t.id); doAction('shell:close-left') }}
+            <div key={t.id} onClick={() => { a.loadTemplate(t.id); doAction('shell:close-left') }}
               className="flex flex-col justify-center px-2 py-3 rounded-md cursor-pointer hover:bg-base-200 transition-colors">
               <div className="text-xs">{t.name}</div>
-              <div className="text-2xs text-base-content/30 mt-1">{t.nodes.map(n => n.data.label).join(' → ')}</div>
+              <div className="text-2xs text-base-content/30 mt-1">{t.nodes.filter(n => n.type === 'upload').map(n => (n.data.config as any)?.docGroup || n.data.label).join(' + ')}</div>
             </div>))}</div>
         ) : (
           <div className="grid grid-cols-3 gap-2 px-4">{PALETTE.map(p => {
@@ -81,7 +81,44 @@ function LeftSidebar() {
   </>
 }
 
-// --- Footer (slot) ---
+// --- Right panel (node config) ---
+
+function RightPanel() {
+  const { s, a } = use()
+  const node = s.nodes.find(n => n.id === s.selectedId)
+  if (!node || !node.data.config || !Object.keys(node.data.config as any).length) return null
+  const cfg = Object.entries(node.data.config as Record<string, string>)
+
+  const onCfg = (k: string, v: string) => {
+    a.setNodes(ns => ns.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: { ...(n.data.config as any), [k]: v } } } : n))
+  }
+
+  return (
+    <div className="w-72 shrink-0 bg-base-100 border-l border-base-300 flex flex-col min-h-0">
+      <div className="flex items-center h-10 min-h-10 px-3 border-b border-base-300">
+        <Lbl>{node.data.label as string}</Lbl>
+        <div className="flex-1" />
+        <button onClick={() => a.setSelectedId(null)} className="btn btn-ghost btn-xs btn-square"><X size={12} /></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {cfg.map(([k, v]) => (
+          <div key={k}>
+            <div className="text-2xs text-base-content/30 mb-1">{k}</div>
+            {String(v).includes('\n') || k === 'questions'
+              ? <textarea value={String(v)} rows={k === 'questions' ? 8 : 3} onChange={e => onCfg(k, e.target.value)}
+                  className="textarea textarea-bordered textarea-sm font-mono w-full bg-transparent border-base-300 text-xs" />
+              : <input type={k === 'apiKey' ? 'password' : 'text'} value={String(v)}
+                  placeholder={k === 'apiKey' ? 'sk-...' : ''}
+                  onChange={e => onCfg(k, e.target.value)}
+                  className="input input-bordered input-sm w-full text-xs font-mono bg-transparent border-base-300" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// --- Footer ---
 
 function FooterPanel() {
   const { s, a } = use()
@@ -97,18 +134,18 @@ function FooterPanel() {
             {s.running && <span className="loading loading-spinner loading-xs text-warning mr-2" />}
             <Terminal size={12} className="text-base-content/25 mr-2" />
             <span className="flex-1 text-2xs font-medium uppercase tracking-wider text-base-content/25">Dziennik</span>
-            {!s.running && <button onClick={() => a.setLog?.([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
+            {!s.running && <button onClick={() => a.setLog([])} className="btn btn-ghost btn-xs btn-square"><Trash2 size={12} /></button>}
           </div>
           <pre ref={logRef} className="flex-1 overflow-y-auto px-3 pb-4 font-mono text-2xs whitespace-pre-wrap break-all text-base-content/40 leading-relaxed">{(s.log || []).join('\n')}</pre>
         </div>
       ) : (
-        <div className="p-3"><button onClick={() => { a.runPipeline?.(); doAction('shell:close-left') }} disabled={s.running} className="btn btn-primary btn-sm w-full gap-2"><Play size={14} />Analizuj</button></div>
+        <div className="p-3"><button onClick={() => { a.runPipeline(); doAction('shell:close-left') }} disabled={s.running} className="btn btn-primary btn-sm w-full gap-2"><Play size={14} />Analizuj</button></div>
       )}
     </div>
   )
 }
 
-// --- Provider (wrapper slot, owns all state) ---
+// --- Provider ---
 
 function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   const [nodes, setNodes] = useState<Node[]>([])
@@ -116,6 +153,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   const [log, setLog] = useState<string[]>([])
   const [running, setRunning] = useState(false)
   const [leftTab, setLeftTab] = useState<'templates' | 'blocks'>('templates')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const rfInstance = useRef<any>(null)
   const dataNodeSide = useRef(0)
   const host = _host
@@ -125,15 +163,13 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     setLog(p => [...p, `${new Date().toLocaleTimeString()} ${msg}`])
   }, [])
 
-  // Load pipeline when project changes
   useEffect(() => {
     if (!project) { setNodes([]); setEdges([]); return }
     try { const s = JSON.parse(localStorage.getItem(`pipeline:${project}`) || 'null'); s ? (setNodes(s.nodes), setEdges(s.edges)) : (setNodes([]), setEdges([])) } catch { setNodes([]); setEdges([]) }
-    setLog([])
+    setLog([]); setSelectedId(null)
     setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
   }, [project])
 
-  // Save pipeline
   useEffect(() => {
     if (!project) return
     const pipe = nodes.filter(x => x.type !== 'data'), ids = new Set(pipe.map(x => x.id))
@@ -147,12 +183,15 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   function loadTemplate(id: string) {
     const t = TEMPLATES.find(t => t.id === id); if (!t || !project) return
     setNodes(t.nodes.map(n => ({ ...n, data: { ...n.data, config: { ...(n.data.config as any || {}) } } }))); setEdges([...t.edges])
+    setSelectedId(null)
     setTimeout(() => rfInstance.current?.fitView({ padding: 0.2 }), 50)
   }
   function onDrop(e: DragEvent) {
     e.preventDefault(); const type = e.dataTransfer.getData('application/reactflow')
     if (!type || !rfInstance.current) return; const p = PALETTE.find(p => p.type === type); if (!p) return
-    setNodes(n => [...n, { id: `${type}-${Date.now()}`, type, position: rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY }), data: { label: p.label, config: { ...p.config } } }])
+    const id = `${type}-${Date.now()}`
+    setNodes(n => [...n, { id, type, position: rfInstance.current.screenToFlowPosition({ x: e.clientX, y: e.clientY }), data: { label: p.label, config: { ...p.config } } }])
+    setSelectedId(id)
   }
 
   function topoSort(): string[] {
@@ -169,7 +208,7 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
   }
   function addDataNodes(pid: string, items: { id: string; label: string; detail?: string }[], posRef?: { x: number; y: number }) {
     const right = dataNodeSide.current++ % 2 === 0
-    const px = posRef ? posRef.x + (right ? 320 : -280) : 500, py = posRef ? posRef.y - ((items.length - 1) * 14) : 0
+    const px = posRef ? posRef.x + (right ? 280 : -240) : 500, py = posRef ? posRef.y - ((items.length - 1) * 14) : 0
     setNodes(n => [...n, ...items.map((it, i) => ({ id: it.id, type: 'data' as const, position: { x: px, y: py + i * 28 }, data: { label: it.label, detail: it.detail } }))])
     setEdges(e => [...e, ...items.map(it => ({ id: `e:${pid}→${it.id}`, source: pid, sourceHandle: right ? 'data' : 'data-left', target: it.id, targetHandle: right ? 'left' : 'right', style: { strokeDasharray: '4 2', strokeWidth: 1, stroke: 'currentColor', opacity: 0.2 } }))])
   }
@@ -193,42 +232,99 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
     }))])
   }
 
+  type NodeOutput = { docIds?: string[]; docGroup?: string; chunks?: Chunk[]; embedFn?: (q: string) => Promise<number[]> }
+
+  function getInputs(nodeId: string, outputs: Map<string, NodeOutput>, pipeIds: Set<string>): NodeOutput {
+    const parentIds = edges.filter(e => e.target === nodeId && pipeIds.has(e.source)).map(e => e.source)
+    const merged: NodeOutput = {}
+    for (const pid of parentIds) {
+      const po = outputs.get(pid); if (!po) continue
+      if (po.docIds) merged.docIds = [...(merged.docIds || []), ...po.docIds]
+      if (po.chunks) merged.chunks = [...(merged.chunks || []), ...po.chunks]
+      if (po.embedFn) merged.embedFn = po.embedFn
+      if (po.docGroup) merged.docGroup = po.docGroup
+    }
+    return merged
+  }
+
   async function runPipeline() {
     if (!project) return addLog('Wybierz projekt')
     const sorted = topoSort()
+    const pipeIds = new Set(sorted)
     const snap = new Map(nodes.filter(n => n.type !== 'data').map(n => [n.id, { type: n.type!, label: n.data.label as string, config: { ...(n.data.config || {}) } as Record<string, string>, _files: (n.data._files || []) as File[], position: n.position }]))
-    dataNodeSide.current = 0; setRunning(true); setLog([]); addLog(`=== ${project} ===`)
+    dataNodeSide.current = 0; setRunning(true); doAction('shell:progress', true); setLog([]); setSelectedId(null); addLog(`=== ${project} ===`)
     setNodes(n => n.filter(x => x.type !== 'data' && x.type !== 'entity' && x.type !== 'doc')); setEdges(e => e.filter(x => !x.id.startsWith('e:') && !x.id.startsWith('g:')))
-    const ctx: Record<string, any> = { project }
+
+    await clearGraph(host, project)
+    const outputs = new Map<string, NodeOutput>()
+
     for (const nid of sorted) {
       const nd = snap.get(nid); if (!nd) continue
       const c = nd.config
-      setNodeResult(nid, 'running'); addLog(`>>> ${nd.label}`)
+      const input = getInputs(nid, outputs, pipeIds)
+      setNodeResult(nid, 'running'); addLog(`>>> ${nd.label}${input.docGroup ? ` [${input.docGroup}]` : ''}`)
       try {
         switch (nd.type) {
-          case 'upload': { const f = nd._files; if (!f.length) throw new Error('Brak plikow'); await blockUpload(host, project, f, addLog); setNodeResult(nid, 'done', `${f.length} plikow`); addDataNodes(nid, f.map(f => ({ id: `d:file:${f.name}`, label: f.name })), nd.position); break }
-          case 'parse': { ctx.pages = await blockParse(host, project, c.language || 'pol', addLog); setNodeResult(nid, 'done', `${ctx.pages.length} stron`); addDataNodes(nid, ctx.pages.slice(0, 5).map((p: any) => ({ id: `d:p:${p.page}`, label: `str. ${p.page}`, detail: `${p.text.length} zn.` })), nd.position); break }
-          case 'embed': { const r = await blockEmbed(host, project, ctx.pages || [], c.model, parseInt(c.chunkSize) || 200, addLog); if (!r) throw new Error('Brak stron'); ctx.chunks = r.chunks; ctx.embedFn = r.embedFn; setNodeResult(nid, 'done', `${r.chunks.length} chunków`); addDataNodes(nid, r.chunks.slice(0, 6).map((ch: Chunk, i: number) => ({ id: `d:c:${i}`, label: `chunk ${i}`, detail: ch.text.slice(0, 40) + '...' })), nd.position); break }
-          case 'extract': { const q = c.questions?.split('\n').map((s: string) => s.trim()).filter(Boolean) || []; if (!q.length) throw new Error('Brak pytan'); if (!ctx.chunks?.length) throw new Error('Brak chunków'); const s = await blockExtract(host, ctx.chunks, ctx.embedFn, q, c.modelUrl, parseInt(c.topK) || 2, project, addLog); setNodeResult(nid, 'done', `${s?.extracted || 0}/${s?.total || 0}`); break }
-          case 'extract-api': { const q = c.questions?.split('\n').map((s: string) => s.trim()).filter(Boolean) || []; if (!c.apiKey) throw new Error('Brak API Key'); if (!ctx.chunks?.length) throw new Error('Brak chunków'); const s = await blockExtractApi(host, ctx.chunks, ctx.embedFn, q, c.apiUrl || '', c.apiKey, c.apiModel || 'gpt-4o-mini', parseInt(c.topK) || 2, project, addLog); setNodeResult(nid, 'done', `${s?.extracted || 0}/${s?.total || 0}`); break }
-          case 'graph': { ctx.graph = await blockGraph(host, project, addLog); setNodeResult(nid, 'done', `${ctx.graph.nodes.length} encji, ${ctx.graph.edges.length} relacji`); addGraphNodes(nid, ctx.graph, nd.position); break }
+          case 'upload': {
+            const f = nd._files; if (!f.length) throw new Error('Brak plikow')
+            const docGroup = c.docGroup || nd.label
+            const docIds = await blockUpload(host, project, f, docGroup, addLog)
+            outputs.set(nid, { docIds, docGroup })
+            setNodeResult(nid, 'done', `${f.length} plikow`)
+            addDataNodes(nid, f.map(f => ({ id: `d:${nid}:${f.name}`, label: f.name })), nd.position)
+            break
+          }
+          case 'embed': {
+            const docIds = input.docIds || []
+            if (!docIds.length) throw new Error('Brak dokumentow — polacz z Upload')
+            const r = await blockEmbed(host, project, docIds, c.language || 'pol', c.model, parseInt(c.chunkSize) || 200, addLog)
+            if (!r) throw new Error('Brak stron')
+            outputs.set(nid, { ...input, chunks: r.chunks, embedFn: r.embedFn })
+            setNodeResult(nid, 'done', `${r.chunks.length} chunków`)
+            addDataNodes(nid, r.chunks.slice(0, 6).map((ch: Chunk, i: number) => ({ id: `d:${nid}:c${i}`, label: `chunk ${i}`, detail: ch.text.slice(0, 40) + '...' })), nd.position)
+            break
+          }
+          case 'extract': {
+            const q = c.questions?.split('\n').map((s: string) => s.trim()).filter(Boolean) || []
+            if (!q.length) throw new Error('Brak pytan')
+            const chunks = input.chunks || []; if (!chunks.length) throw new Error('Brak chunków — polacz z Embed')
+            const s = await blockExtract(host, chunks, input.embedFn, q, c.modelUrl, parseInt(c.topK) || 2, project, addLog)
+            outputs.set(nid, input)
+            setNodeResult(nid, 'done', `${s?.extracted || 0}/${s?.total || 0}`)
+            break
+          }
+          case 'extract-api': {
+            const q = c.questions?.split('\n').map((s: string) => s.trim()).filter(Boolean) || []
+            if (!c.apiKey) throw new Error('Brak API Key')
+            const chunks = input.chunks || []; if (!chunks.length) throw new Error('Brak chunków — polacz z Embed')
+            const s = await blockExtractApi(host, chunks, input.embedFn, q, c.apiUrl || '', c.apiKey, c.apiModel || 'gpt-4o-mini', parseInt(c.topK) || 2, project, addLog)
+            outputs.set(nid, input)
+            setNodeResult(nid, 'done', `${s?.extracted || 0}/${s?.total || 0}`)
+            break
+          }
+          case 'graph': {
+            const g = await blockGraph(host, project, addLog)
+            setNodeResult(nid, 'done', `${g.nodes.length} encji, ${g.edges.length} relacji`)
+            addGraphNodes(nid, g, nd.position)
+            break
+          }
         }
-      } catch (e: any) { addLog(`ERROR: ${e.message}`); setNodeResult(nid, 'error', e.message); break }
+      } catch (e: any) { addLog(`ERROR: ${e.message}`); setNodeResult(nid, 'error', e.message) }
     }
-    addLog('--- done ---'); setRunning(false)
+    addLog('--- done ---'); setRunning(false); doAction('shell:progress', false)
   }
 
-  const s = { nodes, edges, project, log, running, leftTab }
-  const a = { setNodes, setEdges, setLog, setLeftTab, addLog, loadTemplate, runPipeline,
+  const s = { nodes, edges, project, log, running, leftTab, selectedId }
+  const a = { setNodes, setEdges, setLog, setLeftTab, setSelectedId, addLog, loadTemplate, runPipeline,
     onNodesChange, onEdgesChange, onConnect, onDrop, rfInstance }
 
   return <Ctx.Provider value={{ s, a }}>{children}</Ctx.Provider>
 }
 
-// --- Center (slot) ---
+// --- Center ---
 
 function CenterCanvas() {
-  const { s: { nodes, edges, project, running }, a } = use()
+  const { s: { nodes, edges, project }, a } = use()
 
   return <>
     {!project ? (
@@ -246,10 +342,11 @@ function CenterCanvas() {
         <ReactFlow nodes={nodes} edges={edges} onNodesChange={a.onNodesChange} onEdgesChange={a.onEdgesChange}
           onConnect={a.onConnect} onInit={i => { a.rfInstance.current = i }} onDrop={a.onDrop}
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+          onNodeClick={(_, node) => { if (node.data.config) a.setSelectedId(node.id) }}
+          onPaneClick={() => a.setSelectedId(null)}
           nodeTypes={nodeTypes} fitView proOptions={{ hideAttribution: true }} />
       </div>
     )}
-    {running && <progress className="progress progress-primary w-full fixed top-0 left-0 z-50 h-0.5" />}
   </>
 }
 
@@ -260,10 +357,10 @@ const playgroundPlugin: PluginFactory = (deps) => {
   return {
     id: 'playground',
     label: 'Playground',
-    description: 'Wizualny potok analizy dokumentów (React Flow)',
+    description: 'Blokowy RAG builder (React Flow)',
     icon: GitBranch,
     requires: ['projects'],
-    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, center: CenterCanvas, footer: FooterPanel },
+    layout: { wrapper: PlaygroundProvider, left: LeftSidebar, center: CenterCanvas, right: RightPanel, footer: FooterPanel },
   }
 }
 

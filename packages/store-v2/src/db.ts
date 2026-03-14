@@ -1,7 +1,7 @@
 import Dexie from 'dexie'
 
 interface ProjectRecord { id: string; name: string; createdAt: number }
-interface DocumentRecord { id: string; projectId: string; filename: string; addedAt: number }
+export interface DocumentRecord { id: string; projectId: string; filename: string; addedAt: number; docGroup?: string }
 interface PageRecord { id: string; projectId: string; documentId: string; page: number; text: string }
 interface ChunkRecord { id: string; projectId: string; documentId: string; page: number; text: string; embedding: number[] }
 
@@ -15,6 +15,12 @@ class StoreDexie extends Dexie {
     this.version(1).stores({
       projects: 'id',
       documents: 'id, projectId',
+      pages: 'id, projectId, documentId',
+      chunks: 'id, projectId, documentId, page',
+    })
+    this.version(2).stores({
+      projects: 'id',
+      documents: 'id, projectId, docGroup',
       pages: 'id, projectId, documentId',
       chunks: 'id, projectId, documentId, page',
     })
@@ -36,6 +42,9 @@ export interface StoreDB {
   getChunksByProject(projectId: string): Promise<ChunkRecord[]>
   setChunks(chunks: ChunkRecord[]): Promise<void>
   hasChunks(documentId: string): Promise<boolean>
+  listDocumentsByGroup(projectId: string, docGroup: string): Promise<DocumentRecord[]>
+  getChunksByDocIds(docIds: string[]): Promise<ChunkRecord[]>
+  getPagesByDocIds(docIds: string[]): Promise<PageRecord[]>
   clearDocument(documentId: string): Promise<void>
   clearProject(projectId: string): Promise<void>
   dispose(): void
@@ -75,6 +84,10 @@ export function createStoreDB(): StoreDB {
     async getChunksByProject(projectId) { return db.chunks.where('projectId').equals(projectId).toArray() },
     async setChunks(chunks) { await db.chunks.bulkPut(chunks) },
     async hasChunks(documentId) { return (await db.chunks.where('documentId').equals(documentId).count()) > 0 },
+
+    async listDocumentsByGroup(projectId, docGroup) { return db.documents.where('docGroup').equals(docGroup).filter(d => d.projectId === projectId).toArray() },
+    async getChunksByDocIds(docIds) { return docIds.length ? db.chunks.where('documentId').anyOf(docIds).toArray() : [] },
+    async getPagesByDocIds(docIds) { return docIds.length ? db.pages.where('documentId').anyOf(docIds).sortBy('page') : [] },
 
     async clearDocument(documentId) { await deleteData({ documentId }) },
     async clearProject(projectId) { await deleteData({ projectId }) },

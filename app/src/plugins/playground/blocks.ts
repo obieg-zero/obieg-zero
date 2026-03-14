@@ -11,36 +11,43 @@ function normalizeId(text: string): string {
   return text.toLowerCase().replace(/[^a-ząćęłńóśźż0-9\s]/g, '').replace(/\s+/g, ' ').trim()
 }
 
-export async function blockUpload(host: HostAPI, project: string, files: File[], log: Log) {
+/** Upload files tagged with docGroup. Returns docIds. */
+export async function blockUpload(host: HostAPI, project: string, files: File[], docGroup: string, log: Log): Promise<string[]> {
   const { opfs, db } = host
   await opfs.createProject(project).catch(() => {})
   await db.addProject({ id: project, name: project, createdAt: Date.now() }).catch(() => {})
+  const docIds: string[] = []
   for (const file of files) {
     const docId = `${project}:${file.name}`
     await db.clearDocument?.(docId).catch(() => {})
     await opfs.writeFile(project, file.name, file)
-    await db.addDocument({ id: docId, projectId: project, filename: file.name, addedAt: Date.now() })
-    log(`Zapisano ${file.name} → OPFS/${project}/`)
+    await db.addDocument({ id: docId, projectId: project, filename: file.name, addedAt: Date.now(), docGroup })
+    docIds.push(docId)
+    log(`Zapisano ${file.name} → OPFS/${project}/ [${docGroup}]`)
   }
-  log(`Upload: ${files.length} plikow → OPFS/${project}/`)
+  log(`Upload: ${files.length} plikow → ${docGroup}`)
+  return docIds
 }
 
-export async function blockParse(host: HostAPI, project: string, language: string, log: Log) {
+/** Parse documents by docIds. Returns pages. */
+export async function blockParse(host: HostAPI, project: string, docIds: string[], language: string, log: Log) {
   const { opfs, db } = host
-  const docs = await db.listDocuments(project)
-  if (docs.length > 0) {
-    const cached: { page: number; text: string }[] = []
-    for (const doc of docs) { (await db.getPages(doc.id)).forEach((p: any) => cached.push({ page: p.page, text: p.text })) }
-    if (cached.length > 0) { log(`Parse: ${cached.length} stron z Dexie (cache)`); return cached }
-  }
-  const files = await opfs.listFiles(project)
-  if (files.length === 0) { log('Brak plikow w projekcie'); return [] }
 
+  // Cache: check if pages exist for these docIds
+  const cached: { page: number; text: string }[] = []
+  for (const docId of docIds) {
+    (await db.getPages(docId)).forEach((p: any) => cached.push({ page: p.page, text: p.text }))
+  }
+  if (cached.length > 0) { log(`Parse: ${cached.length} stron z Dexie (cache)`); return cached }
+
+  // Parse files matching docIds
   const allPages: { page: number; text: string }[] = []
   let pageNum = 1
-  for (const filename of files) {
+  for (const docId of docIds) {
+    const doc = await db.getDocument(docId)
+    if (!doc) continue
+    const filename = doc.filename
     const ext = filename.split('.').pop()?.toLowerCase() || ''
-    const docId = `${project}:${filename}`
     log(`Parse: ${filename} (${ext})`)
     const pages: { page: number; text: string }[] = []
     if (ext === 'pdf') {
@@ -62,22 +69,36 @@ export async function blockParse(host: HostAPI, project: string, language: strin
   return allPages
 }
 
-export async function blockEmbed(host: HostAPI, project: string, pages: { page: number; text: string }[], model: string, chunkSize: number, log: Log) {
-  if (!pages.length) { log('Brak stron — dodaj Parse przed Embed'); return null }
+/** Embed pages for given docIds. Auto-parses if no pages exist. */
+export async function blockEmbed(host: HostAPI, project: string, docIds: string[], language: string, model: string, chunkSize: number, log: Log) {
+  if (!docIds.length) { log('Embed: brak dokumentow'); return null }
   if (!host.embedder) host.embedder = await createEmbedder({ model, dtype: 'q8', onProgress: m => log(`  ${m}`) })
 
-  const cached = await host.db.getChunksByProject(project)
+  // Cache: check chunks for these docIds
+  const cached = await host.db.getChunksByDocIds(docIds)
   if (cached.length > 0) {
     log(`Embed: ${cached.length} chunków z Dexie (cache)`)
     return { chunks: cached.map((c: any) => ({ text: c.text, page: c.page, embedding: c.embedding })) as Chunk[], embedFn: (q: string) => host.embedder!.embed(q) }
   }
+
+  // Auto-parse if no pages exist
+  let pages: { page: number; text: string }[] = []
+  const existingPages = await host.db.getPagesByDocIds(docIds)
+  if (existingPages.length > 0) {
+    pages = existingPages.map((p: any) => ({ page: p.page, text: p.text }))
+    log(`Embed: ${pages.length} stron z Dexie`)
+  } else {
+    pages = await blockParse(host, project, docIds, language, log)
+  }
+  if (!pages.length) { log('Embed: brak stron'); return null }
+
   const index = await host.embedder!.createIndex(pages, { chunkSize, onProgress: (m: string) => log(`  ${m}`) })
   log(`Embed: ${index.chunks.length} chunks po ~${chunkSize} zn.`)
 
   const pageDoc = new Map<number, string>()
   for (const p of pages) { const m = p.text.match(/^\[([^\]]+)\]/); if (m) pageDoc.set(p.page, `${project}:${m[1]}`) }
   await host.db.setChunks(index.chunks.map((c: any, i: number) => ({
-    id: `${project}:chunk:${i}`, projectId: project, documentId: pageDoc.get(c.page) || project,
+    id: `${pageDoc.get(c.page) || docIds[0]}:chunk:${i}`, projectId: project, documentId: pageDoc.get(c.page) || docIds[0],
     page: c.page, text: c.text, embedding: Array.from(c.embedding),
   })))
   log(`Embed: zapisano ${index.chunks.length} chunków do Dexie`)
@@ -100,9 +121,9 @@ async function initLlm(host: HostAPI, modelUrl: string, log: Log) {
 
 type AskFn = (prompt: string) => Promise<{ text: string; tokenCount?: number; durationMs?: number }>
 
+/** Extract answers from chunks. Does NOT clear graph — caller does that once. */
 async function extractLoop(host: HostAPI, chunks: Chunk[], embedFn: any, questions: string[], topK: number, askFn: AskFn, project: string, log: Log) {
   const graph = await host.createGraphDB(`graph-${project}`)
-  await graph.clear()
   const totalCalls = questions.length * topK
   const pageFile = new Map<number, string>()
   for (const c of chunks) { const m = c.text.match(/^\[([^\]]+)\]/); if (m) pageFile.set(c.page, m[1]) }
@@ -157,4 +178,10 @@ export async function blockGraph(host: HostAPI, project: string, log: Log) {
   const data = await graph.getGraph()
   log(`Graf: ${data.nodes.length} encji, ${data.edges.length} relacji`)
   return data
+}
+
+/** Clear graph for project — call once before running pipeline branches. */
+export async function clearGraph(host: HostAPI, project: string) {
+  const graph = await host.createGraphDB(`graph-${project}`)
+  await graph.clear()
 }

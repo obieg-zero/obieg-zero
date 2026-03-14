@@ -6,12 +6,13 @@ import { PluginErrorBoundary } from './components/Box'
 export function Shell() {
   const [leftOpen, setLeftOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(() => localStorage.getItem('bp-active'))
+  const [progress, setProgress] = useState(false)
   const [, rerender] = useState(0)
 
   const plugins = getAllPlugins().filter(p => isPluginEnabled(p.id))
   const withLayout = plugins.filter(p => p.layout?.center)
   const active = withLayout.find(p => p.id === activeId) ?? withLayout[0]
-  const { left: Left, center: Center, footer: Footer, wrapper: Wrapper } = active?.layout ?? {}
+  const { left: Left, center: Center, right: Right, footer: Footer, wrapper: Wrapper } = active?.layout ?? {}
   const hasLeft = !!Left
   const actionPlugins = plugins.filter(p => p.action)
 
@@ -21,12 +22,14 @@ export function Shell() {
     const c1 = addAction('shell:toggle-left', () => setLeftOpen(o => !o))
     const c2 = addAction('shell:close-left', () => setLeftOpen(false))
     const c3 = addAction('shell:activate', (id: string) => { setActiveId(id); rerender(n => n + 1) })
-    return () => { c1(); c2(); c3() }
+    const c4 = addAction('shell:progress', (on: boolean) => setProgress(on))
+    return () => { c1(); c2(); c3(); c4() }
   }, [])
 
   const shell = (
-    <div className="h-screen overflow-hidden bg-base-200 text-sm text-base-content">
-      <div className={`flex h-full transition-transform duration-300 ease-in-out ${hasLeft && !leftOpen ? 'max-md:-translate-x-72' : ''}`}>
+    <div className="h-screen overflow-hidden bg-base-200 text-sm text-base-content flex flex-col">
+      {progress && <progress className="progress progress-primary w-full h-0.5 shrink-0" />}
+      <div className={`flex flex-1 min-h-0 transition-transform duration-300 ease-in-out ${hasLeft && !leftOpen ? 'max-md:-translate-x-72' : ''}`}>
         {hasLeft && (
           <div className="w-72 shrink-0 border-r border-base-300 flex flex-col h-full min-h-0 bg-base-100">
             <PluginErrorBoundary><Left /></PluginErrorBoundary>
@@ -59,12 +62,15 @@ export function Shell() {
               )
             })}
           </div>
-          <div className="flex-1 min-h-0 flex flex-col">
-            {Center ? <PluginErrorBoundary><Center /></PluginErrorBoundary> : (
-              <div className="hero flex-1"><div className="hero-content text-center">
-                <p className="text-xs text-base-content/30">Wybierz plugin.</p>
-              </div></div>
-            )}
+          <div className="flex-1 min-h-0 flex">
+            <div className="flex-1 min-h-0 flex flex-col">
+              {Center ? <PluginErrorBoundary><Center /></PluginErrorBoundary> : (
+                <div className="hero flex-1"><div className="hero-content text-center">
+                  <p className="text-xs text-base-content/30">Wybierz plugin.</p>
+                </div></div>
+              )}
+            </div>
+            {Right && <PluginErrorBoundary><Right /></PluginErrorBoundary>}
           </div>
           {Footer && <PluginErrorBoundary><Footer /></PluginErrorBoundary>}
         </div>

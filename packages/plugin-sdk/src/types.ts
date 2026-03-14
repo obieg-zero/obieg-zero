@@ -16,6 +16,7 @@ export interface PluginDef {
     wrapper?: FC<{ children: ReactNode }>
     left?: ComponentType
     center?: ComponentType
+    right?: ComponentType
     footer?: ComponentType
   }
 
