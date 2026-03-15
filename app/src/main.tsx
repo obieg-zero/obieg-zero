@@ -33,13 +33,19 @@ async function boot() {
     React, ui, icons,
   }
 
-  // Seed templates from public/templates/ (same pattern as config.json)
+  // Sync templates: delete stale, seed missing
   try {
     const res = await fetch('./templates/index.json')
-    if (res.ok) for (const entry of await res.json()) {
-      if (!await db.getPipeline(entry.id)) {
-        const r = await fetch(`./templates/${entry.file}`)
-        if (r.ok) await db.savePipeline({ ...await r.json(), projectId: null })
+    if (res.ok) {
+      const entries = await res.json()
+      const validIds = new Set(entries.map((e: any) => e.id))
+      const existing = await db.listTemplates()
+      for (const t of existing) { if (!validIds.has(t.id)) await db.deletePipeline(t.id) }
+      for (const entry of entries) {
+        if (!await db.getPipeline(entry.id)) {
+          const r = await fetch(`./templates/${entry.file}`)
+          if (r.ok) await db.savePipeline({ ...await r.json(), projectId: null })
+        }
       }
     }
   } catch {}
