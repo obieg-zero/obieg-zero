@@ -20,7 +20,9 @@ const projectsPlugin: PluginFactory = (deps) => {
   const emit = () => subs.forEach(fn => fn())
   function set(patch: Partial<typeof state>) { state = { ...state, ...patch }; emit() }
 
-  host.opfs.listProjects().then((p: string[]) => set({ projects: p }))
+  // HACK: installer trzyma pluginy w OPFS/__plugins__/, ten sam root co projekty.
+  // Prawidlowo: osobny namespace albo dedykowane API w store-v2. Na teraz filtrujemy.
+  host.opfs.listProjects().then((p: string[]) => set({ projects: p.filter(n => !n.startsWith('__')) }))
 
   async function create(name: string) {
     const n = name.trim(); if (!n) return

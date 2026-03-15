@@ -12,7 +12,6 @@ import darkmodePlugin from './plugins/darkmode'
 import playgroundPlugin from './plugins/playground'
 import notesPlugin from './plugins/notes'
 import pluginManagerPlugin from './plugins/plugin-manager'
-import configExportPlugin from './plugins/config-export'
 
 async function boot() {
   let deployConfig: { plugins?: Record<string, boolean>; defaultPlugin?: string } = {}
@@ -42,7 +41,7 @@ async function boot() {
     }
   } catch {}
 
-  for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin, configExportPlugin]) {
+  for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin]) {
     const def = factory(deps)
     registerPlugin(def)
     if (def.setup) def.setup()
