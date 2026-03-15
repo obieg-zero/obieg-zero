@@ -3,6 +3,20 @@ import { registerPlugin, isPluginEnabled, type PluginDef, type PluginFactory, ty
 const PLUGINS_DIR = '__plugins__'
 const REGISTRY_URL = 'https://raw.githubusercontent.com/obieg-zero/plugin-registry/main/index.json'
 
+let _deps: PluginDeps | null = null
+export function initInstaller(deps: PluginDeps) { _deps = deps }
+
+async function loadPlugin(code: string, manifest: PluginManifest) {
+  if (!_deps) return
+  try {
+    const mod = await import(/* @vite-ignore */ URL.createObjectURL(new Blob([code], { type: 'application/javascript' })))
+    if (typeof mod.default !== 'function') return
+    const def = mod.default(_deps)
+    if (def) registerPlugin(def)
+    if (def?.setup) def.setup()
+  } catch (err) { console.error(`[plugin] ${manifest.id}:`, err) }
+}
+
 // --- OPFS helpers ---
 
 async function getPluginsRoot(): Promise<FileSystemDirectoryHandle> {
@@ -58,6 +72,7 @@ export async function install(repoUrl: string): Promise<PluginManifest> {
   await writeOPFS(dir, entry, code)
 
   registerPlugin(manifest as unknown as PluginDef)
+  await loadPlugin(code, manifest)
   return manifest
 }
 
@@ -84,6 +99,9 @@ export async function installFromZip(file: File): Promise<PluginManifest> {
   }
 
   registerPlugin(manifest as unknown as PluginDef)
+  const entryName = manifest.entry || 'index.mjs'
+  const entryKey = Object.keys(files).find(k => k === prefix + entryName || k === entryName)
+  if (entryKey) await loadPlugin(new TextDecoder().decode(files[entryKey]), manifest)
   return manifest
 }
 

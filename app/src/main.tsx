@@ -2,7 +2,7 @@ import './index.css'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { configureProfileStore, registerPlugin } from '@obieg-zero/plugin-sdk'
-import { loadInstalledPlugins } from './installer'
+import { loadInstalledPlugins, initInstaller } from './installer'
 import { createOpfs, createStoreDB } from '@obieg-zero/store-v2'
 import { createGraphDB } from '@obieg-zero/graph-v2'
 import { search } from '@obieg-zero/embed-v2'
@@ -43,6 +43,8 @@ async function boot() {
       }
     }
   } catch {}
+
+  initInstaller(deps)
 
   for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, pluginManagerPlugin]) {
     const def = factory(deps)
