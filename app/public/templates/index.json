@@ -1,27 +1,12 @@
 [
   {
     "id": "tpl:wibor",
-    "name": "Kalkulator WIBOR",
+    "name": "Umowy kredytowe (WIBOR)",
     "file": "wibor.json"
-  },
-  {
-    "id": "tpl:wibor-full",
-    "name": "WIBOR (pelny)",
-    "file": "wibor-full.json"
-  },
-  {
-    "id": "tpl:wibor-filter",
-    "name": "WIBOR (z filtrem)",
-    "file": "wibor-filter.json"
   },
   {
     "id": "tpl:faktura-gaz",
     "name": "Faktura za gaz",
     "file": "faktura-gaz.json"
-  },
-  {
-    "id": "tpl:wibor-api",
-    "name": "WIBOR (API + filtr + walidacja)",
-    "file": "wibor-api.json"
   }
 ]
