@@ -21,12 +21,17 @@ const pluginManagerPlugin: PluginFactory = () => {
     const token = getToken()
     const plugins = getAllPlugins()
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async (force?: boolean) => {
       const inst = await listInstalled()
       setInstalled(inst)
       try {
-        const reg = await fetchRegistry()
+        const reg = await fetchRegistry(force ? { force: true } : undefined)
         setRegistry(reg)
+        // If cache returned empty, force refresh once
+        if (!force && reg.plugins.length === 0) {
+          const fresh = await fetchRegistry({ force: true })
+          setRegistry(fresh)
+        }
         const upd = await checkUpdates()
         setUpdates(upd)
       } catch { /* offline or no registry yet */ }
@@ -90,7 +95,11 @@ const pluginManagerPlugin: PluginFactory = () => {
 
       return (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {filtered.length === 0 && <p className="text-xs text-base-content/30 px-3 py-4">Brak pluginow w katalogu.</p>}
+          {filtered.length === 0 && <div className="px-3 py-4 space-y-2">
+            <p className="text-xs text-base-content/30">Brak pluginow w katalogu.</p>
+            <button onClick={() => refresh(true)}
+              className="btn btn-ghost btn-xs">Odswiez katalog</button>
+          </div>}
           {filtered.map(entry => {
             const inst = installed.find(i => i.id === entry.id)
             const upd = updates.find(u => u.pluginId === entry.id)
@@ -179,7 +188,7 @@ const pluginManagerPlugin: PluginFactory = () => {
           {tab === 'catalog' && <>
             <Cell><input value={filter} onChange={e => setFilter(e.target.value)}
               placeholder="szukaj..." className="input input-bordered input-xs text-xs w-28" /></Cell>
-            <Cell onClick={() => fetchRegistry({ force: true }).then(r => { setRegistry(r); refresh() })}><RefreshCw size={14} /></Cell>
+            <Cell onClick={() => refresh(true)}><RefreshCw size={14} /></Cell>
           </>}
         </>} body={tab === 'catalog' ? <CatalogView /> : <InstalledView />} />
 
