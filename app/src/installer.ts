@@ -1,4 +1,4 @@
-import { registerPlugin, isPluginEnabled, type PluginDef, type PluginFactory, type PluginDeps, type PluginManifest } from '@obieg-zero/plugin-sdk'
+import { registerPlugin, isPluginEnabled, type PluginFactory, type PluginDeps, type PluginManifest } from '@obieg-zero/plugin-sdk'
 
 const PLUGINS_DIR = '__plugins__'
 const REGISTRY_URL = 'https://raw.githubusercontent.com/obieg-zero/plugin-registry/main/index.json'
@@ -71,7 +71,7 @@ export async function install(repoUrl: string): Promise<PluginManifest> {
   await writeOPFS(dir, 'manifest.json', JSON.stringify(manifest))
   await writeOPFS(dir, entry, code)
 
-  registerPlugin(manifest as unknown as PluginDef)
+  registerPlugin(manifest)
   await loadPlugin(code, manifest)
   return manifest
 }
@@ -98,7 +98,7 @@ export async function installFromZip(file: File): Promise<PluginManifest> {
     if (name) await writeOPFS(dir, name, bytes)
   }
 
-  registerPlugin(manifest as unknown as PluginDef)
+  registerPlugin(manifest)
   const entryName = manifest.entry || 'index.mjs'
   const entryKey = Object.keys(files).find(k => k === prefix + entryName || k === entryName)
   if (entryKey) await loadPlugin(new TextDecoder().decode(files[entryKey]), manifest)
@@ -132,7 +132,7 @@ export async function loadInstalledPlugins(deps: PluginDeps): Promise<void> {
     if (handle.kind !== 'directory') continue
     try {
       const manifest: PluginManifest = JSON.parse(await readOPFS(handle, 'manifest.json'))
-      registerPlugin(manifest as unknown as PluginDef)
+      registerPlugin(manifest)
       entries.push({ manifest, dir: handle })
     } catch {}
   }
