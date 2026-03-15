@@ -10,7 +10,6 @@ import { Shell } from './Shell'
 import projectsPlugin from './plugins/projects'
 import darkmodePlugin from './plugins/darkmode'
 import playgroundPlugin from './plugins/playground'
-import notesPlugin from './plugins/notes'
 import pluginManagerPlugin from './plugins/plugin-manager'
 
 async function boot() {
@@ -41,7 +40,7 @@ async function boot() {
     }
   } catch {}
 
-  for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin]) {
+  for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, pluginManagerPlugin]) {
     const def = factory(deps)
     registerPlugin(def)
     if (def.setup) def.setup()
