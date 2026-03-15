@@ -1,10 +1,13 @@
 import './index.css'
+import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { configureProfileStore, registerPlugin } from '@obieg-zero/plugin-sdk'
 import { loadInstalledPlugins } from './installer'
 import { createOpfs, createStoreDB } from '@obieg-zero/store-v2'
 import { createGraphDB } from '@obieg-zero/graph-v2'
 import { search } from '@obieg-zero/embed-v2'
+import * as ui from './themes'
+import * as icons from 'react-feather'
 import type { PluginDeps } from '@obieg-zero/plugin-sdk'
 import { Shell } from './Shell'
 import projectsPlugin from './plugins/projects'
@@ -26,7 +29,8 @@ async function boot() {
 
   const db = createStoreDB()
   const deps: PluginDeps = {
-    host: { opfs: createOpfs(), db, embedder: null, llm: null, createGraphDB, search }
+    host: { opfs: createOpfs(), db, embedder: null, llm: null, createGraphDB, search },
+    React, ui, icons,
   }
 
   // Seed templates from public/templates/ (same pattern as config.json)

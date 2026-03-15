@@ -35,7 +35,7 @@ export interface HostAPI {
   search: (...args: any[]) => any
 }
 
-export type PluginDeps = { host: HostAPI }
+export type PluginDeps = { host: HostAPI; React?: any; ui?: any; icons?: any }
 
 export type PluginFactory = (deps: PluginDeps) => PluginDef
 
