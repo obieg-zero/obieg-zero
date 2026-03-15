@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getAllPlugins, isPluginEnabled, addAction } from '@obieg-zero/plugin-sdk'
+import { getAllPlugins, isPluginEnabled, addAction, subscribePlugins } from '@obieg-zero/plugin-sdk'
 import { Layout } from './themes'
 
 export function Shell() {
@@ -19,7 +19,8 @@ export function Shell() {
     const c2 = addAction('shell:close-left', () => setLeftOpen(false))
     const c3 = addAction('shell:activate', (id: string) => { setActiveId(id); rerender(n => n + 1) })
     const c4 = addAction('shell:progress', (on: boolean) => setProgress(on))
-    return () => { c1(); c2(); c3(); c4() }
+    const c5 = subscribePlugins(() => rerender(n => n + 1))
+    return () => { c1(); c2(); c3(); c4(); c5() }
   }, [])
 
   return <Layout

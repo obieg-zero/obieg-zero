@@ -1,5 +1,5 @@
 export { addAction, doAction } from './hooks.js'
-export { registerPlugin, getAllPlugins, getPlugin } from './registry.js'
+export { registerPlugin, getAllPlugins, getPlugin, subscribePlugins } from './registry.js'
 export { configureProfileStore, getProfile, isPluginEnabled, setPluginEnabled, useProfile } from './profileStore.js'
 export type { UserProfile } from './profileStore.js'
 export { registerProvider, getProvider } from './contracts.js'
