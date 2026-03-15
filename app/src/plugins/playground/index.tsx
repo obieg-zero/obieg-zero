@@ -3,18 +3,19 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, Filter, Shield, X, Download } from 'react-feather'
+import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, Filter, Shield, Tag, X, Download } from 'react-feather'
 import { doAction, getProvider, type PluginFactory, type HostAPI } from '@obieg-zero/plugin-sdk'
 import { Box, Cell, Bar, ListItem, Field, Tabs } from '../../themes'
 const BIELIK = 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf'
 import type { PipelineRecord } from '@obieg-zero/store-v2'
 import { nodeTypes } from './nodes'
-import { blockUpload, blockEmbed, blockFilter, blockExtract, blockExtractApi, blockValidate, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
+import { blockUpload, blockEmbed, blockFilter, blockClassify, blockExtract, blockExtractApi, blockValidate, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
 import type { ProjectsAPI } from '../projects'
 
 const PALETTE = [
   { type: 'upload', label: 'Upload', icon: Upload, config: { docGroup: '' } },
-  { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200', language: 'pol' } },
+  { type: 'classify', label: 'Classify', icon: Tag, config: { labels: '', minScore: '0.3', model: 'Xenova/multilingual-e5-small', language: 'pol' } },
+  { type: 'embed', label: 'Embed', icon: Layers, config: { model: 'Xenova/multilingual-e5-small', chunkSize: '200', language: 'pol', docGroup: '' } },
   { type: 'filter', label: 'Filter', icon: Filter, config: { contains: '', pages: '' } },
   { type: 'extract', label: 'Extract', icon: Cpu, config: { questions: '', topK: '2', modelUrl: BIELIK } },
   { type: 'extract-api', label: 'ExtractAPI', icon: Globe, config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
@@ -275,10 +276,24 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
             addDataNodes(nid, f.map(f => ({ id: `viz:${nid}:${f.name}`, label: f.name })), nd.position)
             break
           }
+          case 'classify': {
+            const docIds = input.docIds || []; if (!docIds.length) throw new Error('Brak dokumentow — polacz z Upload')
+            const labels = c.labels?.split('\n').map((s: string) => s.trim()).filter(Boolean) || []
+            if (!labels.length) throw new Error('Brak etykiet')
+            const result = await blockClassify(host, project, docIds, labels, c.language || 'pol', c.model || 'Xenova/multilingual-e5-small', parseFloat(c.minScore) || 0.3, addLog)
+            const allClassified = Object.values(result.classified).flat()
+            outputs.set(nid, { ...input, docIds: allClassified })
+            setNodeResult(nid, 'done', `${allClassified.length}/${docIds.length}`)
+            addDataNodes(nid, [
+              ...Object.entries(result.classified).filter(([,ids]) => ids.length).map(([label, ids]) => ({ id: `viz:${nid}:${label}`, label: `${label} (${ids.length})` })),
+              ...(result.rejected.length ? [{ id: `viz:${nid}:rejected`, label: `odrzucone (${result.rejected.length})` }] : []),
+            ], nd.position)
+            break
+          }
           case 'embed': {
             const docIds = input.docIds || []
             if (!docIds.length) throw new Error('Brak dokumentow — polacz z Upload')
-            const r = await blockEmbed(host, project, docIds, c.language || 'pol', c.model, parseInt(c.chunkSize) || 200, addLog)
+            const r = await blockEmbed(host, project, docIds, c.language || 'pol', c.model, parseInt(c.chunkSize) || 200, addLog, c.docGroup || undefined)
             if (!r) throw new Error('Brak stron')
             outputs.set(nid, { ...input, chunks: r.chunks, embedFn: r.embedFn })
             setNodeResult(nid, 'done', `${r.chunks.length} chunków`)

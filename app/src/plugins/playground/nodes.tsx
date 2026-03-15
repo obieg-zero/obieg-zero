@@ -1,7 +1,7 @@
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
-import { Upload, FileText, Layers, Cpu, Globe, GitBranch, Filter, Shield, Check, AlertCircle } from 'react-feather'
+import { Upload, FileText, Layers, Cpu, Globe, GitBranch, Filter, Shield, Tag, Check, AlertCircle } from 'react-feather'
 
-const ICONS: Record<string, any> = { upload: Upload, embed: Layers, extract: Cpu, 'extract-api': Globe, graph: GitBranch, filter: Filter, validate: Shield }
+const ICONS: Record<string, any> = { upload: Upload, embed: Layers, extract: Cpu, 'extract-api': Globe, graph: GitBranch, filter: Filter, validate: Shield, classify: Tag }
 
 function Status({ status }: { status?: string }) {
   if (status === 'running') return <span className="loading loading-spinner loading-xs" />
@@ -106,6 +106,7 @@ export const nodeTypes = {
   'extract-api': mk('extract-api'),
   graph: mk('graph'),
   filter: mk('filter'),
+  classify: mk('classify'),
   validate: mk('validate'),
   data: DataNode,
   entity: EntityNode,

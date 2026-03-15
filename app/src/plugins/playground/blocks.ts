@@ -68,8 +68,74 @@ export async function blockParse(host: HostAPI, project: string, docIds: string[
   return allPages
 }
 
+/** Classify documents by embedding similarity. Tags docGroup in Dexie. */
+export async function blockClassify(host: HostAPI, project: string, docIds: string[], labels: string[], language: string, model: string, minScore: number, log: Log): Promise<{ classified: Record<string, string[]>; rejected: string[] }> {
+  if (!docIds.length) { log('Classify: brak dokumentow'); return { classified: {}, rejected: [] } }
+  if (!labels.length) { log('Classify: brak etykiet'); return { classified: {}, rejected: [] } }
+  if (!host.embedder) host.embedder = await createEmbedder({ model, dtype: 'q8', onProgress: m => log(`  ${m}`) })
+
+  // Embed labels
+  const labelEmbeddings = await Promise.all(labels.map(l => host.embedder!.embed(l)))
+  log(`Classify: ${labels.length} etykiet, ${docIds.length} dokumentow`)
+
+  // For each doc, parse first page and embed it
+  const classified: Record<string, string[]> = {}
+  const rejected: string[] = []
+  for (const label of labels) classified[label] = []
+
+  for (const docId of docIds) {
+    const doc = await host.db.getDocument(docId)
+    if (!doc) continue
+
+    // Get first page text
+    let text = ''
+    const pages = await host.db.getPages(docId)
+    if (pages.length) {
+      text = pages[0].text
+    } else {
+      // Parse first page
+      const parsed = await blockParse(host, project, [docId], language, log)
+      text = parsed[0]?.text || ''
+    }
+    if (!text) { rejected.push(docId); log(`  ${doc.filename} → brak tekstu`); continue }
+
+    // Embed first page
+    const docEmb = await host.embedder!.embed(text.slice(0, 500))
+
+    // Cosine similarity with each label
+    let bestLabel = '', bestScore = -1
+    for (let i = 0; i < labels.length; i++) {
+      let dot = 0, a = 0, b = 0
+      for (let j = 0; j < docEmb.length; j++) { dot += docEmb[j] * labelEmbeddings[i][j]; a += docEmb[j] ** 2; b += labelEmbeddings[i][j] ** 2 }
+      const score = dot / (Math.sqrt(a) * Math.sqrt(b) || 1)
+      if (score > bestScore) { bestScore = score; bestLabel = labels[i] }
+    }
+
+    if (bestScore >= minScore) {
+      classified[bestLabel].push(docId)
+      // Tag in Dexie
+      await host.db.addDocument({ id: docId, projectId: project, filename: doc.filename, addedAt: Date.now(), docGroup: bestLabel }).catch(() => {})
+      log(`  ${doc.filename} → ${bestLabel} (${bestScore.toFixed(3)})`)
+    } else {
+      rejected.push(docId)
+      log(`  ${doc.filename} → odrzucony (${bestScore.toFixed(3)} < ${minScore})`)
+    }
+  }
+
+  const total = docIds.length, ok = total - rejected.length
+  log(`Classify: ${ok}/${total} sklasyfikowanych, ${rejected.length} odrzuconych`)
+  return { classified, rejected }
+}
+
 /** Embed pages for given docIds. Auto-parses if no pages exist. */
-export async function blockEmbed(host: HostAPI, project: string, docIds: string[], language: string, model: string, chunkSize: number, log: Log) {
+export async function blockEmbed(host: HostAPI, project: string, docIds: string[], language: string, model: string, chunkSize: number, log: Log, docGroup?: string) {
+  // If docGroup specified, filter docIds to only those with matching docGroup
+  if (docGroup) {
+    const filtered: string[] = []
+    for (const id of docIds) { const doc = await host.db.getDocument(id); if (doc?.docGroup === docGroup) filtered.push(id) }
+    docIds = filtered
+    if (!docIds.length) { log(`Embed: brak dokumentow dla grupy "${docGroup}"`); return null }
+  }
   if (!docIds.length) { log('Embed: brak dokumentow'); return null }
   if (!host.embedder) host.embedder = await createEmbedder({ model, dtype: 'q8', onProgress: m => log(`  ${m}`) })
 
