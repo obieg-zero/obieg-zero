@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/store-v2",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OPFS files + Dexie data bus. Projects, documents, pages, chunks, embeddings.",
   "type": "module",
   "main": "src/index.ts",

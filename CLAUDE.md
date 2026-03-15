@@ -2,6 +2,10 @@
 
 Browser-native document analysis workbench. Zero backend, zero API, zero cloud.
 
+## FAZA: zamykanie v1.0
+
+Prototyp dziala. Teraz zamykamy do pierwszego klienta. Czytaj BUSINESS.md przed kazdym wiekszym taskiem — tam jest lista co brakuje i priorytety. NIE dodawaj nowych ficzerow, NIE refaktoruj "bo ladniej". Zamykaj to co jest.
+
 ## Kluczowe ograniczenie
 
 LLM dziala jako Q4 GGUF przez WASM na slabym laptopie. Rozumie JEDEN akapit. Kazdy token kosztuje sekundy (~50s/wywolanie). Projektuj wszystko tak, zeby LLM dostal minimum inputu i odpowiedzial raz. Search jest darmowy, LLM jest drogi.
@@ -20,10 +24,13 @@ Zero parsowania, zero regexow, zero JSON.parse. Ta zasada jest niepodwazalna.
 ## Architektura
 
 ```
-@obieg-zero/plugin-sdk (287 LOC)     — micro-framework pluginowy
-app/src/Shell.tsx (87 LOC)           — layout + error boundary + router
-app/src/main.tsx (22 LOC)            — bootstrap: host API + load plugins + render
-app/src/plugins/playground/ (651 LOC) — pierwszy plugin (React Flow workbench)
+@obieg-zero/plugin-sdk              — micro-framework pluginowy
+app/src/Shell.tsx                    — layout (deleguje do themes/) + plugin switching
+app/src/main.tsx                     — bootstrap: host API + config.json + load plugins + render
+app/src/themes/                      — UIKit + layouty (sidebar-layout, stack-layout)
+app/src/installer.ts                 — instalacja pluginow z GitHub/ZIP do OPFS
+app/src/plugins/playground/          — blokowy RAG builder (narzedzie deva)
+app/src/plugins/*.tsx                — pluginy systemowe (projects, darkmode, config-export, plugin-manager, notes)
 packages/ (store, ocr, embed, llm, graph) — niezalezne klocki
 ```
 
@@ -46,6 +53,8 @@ Graf   ← Dexie → podglad encji + relacji
 ```
 
 **OPFS = pliki. Dexie = dane. To jest szyna pracy.**
+
+**localStorage** = tylko UI preferences (aktywny plugin, theme, profil pluginow). Sync bo React `useState` wymaga sync init. To NIE jest dlug — to swiadomy pattern.
 
 ## Plugin SDK (`@obieg-zero/plugin-sdk`)
 
@@ -106,12 +115,56 @@ sdk.addFilter('routes', routes => [...routes, {
 
 ### Shell (app/src/Shell.tsx)
 
-- Renderuje layout ze slotami
-- `applyFilters('routes', [])` + `isPluginEnabled()` filtruje routes
-- `getAllPlugins()` → prawy panel z lista pluginow + toggle on/off
-- `PluginErrorBoundary` — crash pluginu nie zabija shella
-- Mobile: `max-md:-translate-x-72` sliding pattern
+- Deleguje renderowanie do `Layout` z `themes/`
+- `getAllPlugins().filter(isPluginEnabled)` → filtruje aktywne pluginy
+- Pluginy z `layout.center` → przelaczalne w navbar (ikony)
+- Pluginy z `action` → renderowane jako action slots w navbar
+- `localStorage 'bp-active'` → zapamietuje aktywny plugin
+- Shell actions: `shell:toggle-left`, `shell:close-left`, `shell:activate`, `shell:progress`
 - Shell NIGDY nie importuje kodu pluginu
+
+### UIKit + Layouty (app/src/themes/)
+
+`themes/index.tsx` — switch miedzy layoutami (1 linia eksportu). Pluginy importuja UIKit z `../../themes`.
+
+**UIKit primitives** (eksportowane z obu layoutow):
+- `Box` — header/body/footer w kolumnie
+- `Cell` — element navbar/bar (label lub button)
+- `Bar` — pasek z divide-x
+- `ListItem` — wiersz listy z label/detail/aside/action
+- `Field` — label + children (formularz)
+- `Tabs` — tablist boxed
+- `PluginErrorBoundary` — crash pluginu nie zabija shella
+
+**Dwa layouty** (ten sam UIKit, inny uklad):
+- `SidebarLayout` — left sidebar + center + right panel + footer (domyslny)
+- `StackLayout` — scrollable card-based, header/footer globalny (alternatywny)
+
+### Bootstrap (app/src/main.tsx)
+
+```
+1. Fetch config.json (jesli istnieje) → deployConfig { plugins, defaultPlugin }
+2. configureProfileStore({ defaults: deployConfig.plugins })
+3. Ustaw defaultPlugin w localStorage (jesli pierwszy raz)
+4. Stworz host API (opfs, db, createGraphDB, search)
+5. Seed templates do Dexie (jesli pierwszy raz)
+6. Zarejestruj wszystkie pluginy (factory → registerPlugin → setup)
+7. Zaladuj zainstalowane pluginy z OPFS (loadInstalledPlugins)
+8. Renderuj Shell
+```
+
+**config.json** to klucz do deploy klienta. Bez niego — domyslny profil (wszystkie pluginy wlaczone). Z nim — klient widzi tylko co dev wlaczyl.
+
+### Installer (app/src/installer.ts)
+
+System instalacji pluginow do OPFS. Pluginy ladowane przy starcie przez `loadInstalledPlugins()`.
+
+- `installFromGitHub(url)` — fetch manifest.json + entry .mjs z raw.githubusercontent
+- `installFromZip(file)` — unzip (fflate) → zapisz do OPFS
+- `installFromUrl(url)` — GitHub lub ZIP URL
+- `listInstalled()` → lista zainstalowanych pluginow z OPFS
+- `uninstallPlugin(id)` → usun z OPFS
+- `loadInstalledPlugins(deps)` → zaladuj wszystkie wlaczone → registerPlugin + setup
 
 ### Plugin nie wie nic o shellu
 
@@ -131,20 +184,6 @@ deps.host = {
   createGraphDB,  // (name) → GraphDB
   search,         // semantic search w chunkach
 }
-```
-
-### Ladowanie pluginow
-
-```ts
-// main.tsx
-configureProfileStore({ storageKey: 'oz-profile' })
-
-// Lokalne (dev)
-playgroundPlugin(SDK, { host })
-markReady('playground')
-
-// Zdalne (prod) — jeszcze nie aktywne, SDK gotowe
-// await loadPlugins({ indexUrl: '...plugin-index/index.json', sdk: SDK, deps: { host } })
 ```
 
 ### ZASADA: bloki MUSZA uzywac pakietow przez deps.host
@@ -177,6 +216,29 @@ Kazdy klocek to pure functions + handle pattern:
 - `createLlm(opts) → LlmHandle` → `handle.ask(prompt) → AskResult { text, tokenCount, durationMs }`
 - `createGraphDB(name) → GraphDB` → `addNodes()`, `getContext(id, hops)`, `queryNodes()`
 
+## Pluginy systemowe
+
+Oprocz Playground sa pluginy infrastrukturalne. Kazdy ma swoja role w flow dostarczenia.
+
+| Plugin | Plik | Rola | v1.0? |
+|--------|------|------|-------|
+| **projects** | `projects.tsx` | Zarzadzanie projektami OPFS+Dexie. Playground go wymaga. | TAK |
+| **darkmode** | `darkmode.tsx` | Toggle dracula/corporate. Theme dla klienta. | TAK |
+| **config-export** | `config-export.tsx` | Eksport `config.json` (ktore pluginy wlaczone, ktory domyslny). Kluczowy dla dostarczenia apki klientowi. | TAK |
+| **plugin-manager** | `plugin-manager.tsx` | Instalacja pluginow z URL/ZIP. Potrzebny przy remote loading. | NIE (priorytet 5) |
+| **notes** | `notes.tsx` | Lokalne notatki. Zero zwiazku z RAG pipeline. | NIE — usunac |
+
+### Flow dostarczenia apki klientowi
+
+```
+1. Dev buduje pipeline w Playground → testuje na dokumentach
+2. Dev eksportuje pipeline JSON (exportPipeline w Playground)
+3. Claude Code generuje plugin kliencki z tego JSON
+4. Dev wlacza plugin kliencki + darkmode, wylacza Playground/notes/plugin-manager
+5. config-export → config.json
+6. Apka klienta = ten sam kod + config.json → widzi tylko swoj plugin
+```
+
 ## Playground = pierwszy plugin
 
 React Flow canvas z sidebar. Drag & drop blokow, wizualne laczenie, wyniki wewnatrz nodow.
@@ -200,12 +262,25 @@ Stan wspoldzielony przez Context (`Ctx`), nie module-level variables.
 - **Embed** — pages → chunki + embeddingi → Dexie chunks. Cache z Dexie.
 - **Extract** — pytanie → search → LLM (WASM Bielik) → graf (Dexie)
 - **Extract API** — to samo co Extract ale przez OpenAI-compatible API
+- **Validate** — po Extract, przed Graph. Czyta graf z Dexie, dla kazdej odpowiedzi: `embedFn(answer) → search(chunks, answer, embedFn, {topK:1}) → score`. Config: `minConfidence` (prog np. 0.8), `onFail` (mark=dodaj confidence do edge, skip=usun z grafu, log=tylko loguj). Potrzebuje `chunks`+`embedFn` z Embed (przekazywane przez pipeline). Koszt: ~50ms/odpowiedz.
 - **Graph** — podglad grafu z Dexie: encje + relacje
+
+### Pipeline persistence (Dexie)
+
+- Pipeline (nodes + edges) zapisywany do Dexie automatycznie przy kazdej zmianie (`savePipeline`)
+- Odczytywany przy zmianie projektu (`getPipelineByProject`)
+- Templates (SEED_TEMPLATES) seedowane do Dexie przy pierwszym starcie
+- `PipelineRecord` = `{ id, projectId, name, nodes, edges }`
 
 ### Pipeline execution
 
 `runPipeline()` robi snapshot konfiguracji node'ow (`snap`) przed async loop — unika stale closures.
 `topoSort()` sortuje topologicznie. Wyniki dodawane jako data/entity/doc nodes na canvas.
+
+### Pipeline export (JUZ DZIALA)
+
+`exportPipeline()` — pobiera JSON z nodes + edges (bez viz nodes). Plik: `{project}.pipeline.json`.
+Przycisk w FooterPanel obok "Analizuj". To jest input dla Claude Code do generowania pluginu klienckiego.
 
 ## Graf wiedzy — dokument-centryczny
 
@@ -334,24 +409,49 @@ Tailwind + DaisyUI (dracula/corporate). Nie wymyslaj nowych klas — uzywaj poni
 - Ciezkie zaleznosci (pdfjs, tesseract, wllama, transformers) to peer deps, ladowane dynamicznie przez `await import()`
 - OPFS wymaga secure context (HTTPS lub localhost)
 - SharedArrayBuffer (wllama multi-thread) wymaga COOP/COEP headers
-- Faza eksploracyjna — bez testow, kierunek moze sie zmienic
+- Faza zamykania v1.0 — skupienie na jakosci i dostarczeniu, nie na nowych ficzerach
+
+## Priorytety pracy (czytaj BUSINESS.md)
+
+Benchmark istnieje: `samples-docs/wibor/benchmark.md` — 6/8 (75%) na test-mini.txt.
+Prawdziwe dokumenty: `samples-docs/wibor/` (Umowa kredytu.pdf, umowa BGŻ.pdf, Plan splat.pdf, wibor3m.csv).
+
+Kolejnosc priorytetow:
+1. ~~Blok Validate~~ — ZROBIONE. `blockValidate()` w blocks.ts, blok Validate w PALETTE, wszystkie templates zaktualizowane.
+2. Optymalizacja promptow (75% → 90%+) — wieksze chunki, lepsze starters, test na prawdziwych PDF. Validate daje confidence score per odpowiedz.
+3. Pierwszy plugin kliencki (Kalkulator WIBOR) — generowany z exportPipeline JSON
+4. Batch processing + eksport wynikow w pluginie klienckim
+
+**Zasada: nie przeskakuj priorytetow.** Nie buduj pluginu klienckiego bez 90% na benchmarku.
 
 ## Struktura repo
 
 ```
-app/                           — shell + plugins
-  src/Shell.tsx                — layout + error boundary + router (87 LOC)
-  src/main.tsx                 — bootstrap (22 LOC)
-  src/plugins/playground/      — pierwszy plugin (651 LOC)
-    index.tsx                  — UI: provider + 3 sloty + factory
-    blocks.ts                  — logika blokow pipeline
-    nodes.tsx                  — React Flow node types
-    store.ts                   — bridge do host API
-    templates.ts               — predefiniowane pipeline'y
+app/
+  src/
+    Shell.tsx                  — plugin switching + delegacja do Layout z themes/
+    main.tsx                   — bootstrap: config.json + host API + pluginy + render
+    installer.ts               — instalacja pluginow z GitHub/ZIP do OPFS
+    themes/
+      index.tsx                — switch layoutu (1 linia eksportu)
+      sidebar-layout.tsx       — domyslny layout + UIKit (Box, Cell, Bar, ListItem, Field, Tabs)
+      stack-layout.tsx         — alternatywny layout (card-based, scrollable)
+    plugins/
+      playground/              — blokowy RAG builder (narzedzie deva)
+        index.tsx              — UI: provider + 4 sloty + factory
+        blocks.ts              — logika blokow pipeline
+        nodes.tsx              — React Flow node types (Block, Upload, Data, Entity, Doc)
+        store.ts               — bridge do host API
+        templates.ts           — SEED_TEMPLATES (wibor, wibor-full, wibor-filter, faktura-gaz)
+      projects.tsx             — zarzadzanie projektami (OPFS+Dexie), provider API
+      darkmode.tsx             — toggle theme dracula/corporate
+      config-export.tsx        — eksport config.json (ktore pluginy + defaultPlugin)
+      plugin-manager.tsx       — UI instalacji pluginow z URL/ZIP
+      notes.tsx                — notatki (do usuniecia)
   public/samples/              — przykladowe dokumenty
 packages/
-  plugin-sdk/                  — micro-framework pluginowy (287 LOC)
-  store-v2/                    — OPFS + Dexie
+  plugin-sdk/                  — micro-framework pluginowy
+  store-v2/                    — OPFS + Dexie (szyna danych)
   ocr-v2/                      — PDF → tekst
   embed-v2/                    — embeddingi + search
   llm-v2/                      — lokalny LLM (WASM)

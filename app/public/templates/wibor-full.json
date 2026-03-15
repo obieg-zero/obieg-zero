@@ -1,0 +1,489 @@
+{
+  "id": "tpl:wibor-full",
+  "name": "WIBOR (pelny)",
+  "nodes": [
+    {
+      "id": "upload-0",
+      "type": "upload",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "label": "Umowa kredytu",
+        "config": {
+          "docGroup": "Umowa kredytu"
+        }
+      }
+    },
+    {
+      "id": "embed-0",
+      "type": "embed",
+      "position": {
+        "x": 0,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-0",
+      "type": "extract",
+      "position": {
+        "x": 0,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nazwa banku to\nKwota kredytu wynosi\nMarza banku wynosi\nStawka WIBOR wynosi\nUmowe podpisano dnia\nOkres kredytu to\nKredytobiorca to",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-1",
+      "type": "upload",
+      "position": {
+        "x": 420,
+        "y": 0
+      },
+      "data": {
+        "label": "Aneksy",
+        "config": {
+          "docGroup": "Aneksy"
+        }
+      }
+    },
+    {
+      "id": "embed-1",
+      "type": "embed",
+      "position": {
+        "x": 420,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "150",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-1",
+      "type": "extract",
+      "position": {
+        "x": 420,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nowa stawka WIBOR wynosi\nData wejscia w zycie aneksu to\nPoprzednia stawka WIBOR wynosila\nZmiana marzy wynosi",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-2",
+      "type": "upload",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "label": "Historia splat",
+        "config": {
+          "docGroup": "Historia splat"
+        }
+      }
+    },
+    {
+      "id": "embed-2",
+      "type": "embed",
+      "position": {
+        "x": 840,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "500",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-2",
+      "type": "extract",
+      "position": {
+        "x": 840,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Miesieczna rata wynosi\nSaldo zadluzenia wynosi\nData splaty to\nOprocentowanie w okresie wynosi",
+          "topK": "1",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-3",
+      "type": "upload",
+      "position": {
+        "x": 1260,
+        "y": 0
+      },
+      "data": {
+        "label": "Zaswiadczenie z banku",
+        "config": {
+          "docGroup": "Zaswiadczenie z banku"
+        }
+      }
+    },
+    {
+      "id": "embed-3",
+      "type": "embed",
+      "position": {
+        "x": 1260,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "300",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-3",
+      "type": "extract",
+      "position": {
+        "x": 1260,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Saldo kredytu na dzien wynosi\nHistoria zmian oprocentowania to\nLaczna kwota odsetek wynosi",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-4",
+      "type": "upload",
+      "position": {
+        "x": 1680,
+        "y": 0
+      },
+      "data": {
+        "label": "Formularz ESIS",
+        "config": {
+          "docGroup": "Formularz ESIS"
+        }
+      }
+    },
+    {
+      "id": "embed-4",
+      "type": "embed",
+      "position": {
+        "x": 1680,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-4",
+      "type": "extract",
+      "position": {
+        "x": 1680,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "RRSO wynosi\nCalkowity koszt kredytu wynosi\nCalkowita kwota do zaplaty wynosi",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-5",
+      "type": "upload",
+      "position": {
+        "x": 2100,
+        "y": 0
+      },
+      "data": {
+        "label": "Wezwanie do zaplaty",
+        "config": {
+          "docGroup": "Wezwanie do zaplaty"
+        }
+      }
+    },
+    {
+      "id": "embed-5",
+      "type": "embed",
+      "position": {
+        "x": 2100,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-5",
+      "type": "extract",
+      "position": {
+        "x": 2100,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Kwota roszczenia wynosi\nTermin zaplaty to\nPodstawa prawna roszczenia to",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-6",
+      "type": "upload",
+      "position": {
+        "x": 2520,
+        "y": 0
+      },
+      "data": {
+        "label": "Potwierdzenie nadania",
+        "config": {
+          "docGroup": "Potwierdzenie nadania"
+        }
+      }
+    },
+    {
+      "id": "embed-6",
+      "type": "embed",
+      "position": {
+        "x": 2520,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "150",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-6",
+      "type": "extract",
+      "position": {
+        "x": 2520,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Data nadania to\nAdresat to\nNumer przesylki to",
+          "topK": "1",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "validate-1",
+      "type": "validate",
+      "position": {
+        "x": 1260,
+        "y": 420
+      },
+      "data": {
+        "label": "Validate",
+        "config": {
+          "minConfidence": "0.8",
+          "onFail": "mark"
+        }
+      }
+    },
+    {
+      "id": "graph-1",
+      "type": "graph",
+      "position": {
+        "x": 1260,
+        "y": 560
+      },
+      "data": {
+        "label": "Graph",
+        "config": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "p:upload-0-embed-0",
+      "source": "upload-0",
+      "sourceHandle": "next",
+      "target": "embed-0"
+    },
+    {
+      "id": "p:embed-0-extract-0",
+      "source": "embed-0",
+      "sourceHandle": "next",
+      "target": "extract-0"
+    },
+    {
+      "id": "p:extract-0-validate-1",
+      "source": "extract-0",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-1-embed-1",
+      "source": "upload-1",
+      "sourceHandle": "next",
+      "target": "embed-1"
+    },
+    {
+      "id": "p:embed-1-extract-1",
+      "source": "embed-1",
+      "sourceHandle": "next",
+      "target": "extract-1"
+    },
+    {
+      "id": "p:extract-1-validate-1",
+      "source": "extract-1",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-2-embed-2",
+      "source": "upload-2",
+      "sourceHandle": "next",
+      "target": "embed-2"
+    },
+    {
+      "id": "p:embed-2-extract-2",
+      "source": "embed-2",
+      "sourceHandle": "next",
+      "target": "extract-2"
+    },
+    {
+      "id": "p:extract-2-validate-1",
+      "source": "extract-2",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-3-embed-3",
+      "source": "upload-3",
+      "sourceHandle": "next",
+      "target": "embed-3"
+    },
+    {
+      "id": "p:embed-3-extract-3",
+      "source": "embed-3",
+      "sourceHandle": "next",
+      "target": "extract-3"
+    },
+    {
+      "id": "p:extract-3-validate-1",
+      "source": "extract-3",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-4-embed-4",
+      "source": "upload-4",
+      "sourceHandle": "next",
+      "target": "embed-4"
+    },
+    {
+      "id": "p:embed-4-extract-4",
+      "source": "embed-4",
+      "sourceHandle": "next",
+      "target": "extract-4"
+    },
+    {
+      "id": "p:extract-4-validate-1",
+      "source": "extract-4",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-5-embed-5",
+      "source": "upload-5",
+      "sourceHandle": "next",
+      "target": "embed-5"
+    },
+    {
+      "id": "p:embed-5-extract-5",
+      "source": "embed-5",
+      "sourceHandle": "next",
+      "target": "extract-5"
+    },
+    {
+      "id": "p:extract-5-validate-1",
+      "source": "extract-5",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-6-embed-6",
+      "source": "upload-6",
+      "sourceHandle": "next",
+      "target": "embed-6"
+    },
+    {
+      "id": "p:embed-6-extract-6",
+      "source": "embed-6",
+      "sourceHandle": "next",
+      "target": "extract-6"
+    },
+    {
+      "id": "p:extract-6-validate-1",
+      "source": "extract-6",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:validate-1-graph-1",
+      "source": "validate-1",
+      "sourceHandle": "next",
+      "target": "graph-1"
+    }
+  ]
+}

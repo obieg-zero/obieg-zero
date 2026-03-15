@@ -194,6 +194,40 @@ export async function blockExtractApi(host: HostAPI, chunks: Chunk[], embedFn: a
   }, project, log)
 }
 
+/** Validate graph answers against chunks. Marks/removes hallucinations. */
+export async function blockValidate(host: HostAPI, chunks: Chunk[], embedFn: (q: string) => Promise<number[]>, project: string, minConfidence: number, onFail: 'mark' | 'skip' | 'log', log: Log) {
+  const graph = await host.createGraphDB(`graph-${project}`)
+  const data = await graph.getGraph()
+  const values = data.nodes.filter((n: any) => n.type !== 'document')
+  log(`Validate: ${values.length} odpowiedzi, prog=${minConfidence}, onFail=${onFail}`)
+
+  let passed = 0, flagged = 0
+  for (const node of values) {
+    const results = await host.search(chunks, node.label, embedFn, { topK: 1, minWordLength: 2 })
+    const score = results[0]?.score ?? 0
+
+    if (score >= minConfidence) {
+      log(`  ✓ ${node.label} (${score.toFixed(3)})`)
+      passed++
+    } else {
+      flagged++
+      if (onFail === 'skip') {
+        const edges = data.edges.filter((e: any) => e.to === node.id)
+        for (const e of edges) await graph.removeEdge(e.id).catch(() => {})
+        await graph.removeNode(node.id).catch(() => {})
+        log(`  ✗ ${node.label} (${score.toFixed(3)}) — usunieto z grafu`)
+      } else if (onFail === 'mark') {
+        await graph.updateNode(node.id, { ...node.data, confidence: score }).catch(() => {})
+        log(`  ⚠ ${node.label} (${score.toFixed(3)}) — oznaczono`)
+      } else {
+        log(`  ⚠ ${node.label} (${score.toFixed(3)}) — halucynacja`)
+      }
+    }
+  }
+  log(`Validate: ${passed} OK, ${flagged} podejrzanych`)
+  return { passed, flagged, total: values.length }
+}
+
 export async function blockGraph(host: HostAPI, project: string, log: Log) {
   const graph = await host.createGraphDB(`graph-${project}`)
   const data = await graph.getGraph()

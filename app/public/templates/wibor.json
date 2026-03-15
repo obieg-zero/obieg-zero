@@ -1,0 +1,233 @@
+{
+  "id": "tpl:wibor",
+  "name": "Kalkulator WIBOR",
+  "nodes": [
+    {
+      "id": "upload-0",
+      "type": "upload",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "label": "Umowa kredytu",
+        "config": {
+          "docGroup": "Umowa kredytu"
+        }
+      }
+    },
+    {
+      "id": "embed-0",
+      "type": "embed",
+      "position": {
+        "x": 0,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-0",
+      "type": "extract",
+      "position": {
+        "x": 0,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nazwa banku to\nKwota kredytu wynosi\nMarza banku wynosi\nStawka WIBOR wynosi\nUmowe podpisano dnia\nOkres kredytu to\nKredytobiorca to",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-1",
+      "type": "upload",
+      "position": {
+        "x": 420,
+        "y": 0
+      },
+      "data": {
+        "label": "Aneksy",
+        "config": {
+          "docGroup": "Aneksy"
+        }
+      }
+    },
+    {
+      "id": "embed-1",
+      "type": "embed",
+      "position": {
+        "x": 420,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "150",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-1",
+      "type": "extract",
+      "position": {
+        "x": 420,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nowa stawka WIBOR wynosi\nData wejscia w zycie aneksu to\nPoprzednia stawka WIBOR wynosila\nZmiana marzy wynosi",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-2",
+      "type": "upload",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "label": "Historia splat",
+        "config": {
+          "docGroup": "Historia splat"
+        }
+      }
+    },
+    {
+      "id": "embed-2",
+      "type": "embed",
+      "position": {
+        "x": 840,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "500",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "extract-2",
+      "type": "extract",
+      "position": {
+        "x": 840,
+        "y": 280
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Miesieczna rata wynosi\nSaldo zadluzenia wynosi\nData splaty to\nOprocentowanie w okresie wynosi",
+          "topK": "1",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "validate-1",
+      "type": "validate",
+      "position": {
+        "x": 420,
+        "y": 420
+      },
+      "data": {
+        "label": "Validate",
+        "config": {
+          "minConfidence": "0.8",
+          "onFail": "mark"
+        }
+      }
+    },
+    {
+      "id": "graph-1",
+      "type": "graph",
+      "position": {
+        "x": 420,
+        "y": 560
+      },
+      "data": {
+        "label": "Graph",
+        "config": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "p:upload-0-embed-0",
+      "source": "upload-0",
+      "sourceHandle": "next",
+      "target": "embed-0"
+    },
+    {
+      "id": "p:embed-0-extract-0",
+      "source": "embed-0",
+      "sourceHandle": "next",
+      "target": "extract-0"
+    },
+    {
+      "id": "p:extract-0-validate-1",
+      "source": "extract-0",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-1-embed-1",
+      "source": "upload-1",
+      "sourceHandle": "next",
+      "target": "embed-1"
+    },
+    {
+      "id": "p:embed-1-extract-1",
+      "source": "embed-1",
+      "sourceHandle": "next",
+      "target": "extract-1"
+    },
+    {
+      "id": "p:extract-1-validate-1",
+      "source": "extract-1",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-2-embed-2",
+      "source": "upload-2",
+      "sourceHandle": "next",
+      "target": "embed-2"
+    },
+    {
+      "id": "p:embed-2-extract-2",
+      "source": "embed-2",
+      "sourceHandle": "next",
+      "target": "extract-2"
+    },
+    {
+      "id": "p:extract-2-validate-1",
+      "source": "extract-2",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:validate-1-graph-1",
+      "source": "validate-1",
+      "sourceHandle": "next",
+      "target": "graph-1"
+    }
+  ]
+}

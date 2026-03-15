@@ -3,13 +3,13 @@ import {
   ReactFlow, addEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type OnNodesChange, type OnEdgesChange, type Connection,
 } from '@xyflow/react'
-import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, Filter, X, Download } from 'react-feather'
+import { Play, Terminal, Trash2, Upload, Layers, Cpu, Globe, GitBranch, Filter, Shield, X, Download } from 'react-feather'
 import { doAction, getProvider, type PluginFactory, type HostAPI } from '@obieg-zero/plugin-sdk'
 import { Box, Cell, Bar, ListItem, Field, Tabs } from '../../themes'
-import { BIELIK } from './templates'
+const BIELIK = 'https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf'
 import type { PipelineRecord } from '@obieg-zero/store-v2'
 import { nodeTypes } from './nodes'
-import { blockUpload, blockEmbed, blockFilter, blockExtract, blockExtractApi, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
+import { blockUpload, blockEmbed, blockFilter, blockExtract, blockExtractApi, blockValidate, blockGraph, clearGraph, type Chunk, type Log } from './blocks'
 import type { ProjectsAPI } from '../projects'
 
 const PALETTE = [
@@ -18,6 +18,7 @@ const PALETTE = [
   { type: 'filter', label: 'Filter', icon: Filter, config: { contains: '', pages: '' } },
   { type: 'extract', label: 'Extract', icon: Cpu, config: { questions: '', topK: '2', modelUrl: BIELIK } },
   { type: 'extract-api', label: 'ExtractAPI', icon: Globe, config: { questions: '', topK: '2', apiUrl: 'https://api.openai.com/v1/chat/completions', apiKey: '', apiModel: 'gpt-4o-mini' } },
+  { type: 'validate', label: 'Validate', icon: Shield, config: { minConfidence: '0.8', onFail: 'mark' } },
   { type: 'graph', label: 'Graph', icon: GitBranch, config: {} },
 ]
 
@@ -307,6 +308,16 @@ function PlaygroundProvider({ children }: { children: React.ReactNode }) {
             const s = await blockExtractApi(host, chunks, input.embedFn, q, c.apiUrl || '', c.apiKey, c.apiModel || 'gpt-4o-mini', parseInt(c.topK) || 2, project, addLog)
             outputs.set(nid, input)
             setNodeResult(nid, 'done', `${s?.extracted || 0}/${s?.total || 0}`)
+            break
+          }
+          case 'validate': {
+            const chunks = input.chunks || []; if (!chunks.length) throw new Error('Brak chunków — połącz z Embed')
+            if (!input.embedFn) throw new Error('Brak embedFn — połącz z Embed')
+            const minConf = parseFloat(c.minConfidence) || 0.8
+            const onFail = (c.onFail || 'mark') as 'mark' | 'skip' | 'log'
+            const v = await blockValidate(host, chunks, input.embedFn, project, minConf, onFail, addLog)
+            outputs.set(nid, input)
+            setNodeResult(nid, 'done', `${v.passed}✓ ${v.flagged}⚠`)
             break
           }
           case 'graph': {

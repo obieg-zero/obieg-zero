@@ -1,0 +1,211 @@
+{
+  "id": "tpl:wibor-filter",
+  "name": "WIBOR (z filtrem)",
+  "nodes": [
+    {
+      "id": "upload-0",
+      "type": "upload",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "label": "Umowa kredytu",
+        "config": {
+          "docGroup": "Umowa kredytu"
+        }
+      }
+    },
+    {
+      "id": "embed-0",
+      "type": "embed",
+      "position": {
+        "x": 0,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "filter-0",
+      "type": "filter",
+      "position": {
+        "x": 0,
+        "y": 280
+      },
+      "data": {
+        "label": "Filter",
+        "config": {
+          "contains": "kredyt",
+          "pages": ""
+        }
+      }
+    },
+    {
+      "id": "extract-0",
+      "type": "extract",
+      "position": {
+        "x": 0,
+        "y": 420
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nazwa banku to\nKwota kredytu wynosi\nStawka WIBOR wynosi\nKredytobiorca to",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "upload-1",
+      "type": "upload",
+      "position": {
+        "x": 420,
+        "y": 0
+      },
+      "data": {
+        "label": "Aneksy",
+        "config": {
+          "docGroup": "Aneksy"
+        }
+      }
+    },
+    {
+      "id": "embed-1",
+      "type": "embed",
+      "position": {
+        "x": 420,
+        "y": 140
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "150",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "filter-1",
+      "type": "filter",
+      "position": {
+        "x": 420,
+        "y": 280
+      },
+      "data": {
+        "label": "Filter",
+        "config": {
+          "contains": "WIBOR",
+          "pages": ""
+        }
+      }
+    },
+    {
+      "id": "extract-1",
+      "type": "extract",
+      "position": {
+        "x": 420,
+        "y": 420
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nowa stawka WIBOR wynosi\nData wejscia w zycie aneksu to",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "validate-1",
+      "type": "validate",
+      "position": {
+        "x": 210,
+        "y": 560
+      },
+      "data": {
+        "label": "Validate",
+        "config": {
+          "minConfidence": "0.8",
+          "onFail": "mark"
+        }
+      }
+    },
+    {
+      "id": "graph-1",
+      "type": "graph",
+      "position": {
+        "x": 210,
+        "y": 700
+      },
+      "data": {
+        "label": "Graph",
+        "config": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "p:upload-0-embed-0",
+      "source": "upload-0",
+      "sourceHandle": "next",
+      "target": "embed-0"
+    },
+    {
+      "id": "p:embed-0-filter-0",
+      "source": "embed-0",
+      "sourceHandle": "next",
+      "target": "filter-0"
+    },
+    {
+      "id": "p:filter-0-extract-0",
+      "source": "filter-0",
+      "sourceHandle": "next",
+      "target": "extract-0"
+    },
+    {
+      "id": "p:extract-0-validate-1",
+      "source": "extract-0",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:upload-1-embed-1",
+      "source": "upload-1",
+      "sourceHandle": "next",
+      "target": "embed-1"
+    },
+    {
+      "id": "p:embed-1-filter-1",
+      "source": "embed-1",
+      "sourceHandle": "next",
+      "target": "filter-1"
+    },
+    {
+      "id": "p:filter-1-extract-1",
+      "source": "filter-1",
+      "sourceHandle": "next",
+      "target": "extract-1"
+    },
+    {
+      "id": "p:extract-1-validate-1",
+      "source": "extract-1",
+      "sourceHandle": "next",
+      "target": "validate-1"
+    },
+    {
+      "id": "p:validate-1-graph-1",
+      "source": "validate-1",
+      "sourceHandle": "next",
+      "target": "graph-1"
+    }
+  ]
+}

@@ -10,10 +10,10 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@obieg-zero/embed-v2": "^1.0.1",
-    "@obieg-zero/graph-v2": "^1.1.0",
+    "@obieg-zero/graph-v2": "^1.1.1",
     "@obieg-zero/llm-v2": "^1.0.1",
     "@obieg-zero/ocr-v2": "^1.0.2",
-    "@obieg-zero/plugin-sdk": "^0.4.2",
+    "@obieg-zero/plugin-sdk": "^0.4.3",
     "@obieg-zero/store-v2": "^1.0.1",
     "@wllama/wllama": "^2.3.7",
     "@xyflow/react": "^12.10.1",

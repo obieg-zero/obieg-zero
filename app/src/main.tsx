@@ -13,7 +13,6 @@ import playgroundPlugin from './plugins/playground'
 import notesPlugin from './plugins/notes'
 import pluginManagerPlugin from './plugins/plugin-manager'
 import configExportPlugin from './plugins/config-export'
-import { SEED_TEMPLATES } from './plugins/playground/templates'
 
 async function boot() {
   let deployConfig: { plugins?: Record<string, boolean>; defaultPlugin?: string } = {}
@@ -32,10 +31,16 @@ async function boot() {
     host: { opfs: createOpfs(), db, embedder: null, llm: null, createGraphDB, search }
   }
 
-  // Seed templates on first run
-  for (const t of SEED_TEMPLATES) {
-    if (!await db.getPipeline(t.id)) await db.savePipeline({ ...t, projectId: null })
-  }
+  // Seed templates from public/templates/ (same pattern as config.json)
+  try {
+    const res = await fetch('./templates/index.json')
+    if (res.ok) for (const entry of await res.json()) {
+      if (!await db.getPipeline(entry.id)) {
+        const r = await fetch(`./templates/${entry.file}`)
+        if (r.ok) await db.savePipeline({ ...await r.json(), projectId: null })
+      }
+    }
+  } catch {}
 
   for (const factory of [projectsPlugin, darkmodePlugin, playgroundPlugin, notesPlugin, pluginManagerPlugin, configExportPlugin]) {
     const def = factory(deps)

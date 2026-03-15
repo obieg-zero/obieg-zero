@@ -1,0 +1,11 @@
+{
+  "plugins": {
+    "projects": true,
+    "darkmode": true,
+    "playground": true,
+    "plugin-manager": true,
+    "config-export": true,
+    "notes": false
+  },
+  "defaultPlugin": "playground"
+}

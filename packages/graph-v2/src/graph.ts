@@ -25,6 +25,9 @@ export interface Graph {
 export interface GraphDB {
   addNodes(nodes: GraphNode[]): Promise<void>
   addEdges(edges: GraphEdge[]): Promise<void>
+  removeNode(id: string): Promise<void>
+  removeEdge(id: string): Promise<void>
+  updateNode(id: string, data: Record<string, unknown>): Promise<void>
   getGraph(): Promise<Graph>
   getContext(nodeId: string, maxHops?: number): Promise<Graph>
   clear(): Promise<void>
@@ -54,6 +57,19 @@ export async function createGraphDB(name: string): Promise<GraphDB> {
 
     async addEdges(edges) {
       await db.edges.bulkPut(edges)
+    },
+
+    async removeNode(id) {
+      await db.nodes.delete(id)
+    },
+
+    async removeEdge(id) {
+      await db.edges.delete(id)
+    },
+
+    async updateNode(id, data) {
+      const node = await db.nodes.get(id)
+      if (node) await db.nodes.put({ ...node, data: { ...node.data, ...data } })
     },
 
     async getGraph() {

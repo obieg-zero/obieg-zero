@@ -1,0 +1,105 @@
+{
+  "id": "tpl:faktura-gaz",
+  "name": "Faktura za gaz",
+  "nodes": [
+    {
+      "id": "1",
+      "type": "upload",
+      "position": {
+        "x": 300,
+        "y": 0
+      },
+      "data": {
+        "label": "Upload",
+        "config": {
+          "docGroup": "Faktura"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "type": "embed",
+      "position": {
+        "x": 300,
+        "y": 120
+      },
+      "data": {
+        "label": "Embed",
+        "config": {
+          "model": "Xenova/multilingual-e5-small",
+          "chunkSize": "200",
+          "language": "pol"
+        }
+      }
+    },
+    {
+      "id": "3",
+      "type": "extract",
+      "position": {
+        "x": 300,
+        "y": 240
+      },
+      "data": {
+        "label": "Extract",
+        "config": {
+          "questions": "Nazwa sprzedawcy to\nNumer faktury to\nOkres rozliczeniowy to\nZuzycie gazu w m3 wynosi\nZuzycie gazu w kWh wynosi\nWspolczynnik konwersji wynosi\nKwota brutto do zaplaty wynosi\nGrupa taryfowa to\nOplata abonamentowa wynosi\nOplata stala wynosi",
+          "topK": "2",
+          "modelUrl": "https://huggingface.co/obieg-zero/Bielik-1.5B-v3.0-Instruct-GGUF/resolve/main/Bielik-1.5B-v3.0-Instruct.Q4_K_M.gguf"
+        }
+      }
+    },
+    {
+      "id": "4",
+      "type": "validate",
+      "position": {
+        "x": 300,
+        "y": 360
+      },
+      "data": {
+        "label": "Validate",
+        "config": {
+          "minConfidence": "0.8",
+          "onFail": "mark"
+        }
+      }
+    },
+    {
+      "id": "5",
+      "type": "graph",
+      "position": {
+        "x": 300,
+        "y": 480
+      },
+      "data": {
+        "label": "Graph",
+        "config": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1-2",
+      "source": "1",
+      "sourceHandle": "next",
+      "target": "2"
+    },
+    {
+      "id": "e2-3",
+      "source": "2",
+      "sourceHandle": "next",
+      "target": "3"
+    },
+    {
+      "id": "e3-4",
+      "source": "3",
+      "sourceHandle": "next",
+      "target": "4"
+    },
+    {
+      "id": "e4-5",
+      "source": "4",
+      "sourceHandle": "next",
+      "target": "5"
+    }
+  ]
+}

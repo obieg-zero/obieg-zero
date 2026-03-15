@@ -1,6 +1,6 @@
 {
   "name": "@obieg-zero/plugin-sdk",
-  "version": "0.4.0",
+  "version": "0.4.3",
   "description": "Declarative plugin SDK — PluginDef, registry, profile, contracts, hooks",
   "type": "module",
   "main": "src/index.ts",
