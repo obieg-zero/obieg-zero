@@ -39,46 +39,17 @@ export type PluginDeps = { host: HostAPI }
 
 export type PluginFactory = (deps: PluginDeps) => PluginDef
 
-// --- Distribution types (JSON-serializable, no React) ---
-
-/** What a plugin repo's manifest.json must contain */
+/** JSON-serializable plugin metadata. Used in: manifest.json, registry index.json, OPFS. */
 export interface PluginManifest {
   id: string
   label: string
   description: string
   version: string
   author: string
+  repo?: string
   entry?: string
   icon?: string
   requires?: string[]
-  defaultEnabled?: boolean
   private?: boolean
-  minSdkVersion?: string
-}
-
-/** Registry entry — manifest + repo location */
-export interface RegistryEntry extends PluginManifest {
-  repo: string
   tags?: string[]
-}
-
-/** Installed plugin metadata stored in OPFS */
-export interface InstalledPlugin extends PluginManifest {
-  repo?: string
-  installedAt: string
-  installedFrom: 'github' | 'zip' | 'url'
-}
-
-/** Registry index.json format */
-export interface RegistryIndex {
-  schemaVersion: number
-  updatedAt: string
-  plugins: RegistryEntry[]
-}
-
-/** Update check result */
-export interface UpdateInfo {
-  pluginId: string
-  installedVersion: string
-  registryVersion: string
 }
