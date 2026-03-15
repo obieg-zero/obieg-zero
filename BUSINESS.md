@@ -2,6 +2,20 @@
 
 Lokalny RAG builder. Vibe developer sklada bloki w pipeline dopasowany do konkretnego typu dokumentow, testuje jakosc, pakuje w plugin dla klienta.
 
+## Dlaczego to wyglada jak wyglada
+
+LLM dziala jako Bielik 1.5B Q4 GGUF przez WASM — w przegladarce, na laptopie klienta. To nie jest GPT-4. Ten model rozumie JEDEN akapit, odpowiada w ~50 sekund, i myli podobne wartosci (np. nazwy bankow). Nie mozna mu dac calego dokumentu i powiedziec "wyciagnij wszystko".
+
+Dlatego cala architektura to gimnastyka wokol tego ograniczenia:
+
+- **Pipeline per typ dokumentu** — umowa kredytu wymaga innych pytan, innego chunkSize i innego topK niz tabela splat. Jeden pipeline dla wszystkiego nie dziala.
+- **Sentence starters zamiast pytan** — "Nazwa banku to" daje 75% poprawnosci, "Jaki jest bank?" daje 50%. Model lepiej konczydz zdania niz odpowiada na pytania.
+- **Search jest darmowy, LLM jest drogi** — embedding search znajduje wlasciwy akapit w milisekundach. LLM dostaje TYLKO ten akapit. Zero marnowania tokenow.
+- **Validate jako osobny blok** — model halucynuje, wiec po kazdym Extract sprawdzamy odpowiedz przez search: czy to co LLM powiedzial w ogole wystepuje w tekście. Confidence score per odpowiedz.
+- **Playground (visual builder)** — dev MUSI iterowac parametry per typ dokumentu. Bez wizualnego narzedzia to jest nierobalne — za duzo kombinacji chunkSize × pytania × topK × temperature.
+
+Gdyby model byl mocniejszy, polowa tej architektury bylaby zbedna. Ale model jest taki jaki jest — i to jest swiadomy wybor: dane klienta nie opuszczaja urzadzenia.
+
 ## Status: PROTOTYP → v1.0
 
 Projekt jest w fazie prototypu. Cel: zamknac v1.0 i dostarczyc pierwszego klienta.

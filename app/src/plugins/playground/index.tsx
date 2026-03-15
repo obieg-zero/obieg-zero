@@ -357,10 +357,20 @@ function CenterCanvas() {
     {!project ? (
       <div className="hero flex-1">
         <div className="hero-content text-center">
-          <div className="max-w-md space-y-4">
-            <h1 className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</h1>
-            <p className="text-xs text-base-content/50">Analiza dokumentów z&nbsp;Bielikiem — lokalnie, w&nbsp;przeglądarce.</p>
-            <p className="text-2xs text-base-content/20">Utwórz projekt w sidebarze i wybierz szablon.</p>
+          <div className="max-w-lg space-y-5">
+            <div>
+              <h1 className="text-2xl font-black text-primary tracking-tight">OBIEG-ZERO</h1>
+              <p className="text-xs text-base-content/50 mt-2">50&nbsp;umów, 8&nbsp;pytań do&nbsp;każdej — wyniki w&nbsp;tabelce, nie w&nbsp;chacie.</p>
+              <p className="text-xs text-base-content/50">Otwarty model, Twoja przeglądarka. Dane nie zasilają BigTech.</p>
+            </div>
+            <div className="inline-flex items-center gap-2 bg-success/10 text-success rounded-full px-4 py-1.5">
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+              <span className="text-xs font-medium">100% prywatnie — dane nie opuszczają tego urządzenia</span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-2xs text-base-content/30">Jak zacząć:</p>
+              <p className="text-2xs text-base-content/20">1. Utwórz projekt w&nbsp;sidebarze &nbsp;2. Wybierz szablon (np. Umowy kredytowe, Faktura za&nbsp;gaz) &nbsp;3. Wrzuć pliki i&nbsp;kliknij Analizuj</p>
+            </div>
           </div>
         </div>
       </div>
