@@ -1,0 +1,6 @@
+[
+  { "pluginUri": "./plugin-darkmode", "defaultOptions": { "theme": "dracula" } },
+  
+  { "pluginUri": "./plugin-workflow-crm", "importData": ["workflows.json", "opponents.json"] },
+  { "pluginUri": "./plugin-data" }
+]

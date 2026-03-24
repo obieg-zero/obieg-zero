@@ -1,0 +1,31 @@
+[
+  { "type": "workflow", "data": { "wfId": "wibor", "name": "Kredyt WIBOR", "stages": [
+    { "id": "n-client", "label": "1. Pozyskanie klienta", "description": "Dane klienta i kredytu", "blockType": "form", "recordType": "client", "checklist": [{ "text": "Dane klienta", "type": "data" }, { "text": "Dane kredytu", "type": "data" }, { "text": "Kwalifikacja", "type": "manual" }] },
+    { "id": "n-cases", "label": "Sprawy", "blockType": "list", "recordType": "case", "parentRef": "client" },
+    { "id": "n-case", "label": "2. Analiza umowy", "description": "Umowa, klauzule abuzywne", "blockType": "form", "recordType": "case", "checklist": [{ "text": "Umowa", "type": "upload" }, { "text": "Wyciąg danych", "type": "extract" }, { "text": "Aneksy", "type": "upload" }, { "text": "Klauzule", "type": "extract" }] },
+    { "id": "n-calc", "label": "3. Kalkulacja", "color": "#8b5cf6", "description": "Nadpłaty WIBOR", "checklist": [{ "text": "Harmonogram", "type": "upload" }, { "text": "Kalkulacja", "type": "extract" }, { "text": "Wartość sporu", "type": "generate" }] },
+    { "id": "n-docs", "label": "4. Dokumenty", "description": "Kompletowanie akt", "blockType": "upload", "parentRef": "case", "checklist": [{ "text": "Umowa", "type": "upload" }, { "text": "Harmonogramy", "type": "upload" }, { "text": "Saldo", "type": "upload" }, { "text": "Wpłaty", "type": "upload" }, { "text": "Pełnomocnictwo", "type": "generate" }] },
+    { "id": "n-rekl", "label": "5. Reklamacja", "color": "#f59e0b", "description": "Reklamacja przedsądowa", "checklist": [{ "text": "Reklamacja", "type": "generate" }, { "text": "Wysłanie", "type": "manual" }, { "text": "Potwierdzenie", "type": "upload" }, { "text": "Odpowiedź", "type": "manual" }] },
+    { "id": "dec-1", "label": "Bank uznał?", "color": "#f59e0b" },
+    { "id": "n-pozew", "label": "6. Pozew", "color": "#ef4444", "description": "Przygotowanie i złożenie", "checklist": [{ "text": "Pozew", "type": "generate" }, { "text": "Żądania", "type": "manual" }, { "text": "Opłata", "type": "manual" }, { "text": "Złożenie", "type": "upload" }] },
+    { "id": "n-sad", "label": "7. Postępowanie", "color": "#f59e0b", "description": "Korespondencja, rozprawy", "blockType": "timeline", "parentRef": "case", "checklist": [{ "text": "Sprzeciw", "type": "generate" }, { "text": "Pisma", "type": "generate" }, { "text": "Rozprawy", "type": "manual" }, { "text": "Dowody", "type": "generate" }] },
+    { "id": "dec-2", "label": "Wyrok korzystny?", "color": "#f59e0b" },
+    { "id": "n-apel", "label": "8. Apelacja", "color": "#ef4444", "checklist": [{ "text": "Analiza", "type": "extract" }, { "text": "Apelacja", "type": "generate" }, { "text": "Złożenie", "type": "manual" }] },
+    { "id": "n-egz", "label": "9. Egzekucja", "color": "#22c55e", "checklist": [{ "text": "Klauzula", "type": "upload" }, { "text": "Wezwanie", "type": "generate" }, { "text": "Egzekucja", "type": "generate" }] },
+    { "id": "n-rozl", "label": "10. Rozliczenie", "color": "#22c55e", "checklist": [{ "text": "Faktura", "type": "generate" }, { "text": "Success fee", "type": "manual" }, { "text": "Zamknięcie", "type": "manual" }] }
+  ], "branches": [
+    { "from": "dec-1", "to": "n-pozew", "handle": "yes", "label": "Nie" },
+    { "from": "dec-1", "to": "n-rozl", "handle": "no", "label": "Ugoda" },
+    { "from": "dec-2", "to": "n-apel", "handle": "yes", "label": "Nie" },
+    { "from": "dec-2", "to": "n-egz", "handle": "no", "label": "Tak" },
+    { "from": "n-apel", "to": "n-sad" }
+  ] } },
+  { "type": "workflow", "data": { "wfId": "wibor-simple", "name": "WIBOR uproszczony", "stages": [
+    { "id": "n-client", "label": "1. Klient", "blockType": "form", "recordType": "client", "checklist": [{ "text": "Dane", "type": "data" }] },
+    { "id": "n-cases", "label": "Sprawy", "blockType": "list", "recordType": "case", "parentRef": "client" },
+    { "id": "n-case", "label": "2. Analiza", "color": "#8b5cf6", "blockType": "form", "recordType": "case", "checklist": [{ "text": "Umowa", "type": "upload" }, { "text": "Kalkulacja", "type": "extract" }] },
+    { "id": "n-docs", "label": "3. Dokumenty", "color": "#f59e0b", "blockType": "upload", "parentRef": "case", "checklist": [{ "text": "Reklamacja", "type": "generate" }, { "text": "Odpowiedź", "type": "manual" }] },
+    { "id": "n-timeline", "label": "4. Postępowanie", "color": "#ef4444", "blockType": "timeline", "parentRef": "case", "checklist": [{ "text": "Pozew", "type": "generate" }, { "text": "Rozprawy", "type": "manual" }] },
+    { "id": "n-rozl", "label": "5. Rozliczenie", "color": "#22c55e", "checklist": [{ "text": "Faktura", "type": "generate" }, { "text": "Zamknięcie", "type": "manual" }] }
+  ], "branches": [] } }
+]

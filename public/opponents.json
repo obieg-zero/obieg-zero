@@ -1,0 +1,86 @@
+[
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "mBank", "legalName": "mBank S.A.", "krs": "0000025237", "nip": "5260215088", "address": "ul. Prosta 18, 00-850 Warszawa", "formerNames": ["BRE Bank S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "mPlan Hipoteczny", "margin": 2.0, "bridgeMargin": 1.5, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-template", "data": { "name": "Multiplan", "margin": 1.8, "bridgeMargin": 1.0, "wiborType": "3M", "commission": 1.5, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "partial", "uokikClauses": ["771", "772", "773", "774", "775", "4704", "5743"], "notes": "Klauzula 4704 — abuzywność zapisu o zmiennym oprocentowaniu WIBOR potwierdzona przez Sąd Apelacyjny w Warszawie. Klauzula 5743 — umowy kredytu indeksowanego." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "PKO BP", "legalName": "Powszechna Kasa Oszczędności Bank Polski S.A.", "krs": "0000026438", "nip": "5250007738", "address": "ul. Puławska 15, 02-515 Warszawa", "formerNames": [] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Własny Kąt Hipoteczny", "margin": 2.02, "bridgeMargin": 0, "wiborType": "6M", "commission": 1.0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "complete", "uokikClauses": [], "notes": "Postępowania UOKiK w toku. Marża i prowizja ustalane indywidualnie." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Santander", "legalName": "Santander Bank Polska S.A.", "krs": "0000008723", "nip": "8960005765", "address": "al. Jana Pawła II 17, 00-854 Warszawa", "formerNames": ["Bank Zachodni WBK S.A.", "Kredyt Bank S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt Mieszkaniowy", "margin": 2.09, "bridgeMargin": 0, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-template", "data": { "name": "Kredyt Mieszkaniowy Select", "margin": 1.89, "bridgeMargin": 0, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "partial", "uokikClauses": ["6070"], "notes": "Klauzule WIBOR w umowach z lat 2006-2015. Przejął portfel Deutsche Bank Polska." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "ING Bank Śląski", "legalName": "ING Bank Śląski S.A.", "krs": "0000005459", "nip": "6340135475", "address": "ul. Sokolska 34, 40-086 Katowice", "formerNames": [] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Łatwy Start", "margin": 2.38, "bridgeMargin": 0, "wiborType": "1M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-template", "data": { "name": "Lekka Rata", "margin": 1.95, "bridgeMargin": 0, "wiborType": "1M", "commission": 1.95, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "complete", "uokikClauses": [], "notes": "Klient wybiera typ WIBOR: 1M, 3M lub 6M." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Bank Millennium", "legalName": "Bank Millennium S.A.", "krs": "0000010186", "nip": "5260200091", "address": "ul. Stanisława Żarównego 2A, 02-174 Warszawa", "formerNames": ["BIG Bank Gdański S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt Hipoteczny", "margin": 2.15, "bridgeMargin": 1.5, "wiborType": "3M", "commission": 2.0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "missing", "uokikClauses": ["3178", "3179"], "notes": "Klauzula 3178 — indeksacja do CHF/USD/EUR. Klauzula 3179 — przeliczanie rat wg tabel kursowych. Zawieszono udzielanie kredytów o zmiennej stopie (marzec 2026)." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "BNP Paribas", "legalName": "BNP Paribas Bank Polska S.A.", "krs": "0000011571", "nip": "5260009608", "address": "ul. Kasprzaka 2, 01-211 Warszawa", "formerNames": ["Fortis Bank Polska S.A.", "BGŻ BNP Paribas S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt z niską marżą", "margin": 2.05, "bridgeMargin": 0, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "partial", "uokikClauses": [], "notes": "" } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Pekao SA", "legalName": "Bank Polska Kasa Opieki S.A.", "krs": "0000014843", "nip": "5260009305", "address": "ul. Grzybowska 53/57, 00-950 Warszawa", "formerNames": [] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt Hipoteczny Pekao", "margin": 2.10, "bridgeMargin": 0, "wiborType": "3M", "commission": 1.5, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "complete", "uokikClauses": [], "notes": "Postępowania UOKiK w toku." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Alior Bank", "legalName": "Alior Bank S.A.", "krs": "0000305178", "nip": "1070010731", "address": "ul. Łopuszańska 38D, 02-232 Warszawa", "formerNames": [] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Megahipoteka", "margin": 2.19, "bridgeMargin": 0, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-template", "data": { "name": "Megahipoteka z ubezp. niskiego wkładu", "margin": 2.39, "bridgeMargin": 0, "wiborType": "3M", "commission": 0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "missing", "uokikClauses": [], "notes": "Bank działa od 2008 roku." } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Credit Agricole", "legalName": "Credit Agricole Bank Polska S.A.", "krs": "0000039887", "nip": "6570082274", "address": "pl. Orląt Lwowskich 1, 53-605 Wrocław", "formerNames": ["Lukas Bank S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt Hipoteczny CA", "margin": 2.20, "bridgeMargin": 0, "wiborType": "3M", "commission": 2.0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": true, "esisStatus": "partial", "uokikClauses": [], "notes": "" } }
+    ]
+  },
+  {
+    "type": "opponent",
+    "data": { "opponentType": "bank", "name": "Getin Noble Bank", "legalName": "Getin Noble Bank S.A.", "krs": "0000304735", "nip": "1080004850", "address": "ul. Przyokopowa 33, 01-208 Warszawa", "formerNames": ["Getin Bank S.A.", "Noble Bank S.A."] },
+    "children": [
+      { "type": "opponent-template", "data": { "name": "Kredyt Hipoteczny Getin", "margin": 2.60, "bridgeMargin": 2.0, "wiborType": "3M", "commission": 3.0, "interestMethod": "360" } },
+      { "type": "opponent-legal", "data": { "directive93_13": true, "directive2014_17": false, "esisStatus": "missing", "uokikClauses": ["3178", "3179", "5743"], "notes": "Przymusowa restrukturyzacja BFG 30.09.2022. Kara UOKiK 7 mln PLN za niedozwolone praktyki. Klauzule tożsame z Millennium (3178, 3179) i mBank (5743). Liczne pozwy frankowe i wiborowe." } }
+    ]
+  }
+]
