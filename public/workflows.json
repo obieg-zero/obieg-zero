@@ -22,10 +22,10 @@
         }
       }
     },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "case", "fields": [
-      { "key": "clientName", "label": "Klient", "required": true },
-      { "key": "clientPhone", "label": "Telefon klienta", "inputType": "tel" },
-      { "key": "clientEmail", "label": "Email klienta", "inputType": "email" }
+    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "client", "fields": [
+      { "key": "name", "label": "Imię i nazwisko", "required": true },
+      { "key": "phone", "label": "Telefon", "inputType": "tel" },
+      { "key": "email", "label": "Email", "inputType": "email" }
     ] },
     { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "view": "form", "recordType": "case",
       "fields": [
@@ -76,9 +76,9 @@
         }
       }
     },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "case", "fields": [
-      { "key": "clientName", "label": "Klient", "required": true },
-      { "key": "clientPhone", "label": "Telefon klienta", "inputType": "tel" }
+    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "client", "fields": [
+      { "key": "name", "label": "Imię i nazwisko", "required": true },
+      { "key": "phone", "label": "Telefon", "inputType": "tel" }
     ] },
     { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "view": "form", "recordType": "case",
       "fields": [
