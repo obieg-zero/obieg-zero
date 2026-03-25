@@ -69,6 +69,8 @@ export interface SDK {
   getViews(pluginId?: string): ViewDef[]
   getParsers(targetType?: string): ParserDef[]
   getActions(): ActionDef[]
+  registerStageView(name: string, component: ComponentType<any>): void
+  getStageView(node: any): ComponentType<any>
 }
 
 // ── Contribution Point Types ─────────────────────────────────────────
