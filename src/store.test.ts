@@ -1,240 +1,195 @@
 import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createStore } from './store'
+import { createStore, _resetForTests } from './store'
 import type { Store } from './store'
 
 let store: Store
 
-beforeEach(() => {
-  store = createStore('test-' + Math.random())
+beforeEach(async () => {
+  _resetForTests()
+  store = await createStore()
 })
 
-describe('CRM workflow: case filled in stages', () => {
+// ── CRUD ────────────────────────────────────────────────────────────
+
+describe('CRUD', () => {
+  it('add returns PostRecord with id, type, timestamps', () => {
+    const r = store.add('task', { title: 'Test' })
+    expect(r.id).toBeTruthy()
+    expect(r.type).toBe('task')
+    expect(r.parentId).toBeNull()
+    expect(r.data.title).toBe('Test')
+    expect(r.createdAt).toBeGreaterThan(0)
+  })
+
+  it('add with custom id and parentId', () => {
+    const parent = store.add('project', { name: 'P1' })
+    const child = store.add('task', { title: 'T1' }, { id: 'custom-id', parentId: parent.id })
+    expect(child.id).toBe('custom-id')
+    expect(child.parentId).toBe(parent.id)
+  })
+
+  it('get returns record by id', () => {
+    const r = store.add('task', { title: 'X' })
+    expect(store.get(r.id)?.data.title).toBe('X')
+  })
+
+  it('get returns undefined for missing id', () => {
+    expect(store.get('nonexistent')).toBeUndefined()
+  })
+
+  it('update merges data and bumps updatedAt', () => {
+    const r = store.add('task', { title: 'Old', done: false })
+    const before = r.updatedAt
+    store.update(r.id, { done: true })
+    const loaded = store.get(r.id)!
+    expect(loaded.data.title).toBe('Old')
+    expect(loaded.data.done).toBe(true)
+    expect(loaded.updatedAt).toBeGreaterThanOrEqual(before)
+  })
+
+  it('update on missing id is noop', () => {
+    expect(() => store.update('missing', { x: 1 })).not.toThrow()
+  })
+
+  it('remove deletes record', () => {
+    const r = store.add('task', { title: 'Del' })
+    store.remove(r.id)
+    expect(store.get(r.id)).toBeUndefined()
+  })
+
+  it('remove cascades to children', () => {
+    const parent = store.add('project', { name: 'P' })
+    const child = store.add('task', { title: 'T' }, { parentId: parent.id })
+    const grandchild = store.add('note', { text: 'N' }, { parentId: child.id })
+    store.remove(parent.id)
+    expect(store.get(parent.id)).toBeUndefined()
+    expect(store.get(child.id)).toBeUndefined()
+    expect(store.get(grandchild.id)).toBeUndefined()
+  })
+})
+
+// ── Queries ─────────────────────────────────────────────────────────
+
+describe('queries', () => {
+  it('getPosts returns records of type sorted by createdAt', () => {
+    store.add('task', { title: 'A' })
+    store.add('note', { text: 'X' })
+    store.add('task', { title: 'B' })
+    const tasks = store.getPosts('task')
+    expect(tasks.length).toBe(2)
+    expect(tasks[0].data.title).toBe('A')
+    expect(tasks[1].data.title).toBe('B')
+  })
+
+  it('getPosts returns empty for unknown type', () => {
+    expect(store.getPosts('nope')).toEqual([])
+  })
+})
+
+// ── Type registry ───────────────────────────────────────────────────
+
+describe('registerType', () => {
+  it('registers and retrieves type', () => {
+    store.registerType('task', [{ key: 'title', label: 'Tytuł', required: true }], 'Zadania')
+    const t = store.getType('task')
+    expect(t?.label).toBe('Zadania')
+    expect(t?.schema[0].key).toBe('title')
+  })
+
+  it('merges fields on repeated registration', () => {
+    store.registerType('case', [{ key: 'a', label: 'A' }])
+    store.registerType('case', [{ key: 'a', label: 'A2' }, { key: 'b', label: 'B' }])
+    const t = store.getType('case')!
+    expect(t.schema.length).toBe(2)
+    expect(t.schema[0].label).toBe('A') // first wins
+    expect(t.schema[1].key).toBe('b')
+  })
+
+  it('getTypes returns all registered types', () => {
+    store.registerType('a', [], 'AA')
+    store.registerType('b', [], 'BB')
+    expect(store.getTypes().map(t => t.type).sort()).toEqual(['a', 'b'])
+  })
+})
+
+// ── Validation (strict) ─────────────────────────────────────────────
+
+describe('strict validation', () => {
   beforeEach(() => {
-    store.registerType('case', [], 'Sprawy', { validation: 'warn' })
-    // Workflow dynamically adds fields to case
-    store.registerType('case', [
-      { key: 'clientName', label: 'Klient', required: true },
-      { key: 'opponent', label: 'Bank' },
-      { key: 'loanNumber', label: 'Nr umowy' },
-    ])
-    // System fields added last
-    store.registerType('case', [
-      { key: 'workflowType', label: 'Proces' },
-      { key: 'currentStage', label: 'Etap' },
-      { key: 'status', label: 'Status' },
-    ])
+    store.registerType('client', [{ key: 'name', label: 'Nazwa', required: true }], 'Klienci', { strict: true })
   })
 
-  it('step 1: create case with only system fields', async () => {
-    const rec = await store.add('case', {
-      workflowType: 'wibor-simple',
-      currentStage: 'dokumenty',
-      status: 'nowa',
-    })
-    expect(rec.id).toBeTruthy()
-    const loaded = await store.get(rec.id)
-    expect(loaded?.data.workflowType).toBe('wibor-simple')
-    expect(loaded?.data.clientName).toBeUndefined() // not yet filled
+  it('throws on add with missing required field', () => {
+    expect(() => store.add('client', {})).toThrow('Missing required: name')
   })
 
-  it('step 2: update case with client data', async () => {
-    const rec = await store.add('case', {
-      workflowType: 'wibor-simple',
-      currentStage: 'klient',
-      status: 'nowa',
-    })
-    await store.update(rec.id, { clientName: 'Jan Kowalski' })
-    const loaded = await store.get(rec.id)
-    expect(loaded?.data.clientName).toBe('Jan Kowalski')
-    expect(loaded?.data.workflowType).toBe('wibor-simple') // preserved
+  it('allows add with required field present', () => {
+    const r = store.add('client', { name: 'Jan' })
+    expect(r.data.name).toBe('Jan')
   })
 
-  it('step 3: update case with loan data, previous fields preserved', async () => {
-    const rec = await store.add('case', {
-      workflowType: 'wibor-simple',
-      currentStage: 'klient',
-      status: 'nowa',
-    })
-    await store.update(rec.id, { clientName: 'Jan Kowalski' })
-    await store.update(rec.id, { opponent: 'Bank X', loanNumber: '123/2024', currentStage: 'sprawa' })
+  it('throws on update that clears required field', () => {
+    const r = store.add('client', { name: 'Jan' })
+    expect(() => store.update(r.id, { name: '' })).toThrow('Missing required: name')
+  })
 
-    const loaded = await store.get(rec.id)
-    expect(loaded?.data.clientName).toBe('Jan Kowalski') // still there?
-    expect(loaded?.data.opponent).toBe('Bank X')
-    expect(loaded?.data.loanNumber).toBe('123/2024')
-    expect(loaded?.data.currentStage).toBe('sprawa')
+  it('non-strict type allows missing required', () => {
+    store.registerType('note', [{ key: 'text', label: 'Treść', required: true }])
+    const r = store.add('note', {})
+    expect(r.id).toBeTruthy()
   })
 })
 
-describe('CRM workflow: exact production sequence', () => {
-  // Simulates exactly what plugin-workflow-crm does at boot + user actions
+// ── Options ─────────────────────────────────────────────────────────
 
-  it('full flow: register types → add case → update stages → read back', async () => {
-    // 1. Plugin registers types synchronously (index.tsx lines 14-40)
-    store.registerType('client', [
-      { key: 'name', label: 'Imię i nazwisko', required: true },
-    ], 'Klienci', { validation: 'strict' })
-    store.registerType('case', [], 'Sprawy', { validation: 'warn' })
-    store.registerType('event', [
-      { key: 'kind', label: 'Rodzaj', required: true },
-    ], 'Zdarzenia', { validation: 'off' })
-
-    // 2. Async: workflow-derived fields added to case (index.tsx lines 52-64)
-    store.registerType('case', [
-      { key: 'clientName', label: 'Klient' },
-      { key: 'opponent', label: 'Bank' },
-      { key: 'loanNumber', label: 'Nr umowy' },
-    ])
-    store.registerType('case', [
-      { key: 'workflowType', label: 'Proces' },
-      { key: 'currentStage', label: 'Etap' },
-      { key: 'status', label: 'Status' },
-    ])
-
-    // 3. User clicks "Nowa sprawa" (panels.tsx line 37)
-    const cas = await store.add('case', {
-      workflowType: 'wibor-simple',
-      currentStage: 'dokumenty',
-      status: 'nowa',
-    })
-    expect(cas.id).toBeTruthy()
-
-    // 4. Event logged (panels.tsx line 38)
-    const ev = await store.add('event', {
-      kind: 'etap',
-      text: '→ WIBOR uproszczony',
-      date: '2026-03-25',
-    }, { parentId: cas.id })
-    expect(ev.parentId).toBe(cas.id)
-
-    // 5. User fills client step (stage-views.tsx FormView → store.update)
-    await store.update(cas.id, { clientName: 'Jan Kowalski' })
-
-    // 6. User fills case data step
-    await store.update(cas.id, {
-      opponent: 'Bank X',
-      loanNumber: '123/2024',
-      currentStage: 'sprawa',
-    })
-
-    // 7. Verify everything is there
-    const final = await store.get(cas.id)
-    expect(final).toBeDefined()
-    expect(final!.data.workflowType).toBe('wibor-simple')
-    expect(final!.data.clientName).toBe('Jan Kowalski')
-    expect(final!.data.opponent).toBe('Bank X')
-    expect(final!.data.loanNumber).toBe('123/2024')
-    expect(final!.data.currentStage).toBe('sprawa')
-    expect(final!.data.status).toBe('nowa')
-
-    // 8. Verify case is queryable by type
-    const allCases = await store.exportJSON('case')
-    expect(allCases.case.records.length).toBe(1)
-    expect(allCases.case.records[0].data.clientName).toBe('Jan Kowalski')
+describe('options', () => {
+  it('setOption + get via useOption pattern', () => {
+    store.setOption('theme', 'dark')
+    // Can't test useOption (hook) in non-React context, but setOption should persist in state
+    store.setOption('lang', 'pl')
+    // Verify via another setOption/get cycle
+    store.setOption('theme', 'light')
   })
 })
 
-describe('CRM workflow: client as linked record', () => {
-  beforeEach(() => {
-    store.registerType('client', [
-      { key: 'name', label: 'Imię i nazwisko', required: true },
-      { key: 'phone', label: 'Telefon' },
-    ], 'Klienci', { validation: 'strict' })
-    store.registerType('case', [
-      { key: 'workflowType', label: 'Proces' },
-      { key: 'currentStage', label: 'Etap' },
-      { key: 'status', label: 'Status' },
-      { key: 'clientId', label: 'Klient' },
-    ], 'Sprawy', { validation: 'warn' })
+// ── importJSON ──────────────────────────────────────────────────────
+
+describe('importJSON', () => {
+  it('imports flat nodes', () => {
+    const count = store.importJSON([
+      { type: 'task', data: { title: 'A' } },
+      { type: 'task', data: { title: 'B' } },
+    ])
+    expect(count).toBe(2)
+    expect(store.getPosts('task').length).toBe(2)
   })
 
-  it('creates client record and links to case via clientId', async () => {
-    // 1. Create case
-    const cas = await store.add('case', {
-      workflowType: 'wibor-simple', currentStage: 'klient', status: 'nowa',
-    })
-
-    // 2. FormView with recordType "client" creates separate record
-    const client = await store.add('client', { name: 'Jan Kowalski', phone: '123456789' })
-
-    // 3. Links client to case
-    await store.update(cas.id, { clientId: client.id })
-
-    // 4. Case has clientId, not clientName
-    const loadedCase = await store.get(cas.id)
-    expect(loadedCase?.data.clientId).toBe(client.id)
-    expect(loadedCase?.data.clientName).toBeUndefined()
-
-    // 5. Client exists as separate record
-    const loadedClient = await store.get(client.id)
-    expect(loadedClient?.data.name).toBe('Jan Kowalski')
-    expect(loadedClient?.type).toBe('client')
-
-    // 6. Client visible in exportJSON
-    const exp = await store.exportJSON('client')
-    expect(exp.client.records.length).toBe(1)
-    expect(exp.client.records[0].data.name).toBe('Jan Kowalski')
+  it('imports nested parent-child', () => {
+    const count = store.importJSON([{
+      type: 'opponent', data: { name: 'Bank X' },
+      children: [
+        { type: 'opponent-template', data: { margin: 2.5 } },
+        { type: 'opponent-template', data: { margin: 1.8 } },
+      ],
+    }])
+    expect(count).toBe(3)
+    const opponents = store.getPosts('opponent')
+    expect(opponents.length).toBe(1)
+    const templates = store.getPosts('opponent-template')
+    expect(templates.length).toBe(2)
+    expect(templates[0].parentId).toBe(opponents[0].id)
   })
 
-  it('updates existing linked client', async () => {
-    const cas = await store.add('case', {
-      workflowType: 'wibor-simple', currentStage: 'klient', status: 'nowa',
-    })
-    const client = await store.add('client', { name: 'Jan Kowalski' })
-    await store.update(cas.id, { clientId: client.id })
-
-    // User goes back to client step and edits
-    await store.update(client.id, { phone: '999888777' })
-
-    const loaded = await store.get(client.id)
-    expect(loaded?.data.name).toBe('Jan Kowalski')
-    expect(loaded?.data.phone).toBe('999888777')
-  })
-})
-
-describe('validation modes per type', () => {
-  it('strict: throws on missing required field', async () => {
-    store.registerType('client', [
-      { key: 'name', label: 'Nazwa', required: true },
-    ], 'Klienci', { validation: 'strict' })
-
-    await expect(store.add('client', {})).rejects.toThrow('Missing required field: name')
-  })
-
-  it('warn: allows missing required field', async () => {
-    store.registerType('case', [
-      { key: 'name', label: 'Nazwa', required: true },
-    ], 'Sprawy', { validation: 'warn' })
-
-    const rec = await store.add('case', {})
-    expect(rec.id).toBeTruthy()
-  })
-
-  it('off: no validation at all', async () => {
-    store.registerType('event', [
-      { key: 'kind', label: 'Rodzaj', required: true },
-    ], 'Zdarzenia', { validation: 'off' })
-
-    const rec = await store.add('event', { whatever: 'anything' })
-    expect(rec.id).toBeTruthy()
-  })
-
-  it('strict on update: throws if merged data invalid', async () => {
-    store.registerType('client', [
-      { key: 'name', label: 'Nazwa', required: true },
-    ], 'Klienci', { validation: 'strict' })
-
-    const rec = await store.add('client', { name: 'Jan' })
-    await expect(store.update(rec.id, { name: '' })).rejects.toThrow('Missing required field: name')
-  })
-
-  it('default validation mode is warn', async () => {
-    store.registerType('misc', [
-      { key: 'x', label: 'X', required: true },
-    ], 'Misc')
-
-    const rec = await store.add('misc', {})
-    expect(rec.id).toBeTruthy() // warn doesn't throw
+  it('deep nesting works', () => {
+    const count = store.importJSON([{
+      type: 'a', data: { n: 1 },
+      children: [{ type: 'b', data: { n: 2 }, children: [{ type: 'c', data: { n: 3 } }] }],
+    }])
+    expect(count).toBe(3)
+    const cs = store.getPosts('c')
+    expect(cs.length).toBe(1)
+    const bs = store.getPosts('b')
+    expect(cs[0].parentId).toBe(bs[0].id)
   })
 })

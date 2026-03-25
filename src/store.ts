@@ -1,13 +1,5 @@
-import Dexie from 'dexie'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useRef } from 'react'
-
-function useStableLiveQuery<T>(querier: () => Promise<T>, deps: unknown[], fallback: T): T {
-  const result = useLiveQuery(querier, deps, undefined as T | undefined)
-  const ref = useRef<T>(fallback)
-  if (result !== undefined) ref.current = result
-  return ref.current
-}
+import { create } from 'zustand'
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -21,42 +13,74 @@ export interface PostRecord {
 }
 
 export type SchemaField = { key: string; label: string; required?: boolean; inputType?: string }
-export type ValidationMode = 'off' | 'warn' | 'strict'
-export interface PostType { type: string; schema: SchemaField[]; label?: string; validation: ValidationMode }
+export interface PostType { type: string; schema: SchemaField[]; label?: string; strict?: boolean }
 export interface SeedNode { type: string; data: Record<string, any>; children?: SeedNode[] }
 
 export interface Store {
-  validate(type: string, data: Record<string, any>): string[]
-  add(type: string, data: Record<string, any>, opts?: { id?: string; parentId?: string }): Promise<PostRecord>
-  get(id: string): Promise<PostRecord | undefined>
-  update(id: string, data: Record<string, any>): Promise<void>
-  remove(id: string): Promise<void>
+  add(type: string, data: Record<string, any>, opts?: { id?: string; parentId?: string }): PostRecord
+  get(id: string): PostRecord | undefined
+  update(id: string, data: Record<string, any>): void
+  remove(id: string): void
+  usePost(id: string | null | undefined): PostRecord | undefined
   usePosts(type: string): PostRecord[]
-  setOption(key: string, value: unknown): Promise<void>
+  useChildren(parentId: string | null | undefined, type?: string): PostRecord[]
+  setOption(key: string, value: unknown): void
   useOption(key: string): unknown
-  importJSON(nodes: SeedNode[]): Promise<number>
-  registerType(type: string, schema: SchemaField[], label?: string, opts?: { validation?: ValidationMode }): void
+  importJSON(nodes: SeedNode[]): number
+  registerType(type: string, schema: SchemaField[], label?: string, opts?: { strict?: boolean }): void
+  getPosts(type: string): PostRecord[]
   getType(type: string): PostType | undefined
   getTypes(): PostType[]
-  exportJSON(type?: string): Promise<Record<string, { schema: SchemaField[] | null; records: PostRecord[] }>>
   writeFile(postId: string, name: string, data: File | Blob): Promise<void>
   readFile(postId: string, name: string): Promise<File>
   listFiles(postId: string): Promise<string[]>
   removeFile(postId: string, name: string): Promise<void>
 }
 
-// ── DB ───────────────────────────────────────────────────────────────
+// ── IDB key-value storage for Zustand persist ────────────────────────
 
-class StoreDB extends Dexie {
-  posts!: Dexie.Table<PostRecord, string>
-  options!: Dexie.Table<{ key: string; value: unknown }, string>
-  constructor(name: string) {
-    super(name)
-    this.version(1).stores({ posts: 'id, type, parentId', options: 'key' })
-  }
+const DB_NAME = 'ozr-persist'
+const OBJ_STORE = 'kv'
+let dbInstance: IDBDatabase | null = null
+
+function openIDB(): Promise<IDBDatabase> {
+  if (dbInstance) return Promise.resolve(dbInstance)
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1)
+    req.onupgradeneeded = () => req.result.createObjectStore(OBJ_STORE)
+    req.onsuccess = () => { dbInstance = req.result; resolve(req.result) }
+    req.onerror = () => reject(req.error)
+  })
 }
 
-// ── OPFS ─────────────────────────────────────────────────────────────
+function idbOp<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  return openIDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(OBJ_STORE, mode)
+    const req = fn(tx.objectStore(OBJ_STORE))
+    tx.oncomplete = () => resolve(req.result)
+    tx.onerror = () => reject(tx.error)
+  }))
+}
+
+const idbStorage: StateStorage = {
+  getItem: (k) => idbOp('readonly', s => s.get(k)).then(v => v ?? null),
+  setItem: (k, v) => idbOp('readwrite', s => s.put(v, k)).then(() => {}),
+  removeItem: (k) => idbOp('readwrite', s => s.delete(k)).then(() => {}),
+}
+
+// ── Zustand data store ───────────────────────────────────────────────
+
+interface DataState {
+  posts: Record<string, PostRecord>
+  options: Record<string, unknown>
+}
+
+const useDataStore = create<DataState>()(persist(
+  () => ({ posts: {}, options: {} }),
+  { name: 'ozr-store', storage: createJSONStorage(() => idbStorage) },
+))
+
+// ── OPFS (file attachments) ──────────────────────────────────────────
 
 const opfsDir = async (...path: string[]) => {
   let dir = await navigator.storage.getDirectory()
@@ -67,128 +91,154 @@ const opfsDirSafe = async (...path: string[]) => {
   try { return await opfsDir(...path) } catch { return null }
 }
 
+/** @internal test-only: resets Zustand state */
+export const _resetForTests = () => useDataStore.setState({ posts: {}, options: {} }, true)
+
 // ── Factory ──────────────────────────────────────────────────────────
 
-export function createStore(dbName = 'ozr-store'): Store {
-  const db = new StoreDB(dbName)
+export async function createStore(): Promise<Store> {
+  await new Promise<void>(resolve => {
+    if (useDataStore.persist.hasHydrated()) resolve()
+    else useDataStore.persist.onFinishHydration(() => resolve())
+  })
+
   const types = new Map<string, PostType>()
+  const postsCache = new Map<string, { key: string; result: PostRecord[] }>()
 
-  const dirFor = async (postId: string, create = false) => {
-    const p = await db.posts.get(postId)
-    if (!p) return null
-    return create ? opfsDir('posts', p.type, postId) : opfsDirSafe('posts', p.type, postId)
-  }
+  const read = () => useDataStore.getState()
+  const write = (fn: (s: DataState) => Partial<DataState>) => useDataStore.setState(fn)
 
-  const validate = (type: string, data: Record<string, any>): string[] => {
+  const enforce = (type: string, data: Record<string, any>) => {
     const t = types.get(type)
-    if (!t) return []
-    const errors: string[] = []
-    const schemaKeys = new Set(t.schema.map(f => f.key))
+    if (!t?.strict) return
     for (const f of t.schema) {
       if (f.required && (data[f.key] === undefined || data[f.key] === null || data[f.key] === ''))
-        errors.push(`Missing required field: ${f.key}`)
+        throw new Error(`[store] Missing required: ${f.key}`)
     }
-    for (const key of Object.keys(data)) {
-      if (!schemaKeys.has(key)) console.warn(`[store] Unknown field "${key}" for type "${type}"`)
-    }
-    return errors
   }
 
-  const enforce = (op: string, type: string, data: Record<string, any>) => {
-    const mode = types.get(type)?.validation ?? 'warn'
-    if (mode === 'off') return
-    const errors = validate(type, data)
-    if (!errors.length) return
-    const msg = `[store] ${op}("${type}"): ${errors.join(', ')}`
-    if (mode === 'strict') throw new Error(msg)
-    console.warn(msg)
+  const dirFor = (postId: string, doCreate = false) => {
+    const p = read().posts[postId]
+    if (!p) return Promise.resolve(null)
+    return doCreate ? opfsDir('posts', p.type, postId) : opfsDirSafe('posts', p.type, postId)
   }
 
   return {
-    validate,
-    async add(type, data, o) {
-      enforce('add', type, data)
+    add(type, data, o) {
+      enforce(type, data)
       const now = Date.now()
       const post: PostRecord = { id: o?.id ?? crypto.randomUUID(), type, parentId: o?.parentId ?? null, data, createdAt: now, updatedAt: now }
-      await db.posts.put(post)
+      write(s => ({ posts: { ...s.posts, [post.id]: post } }))
       return post
     },
-    async get(id) { return db.posts.get(id) },
-    async update(id, data) {
-      const p = await db.posts.get(id)
+
+    get(id) { return read().posts[id] },
+
+    update(id, data) {
+      const p = read().posts[id]
       if (!p) return
       const merged = { ...p.data, ...data }
-      enforce('update', p.type, merged)
-      await db.posts.put({ ...p, data: merged, updatedAt: Date.now() })
+      enforce(p.type, merged)
+      write(s => ({ posts: { ...s.posts, [id]: { ...p, data: merged, updatedAt: Date.now() } } }))
     },
-    async remove(id) {
-      const queue = [id]
+
+    remove(id) {
+      const s = read()
+      const ids: string[] = [], queue = [id]
       while (queue.length) {
         const cur = queue.shift()!
-        queue.push(...await db.posts.where('parentId').equals(cur).primaryKeys())
-        const p = await db.posts.get(cur)
-        if (!p) continue
-        try { (await opfsDirSafe('posts', p.type))?.removeEntry(cur, { recursive: true }) } catch { /* files may not exist */ }
-        await db.posts.delete(cur)
+        if (s.posts[cur]) ids.push(cur)
+        for (const c of Object.values(s.posts)) if (c.parentId === cur) queue.push(c.id)
+      }
+      write(prev => {
+        const next = { ...prev.posts }
+        for (const i of ids) delete next[i]
+        return { posts: next }
+      })
+      for (const i of ids) {
+        const p = s.posts[i]
+        if (p) opfsDirSafe('posts', p.type).then(d => d?.removeEntry(i, { recursive: true }).catch(() => {})).catch(() => {})
       }
     },
-    usePosts(type) { return useStableLiveQuery(() => db.posts.where('type').equals(type).sortBy('createdAt'), [type], []) },
-    async setOption(key, value) { await db.options.put({ key, value }) },
-    useOption(key) { return useStableLiveQuery(() => db.options.get(key).then(o => o?.value), [key], undefined) },
-    async importJSON(nodes) {
+
+    usePost(id) {
+      return useDataStore(s => id ? s.posts[id] : undefined)
+    },
+
+    usePosts(type) {
+      const posts = useDataStore(s => s.posts)
+      const filtered = Object.values(posts).filter(p => p.type === type).sort((a, b) => a.createdAt - b.createdAt)
+      const key = filtered.map(p => p.id + ':' + p.updatedAt).join(',')
+      const cached = postsCache.get(type)
+      if (cached && cached.key === key) return cached.result
+      postsCache.set(type, { key, result: filtered })
+      return filtered
+    },
+
+    useChildren(parentId, type?) {
+      const posts = useDataStore(s => s.posts)
+      if (!parentId) return []
+      const filtered = Object.values(posts).filter(p => p.parentId === parentId && (!type || p.type === type)).sort((a, b) => a.createdAt - b.createdAt)
+      const cacheKey = `ch:${parentId}:${type || '*'}`
+      const key = filtered.map(p => p.id + ':' + p.updatedAt).join(',')
+      const cached = postsCache.get(cacheKey)
+      if (cached && cached.key === key) return cached.result
+      postsCache.set(cacheKey, { key, result: filtered })
+      return filtered
+    },
+
+    setOption(key, value) { write(s => ({ options: { ...s.options, [key]: value } })) },
+    useOption(key) { return useDataStore(s => s.options[key]) },
+
+    importJSON(nodes) {
       let count = 0
-      const imp = async (node: SeedNode, parentId?: string) => {
+      const batch: Record<string, PostRecord> = {}
+      const imp = (node: SeedNode, parentId?: string) => {
         const now = Date.now()
         const post: PostRecord = { id: crypto.randomUUID(), type: node.type, parentId: parentId ?? null, data: node.data, createdAt: now, updatedAt: now }
-        await db.posts.put(post); count++
-        if (node.children) for (const ch of node.children) await imp(ch, post.id)
+        batch[post.id] = post; count++
+        if (node.children) for (const ch of node.children) imp(ch, post.id)
       }
-      for (const n of nodes) await imp(n)
+      for (const n of nodes) imp(n)
+      write(s => ({ posts: { ...s.posts, ...batch } }))
       return count
     },
+
     registerType(type, schema, label, opts) {
       const existing = types.get(type)
       if (existing) {
-        const knownKeys = new Set(existing.schema.map(f => f.key))
-        const newFields = schema.filter(f => !knownKeys.has(f.key))
-        existing.schema.push(...newFields)
+        const known = new Set(existing.schema.map(f => f.key))
+        existing.schema.push(...schema.filter(f => !known.has(f.key)))
         if (label) existing.label = label
-        if (opts?.validation) existing.validation = opts.validation
+        if (opts?.strict !== undefined) existing.strict = opts.strict
       } else {
-        types.set(type, { type, schema: [...schema], label, validation: opts?.validation ?? 'warn' })
+        types.set(type, { type, schema: [...schema], label, strict: opts?.strict })
       }
     },
+
+    getPosts(type) { return Object.values(read().posts).filter(p => p.type === type).sort((a, b) => a.createdAt - b.createdAt) },
     getType(type) { return types.get(type) },
     getTypes() { return Array.from(types.values()) },
-    async exportJSON(type?) {
-      const tt = type ? [type] : Array.from(new Set((await db.posts.toArray()).map(p => p.type)))
-      const r: Record<string, { schema: SchemaField[] | null; records: PostRecord[] }> = {}
-      for (const t of tt) r[t] = { schema: types.get(t)?.schema ?? null, records: await db.posts.where('type').equals(t).sortBy('createdAt') }
-      return r
-    },
+
     async writeFile(postId, name, data) {
       const dir = await dirFor(postId, true); if (!dir) return
-      // FileSystemFileHandle.createWritable() is not yet in all TS libs
       const handle = await dir.getFileHandle(name, { create: true }) as FileSystemFileHandle & { createWritable(): Promise<{ write(d: File | Blob): Promise<void>; close(): Promise<void> }> }
-      const w = await handle.createWritable()
-      await w.write(data); await w.close()
+      const w = await handle.createWritable(); await w.write(data); await w.close()
     },
     async readFile(postId, name) {
       const dir = await dirFor(postId)
-      if (!dir) throw new Error(`readFile: post "${postId}" not found or has no files`)
+      if (!dir) throw new Error(`readFile: post "${postId}" not found`)
       return (await dir.getFileHandle(name)).getFile()
     },
     async listFiles(postId) {
       const dir = await dirFor(postId); if (!dir) return []
       const n: string[] = []
-      // FileSystemDirectoryHandle.entries() not in all TS libs
       for await (const [name] of (dir as FileSystemDirectoryHandle & AsyncIterable<[string, FileSystemHandle]>).entries()) n.push(name)
       return n.sort()
     },
     async removeFile(postId, name) {
-      const dir = await dirFor(postId)
-      if (!dir) return
-      try { await dir.removeEntry(name) } catch { /* entry may already be deleted */ }
+      const dir = await dirFor(postId); if (!dir) return
+      try { await dir.removeEntry(name) } catch { /* ok */ }
     },
   }
 }

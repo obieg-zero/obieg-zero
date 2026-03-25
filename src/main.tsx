@@ -27,7 +27,7 @@ interface ConfigEntry {
 
 async function boot() {
   const config: unknown = await fetch('./config.json').then(r => r.json()).catch(() => ({}))
-  const store = createStore()
+  const store = await createStore()
   const shared = create(() => ({} as Record<string, unknown>))
   type FormData = Record<string, unknown>
   const sdk: SDK = {
@@ -38,6 +38,20 @@ async function boot() {
     registerParser: (id, def) => registerParser(id, { ...def, pluginId: '_sdk' }),
     registerAction: (id, def) => registerAction(id, { ...def, pluginId: '_sdk' }),
     getViews, getParsers, getActions,
+    uploadFile: async (parentId: string) => {
+      const file = await openFileDialog('*')
+      if (!file) return null
+      const ev = store.add('event', { kind: 'plik', text: file.name, date: new Date().toISOString().slice(0, 10) }, { parentId })
+      await store.writeFile(ev.id, file.name, file)
+      log(`Dodano: ${file.name}`, 'ok')
+      return ev
+    },
+    downloadFile: async (postId: string, filename: string) => {
+      const f = await store.readFile(postId, filename)
+      const u = URL.createObjectURL(f)
+      Object.assign(document.createElement('a'), { href: u, download: filename }).click()
+      URL.revokeObjectURL(u)
+    },
     zip: (files: Record<string, Uint8Array | string>) => {
       const mapped: Record<string, Uint8Array> = {}
       for (const [k, v] of Object.entries(files)) mapped[k] = typeof v === 'string' ? strToU8(v) : v
@@ -69,20 +83,20 @@ async function boot() {
     // Default options (once)
     if (entry.defaultOptions) {
       for (const [k, v] of Object.entries(entry.defaultOptions as Record<string, unknown>)) {
-        if ((await store.get(`__opt:${k}`)) === undefined) {
-          await store.setOption(k, v)
-          await store.add('meta', { opt: k }, { id: `__opt:${k}` })
+        if (store.get(`__opt:${k}`) === undefined) {
+          store.setOption(k, v)
+          store.add('meta', { opt: k }, { id: `__opt:${k}` })
         }
       }
     }
     // Import data (once per file)
     for (const src of entry.importData ?? []) {
       const key = `__data:${src}`
-      if (await store.get(key)) continue
+      if (store.get(key)) continue
       try {
         const nodes = await fetch(`./${src}`).then(r => r.json())
-        const count = await store.importJSON(nodes)
-        await store.add('meta', { src }, { id: key })
+        const count = store.importJSON(nodes)
+        store.add('meta', { src }, { id: key })
         log(`${src}: ${count} rekordów`, 'ok')
       } catch (e) { log(`${src}: ${(e as Error).message}`, 'error') }
     }

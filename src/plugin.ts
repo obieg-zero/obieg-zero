@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Store } from './store'
+import type { Store, PostRecord } from './store'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -60,6 +60,8 @@ export interface SDK {
     submit: () => Promise<void>; toggle: () => void; reset: () => void
   }
   zip(files: Record<string, Uint8Array | string>): Blob
+  uploadFile(parentId: string): Promise<PostRecord | null>
+  downloadFile(postId: string, filename: string): Promise<void>
   // Contribution points
   registerView(id: string, def: Omit<ViewDef, 'pluginId'>): void
   registerParser(id: string, def: Omit<ParserDef, 'pluginId'>): void
@@ -83,6 +85,9 @@ const { getState, setState } = useHostStore
 const views = new Map<string, ViewDef>()
 const parsers = new Map<string, ParserDef>()
 const actions = new Map<string, ActionDef>()
+
+/** @internal test-only */
+export const _resetRegistries = () => { views.clear(); parsers.clear(); actions.clear() }
 
 export const registerView = (id: string, def: ViewDef) => { views.set(id, def) }
 export const registerParser = (id: string, def: ParserDef) => { parsers.set(id, def) }
