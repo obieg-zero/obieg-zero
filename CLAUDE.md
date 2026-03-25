@@ -43,10 +43,30 @@ export default plugin
 
 Pełne API: `@obieg-zero/sdk` README (`node_modules/@obieg-zero/sdk/README.md`).
 
+## Architektura src/
+
+```
+src/
+├── main.tsx           → bootstrap, SDK, ładowanie pluginów
+├── store.ts           → Zustand store, synchroniczny CRUD
+├── plugin.ts          → host store, registries, loader (dane)
+├── Shell.tsx          → hooki na store → przekazuje dane do ShellLayout (dane)
+├── views.tsx          → typy stage views, submitStageData, registry (dane)
+├── ui.tsx             → re-export z themes (proxy)
+└── themes/
+    └── default/
+        ├── columns.tsx     → Layout, Columns, Bar, Content + re-export SDK
+        ├── chrome.tsx      → NavButton, LogBox, FatalError, PluginErrorBoundary
+        ├── stageViews.tsx  → FormView, TimelineView, DecisionView, GenericView
+        └── ShellLayout.tsx → czysty JSX shell, dane tylko z props
+```
+
+**Zasada:** `themes/` = czyste JSX komponenty. Dane (store, hooki) zostają w `Shell.tsx`, `plugin.ts`, `views.tsx` i są przekazywane przez props.
+
 ## NPM packages (w pluginach `../plugins/node_modules/`)
 
-- `@obieg-zero/sdk` — typy + UI komponenty. Każdy plugin importuje `type { PluginFactory }` stąd.
-- `@obieg-zero/workflow-engine` — stage views (FormView, TimelineView, DecisionView), graph nodes, buildWorkflow, submitStageData. Użyj gdy plugin obsługuje workflow z etapami.
+- `@obieg-zero/sdk` — typy + UI komponenty. Każdy plugin importuje `type { PluginFactory }` stąd. Źródło: `../packages/sdk/`, publish: `npm publish` z tego katalogu.
+- `@obieg-zero/workflow-engine` — graph nodes, buildWorkflow. Stage views (FormView, TimelineView, DecisionView, GenericView) są teraz w `src/themes/default/stageViews.tsx`, logika w `src/views.tsx`.
 - `@obieg-zero/doc-pipeline` — OCR + AI extraction pipeline. Użyj gdy plugin przetwarza dokumenty.
 - `@obieg-zero/doc-reader` — PDF text + Tesseract OCR.
 - `@obieg-zero/doc-search` — embeddings + semantic search.
