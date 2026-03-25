@@ -7,7 +7,29 @@ type Color = 'primary' | 'secondary' | 'accent' | 'error' | 'warning' | 'info' |
 type SemanticColor = 'primary' | 'accent' | 'error' | 'warning' | 'info' | 'success' | 'muted'
 
 const logColor: Record<string, string> = { info: 'text-base-content/30', ok: 'text-success', error: 'text-error' }
-const semColor = (c: string) => c === 'base' ? '' : c === 'muted' ? 'text-base-content/30' : `text-${c}`
+
+const semColorMap: Record<SemanticColor | 'base', string> = {
+  base: '', muted: 'text-base-content/30', primary: 'text-primary', accent: 'text-accent',
+  error: 'text-error', warning: 'text-warning', info: 'text-info', success: 'text-success',
+}
+
+const btnSizeMap: Record<string, string> = { xs: 'btn-xs', sm: 'btn-sm', md: 'btn-md', lg: 'btn-lg' }
+const btnColorMap: Record<Color, string> = {
+  primary: 'btn-primary', secondary: 'btn-secondary', accent: 'btn-accent', error: 'btn-error',
+  warning: 'btn-warning', info: 'btn-info', success: 'btn-success', neutral: 'btn-neutral', ghost: 'btn-ghost',
+}
+const badgeColorMap: Record<Color, string> = {
+  primary: 'badge-primary', secondary: 'badge-secondary', accent: 'badge-accent', error: 'badge-error',
+  warning: 'badge-warning', info: 'badge-info', success: 'badge-success', neutral: 'badge-neutral', ghost: 'badge-ghost',
+}
+const cardBgMap: Record<Color, string> = {
+  primary: 'bg-primary/10', secondary: 'bg-secondary/10', accent: 'bg-accent/10', error: 'bg-error/10',
+  warning: 'bg-warning/10', info: 'bg-info/10', success: 'bg-success/10', neutral: 'bg-base-200', ghost: 'bg-base-200',
+}
+const progressColorMap: Record<string, string> = { primary: 'progress-primary', error: 'progress-error' }
+const justifyMap: Record<string, string> = { start: 'justify-start', between: 'justify-between', end: 'justify-end', center: 'justify-center' }
+const textSizeMap: Record<string, string> = { xs: 'text-xs', '2xs': 'text-2xs', sm: 'text-sm', md: 'text-base' }
+const textAlignMap: Record<string, string> = { left: 'text-left', center: 'text-center', right: 'text-right' }
 const bar = 'h-9 min-h-9 shrink-0 flex items-center border-base-300 divide-x divide-base-300 bg-base-200 text-xs'
 
 // ── Primitives ───────────────────────────────────────────────────────
@@ -68,7 +90,7 @@ export function Layout({ left, center, right, progress, leftOpen }: { left?: Rea
 
 export function Button({ children, color = 'primary', size = 'sm', outline, block, disabled, onClick }: {
   children: ReactNode; color?: Color; size?: 'xs' | 'sm' | 'md' | 'lg'; outline?: boolean; block?: boolean; disabled?: boolean; onClick?: () => void
-}) { return <button className={`btn btn-${size} btn-${color} ${outline ? 'btn-outline' : ''} ${block ? 'btn-block' : ''}`} disabled={disabled} onClick={onClick}>{children}</button> }
+}) { return <button className={`btn ${btnSizeMap[size]} ${btnColorMap[color]} ${outline ? 'btn-outline' : ''} ${block ? 'btn-block' : ''}`} disabled={disabled} onClick={onClick}>{children}</button> }
 
 export function Input({ value, type, placeholder, onChange, onKeyDown }: {
   value?: string; type?: string; placeholder?: string; onChange?: (e: { target: { value: string } }) => void; onKeyDown?: (e: { key: string }) => void
@@ -79,7 +101,7 @@ export function Select({ value, options, onChange }: { value?: string; options: 
 }
 
 export const Badge = ({ children, color = 'neutral' }: { children: ReactNode; color?: Color }) =>
-  <span className={`badge badge-sm badge-${color}`}>{children}</span>
+  <span className={`badge badge-sm ${badgeColorMap[color]}`}>{children}</span>
 
 export const Field = ({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) =>
   <fieldset className="fieldset"><label className="label">{label}{required && <AlertCircle size={12} className="inline ml-1 opacity-40" />}</label>{children}</fieldset>
@@ -88,13 +110,13 @@ export const Stats = ({ children, vertical }: { children: ReactNode; vertical?: 
   <div className={`stats ${vertical ? 'stats-vertical' : 'stats-vertical md:stats-horizontal'} w-full`}>{children}</div>
 
 export const Stat = ({ title, value, desc, color }: { title: string; value: string; desc?: string; color?: SemanticColor }) =>
-  <div className="stat"><div className="stat-title">{title}</div><div className={`stat-value tabular-nums ${semColor(color ?? 'base')}`}>{value}</div>{desc && <div className="stat-desc">{desc}</div>}</div>
+  <div className="stat"><div className="stat-title">{title}</div><div className={`stat-value tabular-nums ${semColorMap[color ?? 'base']}`}>{value}</div>{desc && <div className="stat-desc">{desc}</div>}</div>
 
 export const Card = ({ title, children, color }: { title?: string; children: ReactNode; color?: Color }) =>
-  <div className={`card ${color && color !== 'neutral' && color !== 'ghost' ? `bg-${color}/10` : 'bg-base-200'}`}><div className="card-body p-4 gap-2">{title && <h3 className="text-xs font-semibold text-base-content/60">{title}</h3>}{children}</div></div>
+  <div className={`card ${cardBgMap[color ?? 'neutral']}`}><div className="card-body p-4 gap-2">{title && <h3 className="text-xs font-semibold text-base-content/60">{title}</h3>}{children}</div></div>
 
-export function Tabs({ tabs, active, onChange, variant = 'border' }: { tabs: { id: string; label: string }[]; active: string; onChange: (id: string) => void; variant?: 'border' | 'lift' | 'box' }) {
-  return <div role="tablist" className={`tabs tabs-${variant}`}>{tabs.map(t => <button key={t.id} role="tab" className={`tab text-xs uppercase tracking-wider font-medium ${t.id === active ? 'tab-active' : ''}`} onClick={() => onChange(t.id)}>{t.label}</button>)}</div>
+export function Tabs({ tabs, active, onChange }: { tabs: { id: string; label: string }[]; active: string; onChange: (id: string) => void }) {
+  return <div className="flex">{tabs.map(t => <button key={t.id} className={`px-3 py-2 text-xs uppercase tracking-wider font-medium border-b-2 transition-colors ${t.id === active ? 'border-primary text-primary' : 'border-transparent text-base-content/40 hover:text-base-content/60'}`} onClick={() => onChange(t.id)}>{t.label}</button>)}</div>
 }
 
 export const Heading = ({ title, subtitle }: { title: string; subtitle?: string }) =>
@@ -119,7 +141,7 @@ export const Divider = () => <div className="border-t border-base-content/5 my-2
 
 export function ProgressBar({ label, value, total, color = 'primary' }: { label?: string; value: number; total: number; color?: 'primary' | 'error' }) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0
-  return <div className="space-y-1">{label && <div className="flex justify-between text-xs text-base-content/60"><span>{label}</span><span>{pct}%</span></div>}<progress className={`progress progress-${color} w-full`} value={value} max={total} /></div>
+  return <div className="space-y-1">{label && <div className="flex justify-between text-xs text-base-content/60"><span>{label}</span><span>{pct}%</span></div>}<progress className={`progress ${progressColorMap[color]} w-full`} value={value} max={total} /></div>
 }
 
 export const Spinner = () => <span className="loading loading-spinner loading-xs" />
@@ -139,8 +161,8 @@ export const FileAction = ({ icon: Icon, title, subtitle, disabled, onClick }: {
     <Icon size={18} />
     <div><p className="text-xs font-medium tracking-wide">{title}</p>{subtitle && <p className="text-xs text-base-content/25 mt-1">{subtitle}</p>}</div>
   </div>
-export const Row = ({ children, justify = 'start' }: { children: ReactNode; justify?: 'start' | 'between' | 'end' | 'center' }) => <div className={`flex items-center gap-2 justify-${justify}`}>{children}</div>
-export const Text = ({ children, muted, size = 'xs' }: { children: ReactNode; muted?: boolean; size?: 'xs' | '2xs' }) => <p className={`text-${size} ${muted ? 'text-base-content/30' : ''}`}>{children}</p>
+export const Row = ({ children, justify = 'start' }: { children: ReactNode; justify?: 'start' | 'between' | 'end' | 'center' }) => <div className={`flex items-center gap-2 ${justifyMap[justify]}`}>{children}</div>
+export const Text = ({ children, muted, size = 'xs' }: { children: ReactNode; muted?: boolean; size?: 'xs' | '2xs' }) => <p className={`${textSizeMap[size]} ${muted ? 'text-base-content/30' : ''}`}>{children}</p>
 export const RemoveButton = ({ onClick }: { onClick: () => void }) => <button className="text-error text-xs opacity-0 group-hover:opacity-50 transition-opacity" onClick={onClick} aria-label="Usuń">×</button>
 
 export function ListItem({ label, detail, active, onClick, action }: { label: ReactNode; detail?: ReactNode; active?: boolean; onClick?: () => void; action?: ReactNode }) {
@@ -154,20 +176,26 @@ export function ListItem({ label, detail, active, onClick, action }: { label: Re
 }
 
 export const Value = ({ children, color = 'base', size = 'xs', bold, align }: { children: ReactNode; color?: SemanticColor | 'base'; size?: 'xs' | 'sm' | 'md'; bold?: boolean; align?: 'left' | 'center' | 'right' }) =>
-  <span className={`tabular-nums ${size === 'md' ? 'text-base' : `text-${size}`} ${semColor(color)} ${bold ? 'font-bold' : ''} ${align ? `text-${align}` : ''}`}>{children}</span>
+  <span className={`tabular-nums ${textSizeMap[size]} ${semColorMap[color]} ${bold ? 'font-bold' : ''} ${align ? textAlignMap[align] : ''}`}>{children}</span>
 
 export interface TableColumn { key: string; header: string; align?: 'left' | 'right' | 'center' }
-export function Table({ columns, rows, pageSize, empty }: { columns: TableColumn[]; rows: Record<string, ReactNode>[]; pageSize?: number; empty?: string }) {
+export function Table({ columns, rows, pageSize, empty, activeRow, onRowClick }: {
+  columns: TableColumn[]; rows: Record<string, ReactNode>[]; pageSize?: number; empty?: string
+  activeRow?: number; onRowClick?: (index: number) => void
+}) {
   const [showAll, setShowAll] = useState(!pageSize)
   if (!rows.length) return empty ? <Placeholder text={empty} /> : null
   const visible = showAll ? rows : rows.slice(0, pageSize!)
-  const al = (a?: string) => a ? `text-${a}` : 'text-left'
+  const al = (a?: string) => a ? textAlignMap[a] || 'text-left' : 'text-left'
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto">
         <table className="table table-sm w-full">
           <thead><tr>{columns.map(c => <th key={c.key} className={al(c.align)}>{c.header}</th>)}</tr></thead>
-          <tbody>{visible.map((row, i) => <tr key={i}>{columns.map(c => <td key={c.key} className={al(c.align)}>{row[c.key] ?? ''}</td>)}</tr>)}</tbody>
+          <tbody>{visible.map((row, i) => <tr key={i}
+            className={`${onRowClick ? 'cursor-pointer hover:bg-base-200' : ''} ${i === activeRow ? 'bg-primary/10' : ''}`}
+            onClick={onRowClick ? () => onRowClick(i) : undefined}
+          >{columns.map(c => <td key={c.key} className={al(c.align)}>{row[c.key] ?? ''}</td>)}</tr>)}</tbody>
         </table>
       </div>
       {pageSize && rows.length > pageSize && <button className="btn btn-ghost btn-xs w-full" onClick={() => setShowAll(v => !v)}>{showAll ? `Pokaż ${pageSize}` : `Pokaż wszystkie (${rows.length})`}</button>}

@@ -2,7 +2,7 @@ import Dexie from 'dexie'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef } from 'react'
 
-function useStableLiveQuery<T>(querier: () => Promise<T>, deps: any[], fallback: T): T {
+function useStableLiveQuery<T>(querier: () => Promise<T>, deps: unknown[], fallback: T): T {
   const result = useLiveQuery(querier, deps, undefined as T | undefined)
   const ref = useRef<T>(fallback)
   if (result !== undefined) ref.current = result
@@ -21,19 +21,21 @@ export interface PostRecord {
 }
 
 export type SchemaField = { key: string; label: string; required?: boolean; inputType?: string }
-export interface PostType { type: string; schema: SchemaField[]; label?: string }
+export type ValidationMode = 'off' | 'warn' | 'strict'
+export interface PostType { type: string; schema: SchemaField[]; label?: string; validation: ValidationMode }
 export interface SeedNode { type: string; data: Record<string, any>; children?: SeedNode[] }
 
 export interface Store {
+  validate(type: string, data: Record<string, any>): string[]
   add(type: string, data: Record<string, any>, opts?: { id?: string; parentId?: string }): Promise<PostRecord>
   get(id: string): Promise<PostRecord | undefined>
   update(id: string, data: Record<string, any>): Promise<void>
   remove(id: string): Promise<void>
   usePosts(type: string): PostRecord[]
-  setOption(key: string, value: any): Promise<void>
-  useOption(key: string): any
+  setOption(key: string, value: unknown): Promise<void>
+  useOption(key: string): unknown
   importJSON(nodes: SeedNode[]): Promise<number>
-  registerType(type: string, schema: SchemaField[], label?: string): void
+  registerType(type: string, schema: SchemaField[], label?: string, opts?: { validation?: ValidationMode }): void
   getType(type: string): PostType | undefined
   getTypes(): PostType[]
   exportJSON(type?: string): Promise<Record<string, { schema: SchemaField[] | null; records: PostRecord[] }>>
@@ -47,7 +49,7 @@ export interface Store {
 
 class StoreDB extends Dexie {
   posts!: Dexie.Table<PostRecord, string>
-  options!: Dexie.Table<{ key: string; value: any }, string>
+  options!: Dexie.Table<{ key: string; value: unknown }, string>
   constructor(name: string) {
     super(name)
     this.version(1).stores({ posts: 'id, type, parentId', options: 'key' })
@@ -77,8 +79,35 @@ export function createStore(dbName = 'ozr-store'): Store {
     return create ? opfsDir('posts', p.type, postId) : opfsDirSafe('posts', p.type, postId)
   }
 
+  const validate = (type: string, data: Record<string, any>): string[] => {
+    const t = types.get(type)
+    if (!t) return []
+    const errors: string[] = []
+    const schemaKeys = new Set(t.schema.map(f => f.key))
+    for (const f of t.schema) {
+      if (f.required && (data[f.key] === undefined || data[f.key] === null || data[f.key] === ''))
+        errors.push(`Missing required field: ${f.key}`)
+    }
+    for (const key of Object.keys(data)) {
+      if (!schemaKeys.has(key)) console.warn(`[store] Unknown field "${key}" for type "${type}"`)
+    }
+    return errors
+  }
+
+  const enforce = (op: string, type: string, data: Record<string, any>) => {
+    const mode = types.get(type)?.validation ?? 'warn'
+    if (mode === 'off') return
+    const errors = validate(type, data)
+    if (!errors.length) return
+    const msg = `[store] ${op}("${type}"): ${errors.join(', ')}`
+    if (mode === 'strict') throw new Error(msg)
+    console.warn(msg)
+  }
+
   return {
+    validate,
     async add(type, data, o) {
+      enforce('add', type, data)
       const now = Date.now()
       const post: PostRecord = { id: o?.id ?? crypto.randomUUID(), type, parentId: o?.parentId ?? null, data, createdAt: now, updatedAt: now }
       await db.posts.put(post)
@@ -87,7 +116,10 @@ export function createStore(dbName = 'ozr-store'): Store {
     async get(id) { return db.posts.get(id) },
     async update(id, data) {
       const p = await db.posts.get(id)
-      if (p) await db.posts.put({ ...p, data: { ...p.data, ...data }, updatedAt: Date.now() })
+      if (!p) return
+      const merged = { ...p.data, ...data }
+      enforce('update', p.type, merged)
+      await db.posts.put({ ...p, data: merged, updatedAt: Date.now() })
     },
     async remove(id) {
       const queue = [id]
@@ -96,7 +128,7 @@ export function createStore(dbName = 'ozr-store'): Store {
         queue.push(...await db.posts.where('parentId').equals(cur).primaryKeys())
         const p = await db.posts.get(cur)
         if (!p) continue
-        try { (await opfsDirSafe('posts', p.type))?.removeEntry(cur, { recursive: true }) } catch {}
+        try { (await opfsDirSafe('posts', p.type))?.removeEntry(cur, { recursive: true }) } catch { /* files may not exist */ }
         await db.posts.delete(cur)
       }
     },
@@ -114,7 +146,18 @@ export function createStore(dbName = 'ozr-store'): Store {
       for (const n of nodes) await imp(n)
       return count
     },
-    registerType(type, schema, label) { types.set(type, { type, schema, label }) },
+    registerType(type, schema, label, opts) {
+      const existing = types.get(type)
+      if (existing) {
+        const knownKeys = new Set(existing.schema.map(f => f.key))
+        const newFields = schema.filter(f => !knownKeys.has(f.key))
+        existing.schema.push(...newFields)
+        if (label) existing.label = label
+        if (opts?.validation) existing.validation = opts.validation
+      } else {
+        types.set(type, { type, schema: [...schema], label, validation: opts?.validation ?? 'warn' })
+      }
+    },
     getType(type) { return types.get(type) },
     getTypes() { return Array.from(types.values()) },
     async exportJSON(type?) {
@@ -125,11 +168,27 @@ export function createStore(dbName = 'ozr-store'): Store {
     },
     async writeFile(postId, name, data) {
       const dir = await dirFor(postId, true); if (!dir) return
-      const w = await (await dir.getFileHandle(name, { create: true }) as any).createWritable()
+      // FileSystemFileHandle.createWritable() is not yet in all TS libs
+      const handle = await dir.getFileHandle(name, { create: true }) as FileSystemFileHandle & { createWritable(): Promise<{ write(d: File | Blob): Promise<void>; close(): Promise<void> }> }
+      const w = await handle.createWritable()
       await w.write(data); await w.close()
     },
-    async readFile(postId, name) { const dir = await dirFor(postId); if (!dir) throw new Error('not found'); return (await dir.getFileHandle(name)).getFile() },
-    async listFiles(postId) { const dir = await dirFor(postId); if (!dir) return []; const n: string[] = []; for await (const [name] of (dir as any).entries()) n.push(name); return n.sort() },
-    async removeFile(postId, name) { try { (await dirFor(postId))?.removeEntry(name) } catch {} },
+    async readFile(postId, name) {
+      const dir = await dirFor(postId)
+      if (!dir) throw new Error(`readFile: post "${postId}" not found or has no files`)
+      return (await dir.getFileHandle(name)).getFile()
+    },
+    async listFiles(postId) {
+      const dir = await dirFor(postId); if (!dir) return []
+      const n: string[] = []
+      // FileSystemDirectoryHandle.entries() not in all TS libs
+      for await (const [name] of (dir as FileSystemDirectoryHandle & AsyncIterable<[string, FileSystemHandle]>).entries()) n.push(name)
+      return n.sort()
+    },
+    async removeFile(postId, name) {
+      const dir = await dirFor(postId)
+      if (!dir) return
+      try { await dir.removeEntry(name) } catch { /* entry may already be deleted */ }
+    },
   }
 }

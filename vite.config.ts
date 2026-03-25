@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 import { readFileSync, existsSync } from 'fs'
 
-const pluginsDir = resolve(__dirname, '../plugins-v2')
+const pluginsDir = resolve(__dirname, '../plugins')
 
 export default defineConfig({
   base: './',
