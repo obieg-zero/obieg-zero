@@ -5,9 +5,10 @@ import * as jsxRuntime from 'react/jsx-runtime'
 import { createRoot } from 'react-dom/client'
 import * as icons from 'react-feather'
 import * as ui from './ui'
-import { FatalError } from './ui'
+import { FatalError } from './themes'
 import { create } from 'zustand'
 import { getAllPlugins, unregisterPlugin, log, loadOne, openFileDialog, registerView, registerParser, registerAction, getViews, getParsers, getActions } from './plugin'
+import { registerStageView, getStageView } from './views'
 import { zipSync, strToU8 } from 'fflate'
 import type { PluginDeps, SDK } from './plugin'
 import { useHostStore } from './plugin'
@@ -37,7 +38,7 @@ async function boot() {
     registerView: (id, def) => registerView(id, { ...def, pluginId: '_sdk' }),
     registerParser: (id, def) => registerParser(id, { ...def, pluginId: '_sdk' }),
     registerAction: (id, def) => registerAction(id, { ...def, pluginId: '_sdk' }),
-    getViews, getParsers, getActions,
+    getViews, getParsers, getActions, registerStageView, getStageView,
     uploadFile: async (parentId: string) => {
       const file = await openFileDialog('*')
       if (!file) return null
