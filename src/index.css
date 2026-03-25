@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../node_modules/@obieg-zero/sdk/src/ui.tsx";
 @plugin "daisyui";
 
 html {
