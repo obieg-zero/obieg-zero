@@ -1,6 +1,11 @@
 @import "tailwindcss";
-@source "../../node_modules/@obieg-zero/sdk/src/ui.tsx";
+@source "../node_modules/@obieg-zero/sdk/src/ui.tsx";
 @plugin "daisyui";
+
+@utility text-2xs {
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+}
 
 html {
   -webkit-font-smoothing: antialiased;
