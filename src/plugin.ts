@@ -177,7 +177,7 @@ export const loadOne = async (spec: string, deps: PluginDeps, expectedHash?: str
   // TOFU
   const key = `integrity:${spec}`
   const known = spec.startsWith('./') ? undefined : await deps.store.get(key)
-  if (known?.data?.hash && known.data.hash !== hash) throw new Error('integrity changed (TOFU)')
+  if (known?.data?.hash && known.data.hash !== hash) throw new Error(`Plugin "${spec}" został zmodyfikowany — kod pluginu zmienił się od ostatniego użycia. Wyczyść dane przeglądarki aby zaakceptować nową wersję.`)
   if (!known && !spec.startsWith('./')) await deps.store.add('_integrity', { hash, spec }, { id: key })
   if (typeof mod.default !== 'function') throw new Error('no default export')
   // Deferred SDK: captures registrations, binds pluginId after factory returns
