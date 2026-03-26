@@ -157,6 +157,7 @@ const sha256 = async (text: string) => {
 const fetchModule = async (spec: string) => {
   shims()
   const res = await fetch(resolveUrl(spec))
+  if (res.status === 429) throw new Error('429 — zbyt wiele żądań do GitHub, spróbuj ponownie za chwilę lub użyj lokalnej wersji pluginu')
   if (!res.ok) throw new Error(`${res.status}`)
   const raw = await res.text()
   const hash = await sha256(raw)
