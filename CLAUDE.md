@@ -8,6 +8,7 @@ WordPress w przeglądarce. Zustand + IndexedDB, sandbox pluginów, zero backendu
 - Nie uruchamiaj dev servera bez pytania
 - Przed zmianą pluginu: config na local → praca → build → user potwierdza → push → config na GitHub
 - Sprawdź czy WSZYSTKIE typy z seed data mają `store.registerType()`
+- Operacje na repozytoriach GitHub (tworzenie, usuwanie) wykonuj przez `gh` CLI
 
 ## Store — synchroniczny CRUD
 
