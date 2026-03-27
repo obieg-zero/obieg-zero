@@ -3,9 +3,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   useHostStore, log, clearLog, getAllPlugins, registerView, registerParser, registerAction,
   getViews, getParsers, getActions, unregisterPlugin, _resetRegistries, loadOne,
-} from './plugin'
-import { createStore, _resetForTests } from './store'
-import type { Store } from './store'
+} from '../src/plugin'
+import { createStore, _resetForTests } from '../src/store'
+import type { Store } from '../src/store'
 
 beforeEach(() => {
   useHostStore.setState({ plugins: [], logs: [], activeId: null, leftOpen: false, progress: false }, true)
@@ -134,7 +134,7 @@ describe('TOFU integrity', () => {
 
   it('zapisuje hash przy pierwszym pobraniu pluginu', async () => {
     const mod = { default: pluginFactory }
-    vi.doMock('./plugin', async (importOriginal) => {
+    vi.doMock('../src/plugin', async (importOriginal) => {
       const orig = await importOriginal<typeof import('./plugin')>()
       return orig
     })
