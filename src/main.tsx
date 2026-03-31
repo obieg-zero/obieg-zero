@@ -8,10 +8,10 @@ import * as ui from './themes'
 import { FatalError } from './themes'
 import { create } from 'zustand'
 import { getAllPlugins, unregisterPlugin, log, loadOne, openFileDialog, registerView, registerParser, registerAction, getViews, getParsers, getActions, setStoreAuth, getStoreAuth } from './plugin'
-import { opfsReadMeta, opfsAddPlugin, opfsRemovePlugin } from './opfs'
+import { loadMeta, saveMeta, meta } from './opfs'
 import { registerStageView, getStageView } from './stageRegistry'
 import { zipSync, strToU8 } from 'fflate'
-import type { PluginDeps, SDK } from './plugin'
+import type { PluginDeps, SDK, StoreAuth } from './plugin'
 import { useHostStore } from './plugin'
 import { createStore } from './store'
 import { Shell } from './Shell'
@@ -39,17 +39,29 @@ async function boot() {
     registerView: (id, def) => registerView(id, { ...def, pluginId: '_sdk' }),
     registerParser: (id, def) => registerParser(id, { ...def, pluginId: '_sdk' }),
     registerAction: (id, def) => registerAction(id, { ...def, pluginId: '_sdk' }),
-    getViews, getParsers, getActions, registerStageView, getStageView, setStoreAuth, getStoreAuth,
+    getViews, getParsers, getActions, registerStageView, getStageView, getStoreAuth,
+    setStoreAuth: (auth: StoreAuth | null) => {
+      setStoreAuth(auth)
+      if (auth?.licenseKey) { meta().licenseKey = auth.licenseKey; saveMeta() }
+    },
     getInstalledPlugins: async () => {
-      const m = await opfsReadMeta()
+      const m = meta()
       return m.specs.map(spec => ({ spec, label: m.labels[spec] ?? spec }))
     },
     installPlugin: async (spec: string, label?: string) => {
       await loadOne(spec, deps)
-      await opfsAddPlugin(spec, label)
+      const m = meta()
+      if (!m.specs.includes(spec)) {
+        m.specs.push(spec)
+        if (label) m.labels[spec] = label
+        await saveMeta()
+      }
     },
     uninstallPlugin: async (spec: string) => {
-      await opfsRemovePlugin(spec)
+      const m = meta()
+      m.specs = m.specs.filter(s => s !== spec)
+      delete m.labels[spec]
+      await saveMeta()
     },
     uploadFile: async (parentId: string) => {
       const file = await openFileDialog('*')
@@ -120,9 +132,9 @@ async function boot() {
     }
   }
   // Installed plugins + license z OPFS (przeżywa czyszczenie IndexedDB)
-  const meta = await opfsReadMeta()
-  if (meta.licenseKey) setStoreAuth({ licenseKey: meta.licenseKey })
-  for (const spec of meta.specs) toLoad.push({ spec })
+  const pm = await loadMeta()
+  if (pm.licenseKey) setStoreAuth({ licenseKey: pm.licenseKey })
+  for (const spec of pm.specs) toLoad.push({ spec })
   // Load all plugins
   for (const { spec, integrity } of toLoad) {
     await loadOne(spec, deps, integrity).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
