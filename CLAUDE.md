@@ -1,6 +1,6 @@
 # Obieg Zero — core-host
 
-WordPress w przeglądarce. Zustand + IndexedDB (dane), OPFS (pluginy), sandbox pluginów, zero backendu.
+Platforma pluginowa w przeglądarce. Zustand + IndexedDB (dane), OPFS (pluginy), sandbox, zero backendu.
 
 ## Zasady
 
