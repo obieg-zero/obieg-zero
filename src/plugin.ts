@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
-import { shouldCache, opfsRead, opfsWrite } from './opfs'
+import { shouldCache, opfsReadCode, opfsWriteCode, opfsSaveLicense } from './opfs'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Store, PostRecord } from './store'
@@ -74,6 +74,10 @@ export interface SDK {
   getStageView(node: any): ComponentType<any>
   setStoreAuth(auth: StoreAuth | null): void
   getStoreAuth(): StoreAuth | null
+  // Plugin persistence (OPFS)
+  getInstalledPlugins(): Promise<{ spec: string; label: string }[]>
+  installPlugin(spec: string, label?: string): Promise<void>
+  uninstallPlugin(spec: string): Promise<void>
 }
 
 // ── Contribution Point Types ─────────────────────────────────────────
@@ -144,7 +148,10 @@ export const openFileDialog = (accept: string): Promise<File | null> =>
 export type StoreAuth = { licenseKey: string }
 
 let _storeAuth: StoreAuth | null = null
-export const setStoreAuth = (auth: StoreAuth | null) => { _storeAuth = auth }
+export const setStoreAuth = (auth: StoreAuth | null) => {
+  _storeAuth = auth
+  if (auth?.licenseKey) opfsSaveLicense(auth.licenseKey)
+}
 export const getStoreAuth = () => _storeAuth
 
 const STORE_BASE = 'https://obieg-zero-store.gotoreadyai.workers.dev'
@@ -185,7 +192,7 @@ const fetchModule = async (spec: string) => {
 
   // OPFS cache hit
   if (useCache) {
-    const cached = await opfsRead(spec)
+    const cached = await opfsReadCode(spec)
     if (cached) {
       const code = shimCode(cached)
       return { mod: await evalModule(code), hash: await sha256(cached), fromCache: true }
@@ -205,7 +212,7 @@ const fetchModule = async (spec: string) => {
   const hash = await sha256(raw)
 
   if (useCache) {
-    await opfsWrite(spec, raw).catch(() => {})
+    await opfsWriteCode(spec, raw).catch(e => console.warn('OPFS cache write:', e))
   }
 
   const code = shimCode(raw)

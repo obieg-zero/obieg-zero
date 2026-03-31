@@ -164,7 +164,7 @@ export async function createStore(): Promise<Store> {
       })
       for (const i of ids) {
         const p = s.posts[i]
-        if (p) opfsDirSafe('posts', p.type).then(d => d?.removeEntry(i, { recursive: true }).catch(() => {})).catch(() => {})
+        if (p) opfsDirSafe('posts', p.type).then(d => d?.removeEntry(i, { recursive: true }).catch(e => console.warn('OPFS cleanup:', e))).catch(e => console.warn('OPFS cleanup:', e))
       }
     },
 
@@ -223,8 +223,9 @@ export async function createStore(): Promise<Store> {
     },
     async readFile(postId, name) {
       const dir = await dirFor(postId)
-      if (!dir) throw new Error(`readFile: post "${postId}" not found`)
-      return (await dir.getFileHandle(name)).getFile()
+      if (!dir) throw new Error(`readFile: post "${postId}" nie istnieje`)
+      try { return await (await dir.getFileHandle(name)).getFile() }
+      catch { throw new Error(`readFile: plik "${name}" nie istnieje w poście "${postId}"`) }
     },
     async listFiles(postId) {
       const dir = await dirFor(postId); if (!dir) return []

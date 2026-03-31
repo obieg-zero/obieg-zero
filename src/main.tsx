@@ -8,6 +8,7 @@ import * as ui from './themes'
 import { FatalError } from './themes'
 import { create } from 'zustand'
 import { getAllPlugins, unregisterPlugin, log, loadOne, openFileDialog, registerView, registerParser, registerAction, getViews, getParsers, getActions, setStoreAuth, getStoreAuth } from './plugin'
+import { opfsReadMeta, opfsAddPlugin, opfsRemovePlugin } from './opfs'
 import { registerStageView, getStageView } from './stageRegistry'
 import { zipSync, strToU8 } from 'fflate'
 import type { PluginDeps, SDK } from './plugin'
@@ -39,6 +40,17 @@ async function boot() {
     registerParser: (id, def) => registerParser(id, { ...def, pluginId: '_sdk' }),
     registerAction: (id, def) => registerAction(id, { ...def, pluginId: '_sdk' }),
     getViews, getParsers, getActions, registerStageView, getStageView, setStoreAuth, getStoreAuth,
+    getInstalledPlugins: async () => {
+      const m = await opfsReadMeta()
+      return m.specs.map(spec => ({ spec, label: m.labels[spec] ?? spec }))
+    },
+    installPlugin: async (spec: string, label?: string) => {
+      await loadOne(spec, deps)
+      await opfsAddPlugin(spec, label)
+    },
+    uninstallPlugin: async (spec: string) => {
+      await opfsRemovePlugin(spec)
+    },
     uploadFile: async (parentId: string) => {
       const file = await openFileDialog('*')
       if (!file) return null
@@ -107,10 +119,10 @@ async function boot() {
       toLoad.push({ spec, integrity })
     }
   }
-  // Add saved store:// plugins (installed via plugin-manager)
-  const auth = store.get('__store_auth')
-  if (auth?.data?.licenseKey) setStoreAuth({ licenseKey: auth.data.licenseKey as string })
-  for (const spec of (store.get('__plugin-manager')?.data?.specs ?? []) as string[]) toLoad.push({ spec })
+  // Installed plugins + license z OPFS (przeżywa czyszczenie IndexedDB)
+  const meta = await opfsReadMeta()
+  if (meta.licenseKey) setStoreAuth({ licenseKey: meta.licenseKey })
+  for (const spec of meta.specs) toLoad.push({ spec })
   // Load all plugins
   for (const { spec, integrity } of toLoad) {
     await loadOne(spec, deps, integrity).catch(err => log(`${spec}: ${(err as Error).message}`, 'error'))
