@@ -219,7 +219,9 @@ export async function createStore(): Promise<Store> {
     async writeFile(postId, name, data) {
       const dir = await dirFor(postId, true); if (!dir) return
       const handle = await dir.getFileHandle(name, { create: true }) as FileSystemFileHandle & { createWritable(): Promise<{ write(d: File | Blob): Promise<void>; close(): Promise<void> }> }
-      const w = await handle.createWritable(); await w.write(data); await w.close()
+      const w = await handle.createWritable()
+      try { await w.write(data); await w.close() }
+      catch (e) { try { await w.close() } catch { /* already closed */ }; throw e }
     },
     async readFile(postId, name) {
       const dir = await dirFor(postId)

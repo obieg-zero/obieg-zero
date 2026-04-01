@@ -56,7 +56,7 @@ export function ShellLayout({
           <Bar>
             {hasLeft && <Cell onClick={onToggleLeft} mobileOnly>{leftOpen ? <ChevronLeft size={16} /> : <Menu size={16} />}</Cell>}
             <Cell label>{active?.label ?? 'plugin-host'}</Cell>
-            {plugins.map(p => p.icon && (
+            {[...plugins].reverse().map(p => p.icon && (
               <NavButton key={p.id} icon={p.icon} label={p.label} active={p.id === active?.id} onClick={() => onSetActive(p.id)} />
             ))}
             {actions.map(a => <ActionSlot key={a.pluginId}>{a.node}</ActionSlot>)}

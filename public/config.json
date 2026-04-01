@@ -15,6 +15,7 @@
     "pluginUri": "./plugin-wibor-calc"
   },
   {
+    "importData": ["workflows.json", "opponents.json"],
     "pluginUri": "./plugin-workflow-crm"
   }
 ]

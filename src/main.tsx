@@ -84,7 +84,7 @@ async function boot() {
     useForm: (defaults: FormData, opts?: { onSubmit?: (data: FormData) => void, isComplete?: (data: FormData) => boolean, sync?: FormData }) => {
       const [form, sf] = React.useState(defaults)
       const [editing, setEditing] = React.useState(false)
-      React.useEffect(() => { if (opts?.sync) sf(opts.sync) }, [JSON.stringify(opts?.sync)])
+      React.useEffect(() => { if (opts?.sync) sf(opts.sync) }, [opts?.sync])
       const bind = (key: string, transform?: (v: unknown) => unknown) => ({ value: form[key] ?? '', onChange: (e: unknown) => { const raw = typeof e === 'object' && e !== null && 'target' in e ? (e as { target: { value: string } }).target.value : e; sf((f: FormData) => ({ ...f, [key]: transform ? transform(raw) : raw })) } })
       const set = (kOrO: string | FormData, v?: unknown) => sf((f: FormData) => typeof kOrO === 'string' ? { ...f, [kOrO]: v } : { ...f, ...kOrO })
       const incomplete = opts?.isComplete ? !opts.isComplete(form) : false

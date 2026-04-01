@@ -57,40 +57,14 @@
     { "from": "apelacja", "to": "postepowanie" }
   ] } },
   { "type": "workflow", "data": { "wfId": "wibor-simple", "name": "WIBOR uproszczony", "stages": [
-    { "id": "dokument", "label": "1. Dokument", "color": "#3b82f6", "description": "Wgraj umowę kredytu", "view": "upload",
-      "checklist": [{ "text": "Umowa kredytu", "type": "upload" }],
-      "pipeline": {
-        "ocr": { "language": "pol" },
-        "embed": [{ "group": "umowa", "docs": ["*"], "chunkSize": 512 }],
-        "extract": {
-          "from": "umowa",
-          "method": "api",
-          "questions": {
-            "clientName": "Jak nazywa się kredytobiorca (osoba fizyczna)? Podaj TYLKO imię i nazwisko.",
-            "opponent": "Jaki bank udzielił tego kredytu? Podaj TYLKO nazwę banku.",
-            "loanNumber": "Jaki jest numer umowy kredytowej? Podaj TYLKO numer.",
-            "loanAmount": "Jaka jest kwota kredytu w PLN? Podaj TYLKO liczbę bez waluty.",
-            "loanDate": "Jaka jest data zawarcia umowy? Format YYYY-MM-DD.",
-            "subject": "Jaki jest główny przedmiot umowy kredytowej? Odpowiedz krótko."
-          }
-        }
-      }
-    },
-    { "id": "klient", "label": "2. Klient", "color": "#3b82f6", "description": "Sprawdź dane klienta", "view": "form", "recordType": "client", "fields": [
+    { "id": "klient", "label": "1. Dane klienta", "color": "#3b82f6", "description": "Wprowadź dane klienta", "view": "form", "recordType": "client", "fields": [
       { "key": "name", "label": "Imię i nazwisko", "required": true },
-      { "key": "phone", "label": "Telefon", "inputType": "tel" }
+      { "key": "phone", "label": "Telefon", "inputType": "tel" },
+      { "key": "email", "label": "Email", "inputType": "email" }
     ] },
-    { "id": "sprawa", "label": "3. Dane sprawy", "color": "#8b5cf6", "description": "Sprawdź dane kredytu", "view": "form", "recordType": "case",
-      "fields": [
-        { "key": "opponent", "label": "Bank", "required": true, "inputType": "select:opponent" },
-        { "key": "loanNumber", "label": "Nr umowy" },
-        { "key": "loanAmount", "label": "Kwota kredytu", "inputType": "number" },
-        { "key": "loanDate", "label": "Data umowy", "inputType": "date" },
-        { "key": "subject", "label": "Przedmiot roszczenia", "required": true }
-      ]
+    { "id": "kalkulacja", "label": "2. Kalkulator", "color": "#8b5cf6", "description": "Oblicz nadpłaty WIBOR", "view": "calc-redirect",
+      "targetPlugin": "plugin-wibor-calc"
     },
-    { "id": "reklamacja", "label": "3. Reklamacja", "color": "#f59e0b", "description": "Reklamacja przedsądowa", "view": "upload", "checklist": [{ "text": "Reklamacja", "type": "generate" }, { "text": "Odpowiedź banku", "type": "upload" }] },
-    { "id": "postepowanie", "label": "4. Postępowanie", "color": "#ef4444", "view": "timeline", "checklist": [{ "text": "Pozew", "type": "generate" }, { "text": "Rozprawy", "type": "manual" }] },
-    { "id": "rozliczenie", "label": "5. Rozliczenie", "color": "#22c55e", "checklist": [{ "text": "Faktura", "type": "generate" }, { "text": "Zamknięcie", "type": "manual" }] }
+    { "id": "podsumowanie", "label": "3. Podsumowanie", "color": "#22c55e", "description": "Przegląd sprawy i raport PDF", "view": "summary-report" }
   ], "branches": [] } }
 ]
