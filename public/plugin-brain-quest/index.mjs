@@ -483,14 +483,13 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
     const nodes = store.useChildren(treeId || "", "node");
     if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
     const d = nodes.filter((n) => Number(n.data.hits) > 0);
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: /* @__PURE__ */ jsxs(ui.Stack, { children: [
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
       /* @__PURE__ */ jsxs(ui.Stats, { children: [
-        /* @__PURE__ */ jsx(ui.Stat, { label: "Odkryte", value: `${d.length}/${nodes.length}` }),
-        /* @__PURE__ */ jsx(ui.Stat, { label: "Opanowane", value: nodes.filter((n) => str(n) >= 1).length })
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Odkryte", value: `${d.length}/${nodes.length}` }),
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Opanowane", value: `${nodes.filter((n) => str(n) >= 1).length}` })
       ] }),
-      /* @__PURE__ */ jsx(ui.Divider, {}),
       d.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((n) => /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
-        str(n) >= 1 ? /* @__PURE__ */ jsx(Star, { size: 12 }) : /* @__PURE__ */ jsx(Check, { size: 12 }),
+        str(n) >= 1 ? /* @__PURE__ */ jsx(Award, { size: 12 }) : /* @__PURE__ */ jsx(Zap, { size: 12 }),
         /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
       ] }, n.id))
     ] }), grow: true });

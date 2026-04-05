@@ -1,4 +1,4 @@
-import { jsx, jsxs } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 const plugin = ({ React, ui, store, sdk, icons }) => {
   const { useState, useMemo, useEffect } = React;
   const { BookOpen, ChevronLeft, ChevronRight, X, Link2 } = icons;
@@ -390,22 +390,38 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
         return ns.includes(nodeId) && discoveredSet.has(l.id);
       }).map((l) => ({ id: l.id, term: String(l.data.term || ""), definition: String(l.data.definition || "") }));
     }, [lexicon, nodeId, discoveredSet]);
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Odkryte terminy" }), body: /* @__PURE__ */ jsxs(ui.Stack, { gap: "sm", children: [
-      /* @__PURE__ */ jsxs(ui.Button, { size: "sm", outline: true, onClick: () => {
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(ui.Cell, { onClick: () => {
         sdk.shared.setState({ bq: { ...bq, phase: "map" } });
         sdk.useHostStore.setState({ activeId: "plugin-brain-quest" });
-      }, children: [
-        /* @__PURE__ */ jsx(ChevronLeft, { size: 14 }),
-        " Wróć do mapy"
+      }, children: /* @__PURE__ */ jsx(ChevronLeft, { size: 14 }) }),
+      /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Odkryte terminy" })
+    ] }), body: /* @__PURE__ */ jsx(ui.Stack, { gap: "sm", children: nodeTerms.map((t) => /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { gap: "xs", children: [
+      /* @__PURE__ */ jsx(ui.Text, { size: "xs", bold: true, children: t.term }),
+      /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: t.definition })
+    ] }) }, t.id)) }), grow: true });
+  }
+  function Progress() {
+    const bq = sdk.shared((s) => s == null ? void 0 : s.bq);
+    const treeId = (bq == null ? void 0 : bq.treeId) || "";
+    const nodes = store.useChildren(treeId, "node");
+    if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
+    const str = (n) => Math.min((Number(n.data.hits) || 0) / 5, 1);
+    const d = nodes.filter((n) => Number(n.data.hits) > 0);
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(icons.Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
+      /* @__PURE__ */ jsxs(ui.Stats, { children: [
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Odkryte", value: `${d.length}/${nodes.length}` }),
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Opanowane", value: `${nodes.filter((n) => str(n) >= 1).length}` })
       ] }),
-      nodeTerms.map((t) => /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { gap: "xs", children: [
-        /* @__PURE__ */ jsx(ui.Text, { size: "xs", bold: true, children: t.term }),
-        /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: t.definition })
-      ] }) }, t.id))
+      d.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((n) => /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
+        str(n) >= 1 ? /* @__PURE__ */ jsx(icons.Award, { size: 12 }) : /* @__PURE__ */ jsx(icons.Zap, { size: 12 }),
+        /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
+      ] }, n.id))
     ] }), grow: true });
   }
   sdk.registerView("bqr.left", { slot: "left", component: LeftPanel });
   sdk.registerView("bqr.center", { slot: "center", component: SlideReader });
+  sdk.registerView("bqr.right", { slot: "right", component: Progress });
   return { id: "plugin-brain-quest-reader", label: "BQ Czytnik", icon: BookOpen, version: "0.3.0" };
 };
 export {

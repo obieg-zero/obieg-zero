@@ -1,14 +1,11 @@
 [
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest@main"
+    "pluginUri": "./plugin-brain-quest"
   },
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest-reader@main"
+    "pluginUri": "./plugin-brain-quest-reader"
   },
   {
-    "pluginUri": "obieg-zero/plugin-brain-quest-arena@main"
-  },
-  {
-    "pluginUri": "./plugin-data"
+    "pluginUri": "./plugin-brain-quest-arena"
   }
 ]

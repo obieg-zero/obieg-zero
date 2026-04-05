@@ -99,9 +99,9 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
         top: /* @__PURE__ */ jsxs(ui.Stack, { gap: "md", children: [
           /* @__PURE__ */ jsx(ui.StepHeading, { title, subtitle: `Traf ${WIN_THRESHOLD}x by odblokować` }),
           /* @__PURE__ */ jsxs(ui.Stats, { children: [
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Terminy", value: lexicon.length }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Życia", value: START_HP }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Czas", value: `${ROUND_TIME}s` })
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Terminy", value: lexicon.length }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Życia", value: START_HP }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Czas", value: `${ROUND_TIME}s` })
           ] })
         ] }),
         bottom: /* @__PURE__ */ jsxs(ui.Stack, { children: [
@@ -129,9 +129,9 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
             ], active: mode, onChange: (id) => useGame.setState({ mode: id }) })
           ] }) }),
           /* @__PURE__ */ jsxs(ui.Stats, { children: [
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Terminy", value: lexicon.length }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Czas", value: `${ROUND_TIME}s` }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Życia", value: START_HP })
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Terminy", value: lexicon.length }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Czas", value: `${ROUND_TIME}s` }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Życia", value: START_HP })
           ] })
         ] }),
         bottom: /* @__PURE__ */ jsx(ui.Button, { size: "lg", color: "primary", block: true, onClick: () => useGame.setState(freshGame()), children: "Start!" })
@@ -342,10 +342,10 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
             }
           ),
           /* @__PURE__ */ jsxs(ui.Stats, { children: [
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Wynik", value: score }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Trafione", value: correct, color: "success" }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Pudła", value: wrong, color: "error" }),
-            /* @__PURE__ */ jsx(ui.Stat, { label: "Max combo", value: maxCombo })
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Wynik", value: score }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Trafione", value: correct, color: "success" }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Pudła", value: wrong, color: "error" }),
+            /* @__PURE__ */ jsx(ui.Stat, { title: "Max combo", value: maxCombo })
           ] }),
           /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
             /* @__PURE__ */ jsxs(ui.Row, { justify: "between", children: [
@@ -408,53 +408,35 @@ const plugin = ({ React, ui, store, sdk, icons }) => {
       }));
     }, [lexicon, holeTermIds, discoveredSet]);
     if (phase !== "playing") return null;
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Odkryte terminy" }), body: /* @__PURE__ */ jsx(ui.Stack, { gap: "sm", children: discovered.map((t) => /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { gap: "xs", children: [
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(ui.Cell, { onClick: backToTree, children: /* @__PURE__ */ jsx(ArrowLeft, { size: 14 }) }),
+      /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Odkryte terminy" })
+    ] }), body: /* @__PURE__ */ jsx(ui.Stack, { gap: "sm", children: discovered.map((t) => /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { gap: "xs", children: [
       /* @__PURE__ */ jsx(ui.Text, { size: "xs", bold: true, children: t.term }),
       /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: t.definition })
     ] }) }, t.id)) }), grow: true });
   }
-  function Scoreboard() {
-    const { phase, score, combo, correct } = useGame();
+  function Progress() {
     const bq = useBq();
     const treeId = (bq == null ? void 0 : bq.treeId) || "";
-    const isChallenge = !!(bq == null ? void 0 : bq.challenge);
-    const node = store.usePost((bq == null ? void 0 : bq.postId) || "");
-    const discoveries = store.usePosts("discovery");
-    const lexicon = store.useChildren(treeId, "lexicon");
-    const discoveredCount = useMemo(() => {
-      const dset = new Set(discoveries.map((d) => String(d.data.termId)));
-      return lexicon.filter((l) => dset.has(l.id)).length;
-    }, [lexicon, discoveries]);
-    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Arena" }), body: /* @__PURE__ */ jsxs(ui.Stack, { children: [
-      isChallenge && node && /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
-        /* @__PURE__ */ jsx(ui.Text, { size: "xs", muted: true, children: "Cel" }),
-        /* @__PURE__ */ jsx(ui.Text, { bold: true, children: String(node.data.title) }),
-        phase === "playing" && /* @__PURE__ */ jsxs(ui.Badge, { color: correct >= WIN_THRESHOLD ? "success" : "warning", children: [
-          correct,
-          "/",
-          WIN_THRESHOLD
-        ] })
-      ] }) }),
-      phase === "playing" && /* @__PURE__ */ jsx(ui.Card, { children: /* @__PURE__ */ jsxs(ui.Stack, { children: [
-        /* @__PURE__ */ jsxs(ui.Row, { justify: "between", children: [
-          /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: "Wynik" }),
-          /* @__PURE__ */ jsx(ui.Text, { bold: true, children: score })
-        ] }),
-        /* @__PURE__ */ jsxs(ui.Row, { justify: "between", children: [
-          /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: "Combo" }),
-          /* @__PURE__ */ jsxs(ui.Badge, { color: combo > 2 ? "accent" : "neutral", children: [
-            "x",
-            combo
-          ] })
-        ] })
-      ] }) }),
-      /* @__PURE__ */ jsx(ui.Divider, {}),
-      /* @__PURE__ */ jsx(ui.Stats, { children: /* @__PURE__ */ jsx(ui.Stat, { label: "Odkryte terminy", value: `${discoveredCount}/${lexicon.length}` }) })
+    const nodes = store.useChildren(treeId, "node");
+    if (!treeId) return /* @__PURE__ */ jsx(ui.Placeholder, { text: "Wybierz drzewo" });
+    const str = (n) => Math.min((Number(n.data.hits) || 0) / 5, 1);
+    const d = nodes.filter((n) => Number(n.data.hits) > 0);
+    return /* @__PURE__ */ jsx(ui.Box, { header: /* @__PURE__ */ jsx(ui.Cell, { label: true, children: "Postęp" }), body: d.length === 0 ? /* @__PURE__ */ jsx(ui.Placeholder, { text: "Odkrywaj węzły na mapie", children: /* @__PURE__ */ jsx(Award, { size: 32 }) }) : /* @__PURE__ */ jsxs(ui.Stack, { children: [
+      /* @__PURE__ */ jsxs(ui.Stats, { children: [
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Odkryte", value: `${d.length}/${nodes.length}` }),
+        /* @__PURE__ */ jsx(ui.Stat, { title: "Opanowane", value: `${nodes.filter((n) => str(n) >= 1).length}` })
+      ] }),
+      d.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((n) => /* @__PURE__ */ jsxs(ui.Row, { gap: "sm", children: [
+        str(n) >= 1 ? /* @__PURE__ */ jsx(Award, { size: 12 }) : /* @__PURE__ */ jsx(Zap, { size: 12 }),
+        /* @__PURE__ */ jsx(ui.Text, { size: "sm", children: String(n.data.title) })
+      ] }, n.id))
     ] }), grow: true });
   }
   sdk.registerView("bqa.left", { slot: "left", component: CheatSheet });
   sdk.registerView("bqa.center", { slot: "center", component: Arena });
-  sdk.registerView("bqa.right", { slot: "right", component: Scoreboard });
+  sdk.registerView("bqa.right", { slot: "right", component: Progress });
   return { id: "plugin-brain-quest-arena", label: "BQ Arena", icon: Zap, version: "0.4.0" };
 };
 export {
